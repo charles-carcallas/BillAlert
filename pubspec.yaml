@@ -1,5 +1,5 @@
 name: billalert
-description: "A new Flutter project."
+description: "BillAlert - electricity billing notifications for Barangay Tubod, Clarin, Bohol."
 publish_to: 'none'
 version: 0.1.0+1
 
@@ -7,13 +7,42 @@ environment:
   sdk: ^3.12.0
 
 dependencies:
+  connectivity_plus: ^7.3.1
+  drift: ^2.34.4
   flutter:
     sdk: flutter
+  flutter_riverpod: ^3.4.3
+  flutter_secure_storage: ^11.0.0
+  go_router: ^18.0.1
+  path: ^1.9.1
+  path_provider: ^2.1.6
+  sqlite3: ^3.5.2
+  supabase_flutter: ^2.17.2
+  uuid: ^4.6.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  drift_dev: ^2.34.6
+  build_runner: ^2.15.1
+  mocktail: ^1.0.5
 
 flutter:
   uses-material-design: true
+
+# ---------------------------------------------------------------------
+# SYS-05: the on-device cache is encrypted.
+#
+# package:sqlite3 3.x bundles SQLite through Dart build hooks. Selecting
+# "sqlcipher" here swaps the bundled upstream SQLite for a SQLCipher
+# build, so `PRAGMA key` works and the database file on disk is
+# unreadable without the key held in flutter_secure_storage.
+#
+# This replaces the old sqlcipher_flutter_libs package, which as of
+# version 0.7.0 is deprecated and contains no code.
+# ---------------------------------------------------------------------
+hooks:
+  user_defines:
+    sqlite3:
+      source: sqlcipher
