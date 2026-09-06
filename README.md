@@ -48,8 +48,34 @@ before anyone tries again:
 sdkmanager --list | grep "platforms;android-37"
 ```
 
-Target platform is **Android only**. The `ios/` and `windows/` folders are as
+**Android is the product.** The web build below runs, but only as a
+development convenience. The `ios/` and `windows/` folders are as
 `flutter create` left them and are not configured.
+
+### Running in a browser
+
+```bash
+flutter run -d chrome --dart-define=SUPABASE_URL=https://YOUR-PROJECT.supabase.co --dart-define=SUPABASE_ANON_KEY=YOUR-ANON-KEY
+```
+
+Useful when you want to iterate on a screen without waiting for the emulator.
+Two things are committed under `web/` to make it work, and both must stay:
+`sqlite3.wasm` (SQLite compiled to WebAssembly) and `drift_worker.js` (copied
+from the installed drift package, so it cannot fall out of step with the
+version in `pubspec.lock` — re-copy it if you ever change the drift version).
+
+**The cache is not encrypted in a browser, and cannot honestly be made so.**
+SYS-05 is satisfied on Android by SQLCipher plus a key in the Android
+Keystore. Neither half survives the move to the web: drift opens the database
+inside a web worker, where the `localSetup` callback that would run
+`PRAGMA key` is documented as not being called, and the key would sit in
+browser storage where any script or open devtools panel could read it. The
+code says so out loud — `databaseIsEncrypted` is `false` in
+`lib/data/local/connection/web_connection.dart`.
+
+So: build screens on the web if it is faster. Do not sign in as a real
+consumer there, and do not use a web build as evidence to anyone that the
+cache is encrypted. Demo on Android.
 
 ```bash
 flutter --version    # expect 3.44.x

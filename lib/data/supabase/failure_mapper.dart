@@ -1,9 +1,7 @@
-import 'dart:async';
-import 'dart:io';
-
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/errors/app_failure.dart';
+import 'network_error.dart';
 
 /// Turns whatever Supabase threw into an [AppFailure] a person can read.
 ///
@@ -35,10 +33,10 @@ class FailureMapper {
 
     // ---- no network -------------------------------------------------
     // Ordinary in the field, so it gets the reassuring message rather than
-    // an alarming one.
-    if (error is SocketException ||
-        error is TimeoutException ||
-        error is HttpException) {
+    // an alarming one. What counts as a network error differs between a
+    // phone and a browser, which is why the check is behind a conditional
+    // import rather than a `dart:io` type test written here.
+    if (isNetworkError(error)) {
       return NetworkFailure(NetworkFailure.defaultMessage, detail);
     }
 
