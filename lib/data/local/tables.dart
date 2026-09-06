@@ -1,24 +1,26 @@
 import 'package:drift/drift.dart';
 
-/// The on-device half of the data model, ported from
-/// `Week10_DataModel/local/local_cache_schema.sql`.
+/// The on-device half of the core data model: the cache the app reads when
+/// there is no signal, and the outbox of work that has not reached the server.
 ///
-/// Everything here is a CACHE or a QUEUE. Supabase is the source of truth;
-/// on sign-out the cached tables are emptied.
+/// Everything here is a CACHE or a QUEUE. Supabase is the source of truth; on
+/// sign-out the cached tables are emptied and the outbox deliberately is not.
 ///
-/// ONE DELIBERATE CHANGE FROM THAT SQL FILE, and it needs to be agreed with
-/// the team rather than discovered later. The SQL declares money and meter
-/// readings as `real`:
+/// **This file is the schema of record.** It was ported from
+/// `Week10_DataModel/local/local_cache_schema.sql`, which has since been
+/// retired. The reasoning that used to live in that file's comments — why the
+/// outbox is written before the UI confirms, why `capturedAt` is the moment of
+/// capture, why `clientUuid` is minted once, why the cycle label is computed in
+/// Manila time rather than read from the device clock — is now in
+/// `Week10_DataModel/local/local_cache_design_notes.md`. Read that before
+/// changing anything here.
 ///
-///     previous_reading  real not null default 0
-///     total_amount      real
-///
-/// `real` is a double, and the project rule is that money is never a double —
-/// binary floating point cannot hold 0.10 exactly, and these columns are
-/// summed. So every money column here is an INTEGER number of centavos and
-/// every kWh column an INTEGER number of hundredths, matching the Money and
-/// Kwh value objects exactly. `local_cache_schema.sql` should be updated to
-/// match before anyone else builds on it.
+/// The one rule worth repeating at the point of use: money is an INTEGER
+/// number of centavos and kWh an INTEGER number of hundredths, matching the
+/// Money and Kwh value objects and the server's `numeric(12,2)`. Never `real` —
+/// that is a double, and binary floating point cannot hold 0.10 exactly.
+@TableIndex(name: 'idx_cached_consumers_name', columns: <Symbol>{#lastName, #firstName})
+@TableIndex(name: 'idx_cached_consumers_area', columns: <Symbol>{#areaId})
 @DataClassName('CachedConsumerRow')
 class CachedConsumers extends Table {
   @override
@@ -50,6 +52,10 @@ class CachedConsumers extends Table {
   Set<Column<Object>> get primaryKey => <Column<Object>>{id};
 }
 
+@TableIndex(
+  name: 'idx_cached_bills_consumer',
+  columns: <Symbol>{#consumerId, #dueDate},
+)
 @DataClassName('CachedBillRow')
 class CachedBills extends Table {
   @override
@@ -95,6 +101,10 @@ class CachedPayments extends Table {
 }
 
 /// CON-05: the alert inbox has to be readable offline too.
+@TableIndex(
+  name: 'idx_cached_notif_unread',
+  columns: <Symbol>{#isRead, #createdAt},
+)
 @DataClassName('CachedNotificationRow')
 class CachedNotifications extends Table {
   @override
@@ -123,9 +133,23 @@ class CacheOwner extends Table {
   @override
   String get tableName => 'cache_owner';
 
-  IntColumn get id => integer()();
+  /// Always 1. This table holds at most one row, and the constraint says so
+  /// rather than leaving it to every caller to remember.
+  //
+  // A drift `.check()` names its own column. drift_dev reads the expression
+  // statically to build the SQL and never calls the getter, so the analyzer's
+  // recursion warning does not apply. Suppressed per line rather than by
+  // turning the lint off for the project, where it is worth keeping.
+  // ignore: recursive_getters
+  IntColumn get id => integer().check(id.equals(1))();
+
   TextColumn get profileId => text().named('profile_id')();
-  TextColumn get role => text()();
+
+  TextColumn get role => text().check(
+        // ignore: recursive_getters
+        role.isIn(<String>['admin', 'meter_reader', 'cashier', 'consumer']),
+      )();
+
   TextColumn get areaId => text().named('area_id').nullable()();
   TextColumn get cachedAt => text().named('cached_at')();
 
@@ -154,6 +178,12 @@ class SyncMeta extends Table {
 ///
 /// Every action taken offline is written here first, synchronously, before
 /// the UI confirms it. The app never holds a pending write only in memory.
+@TableIndex(
+  // Exactly the filter and sort OutboxRepositoryImpl.pending() runs on every
+  // sync drain, against the table most likely to grow over a day in the field.
+  name: 'idx_outbox_pending',
+  columns: <Symbol>{#status, #capturedAt},
+)
 @DataClassName('OutboxRow')
 class OutboxRows extends Table {
   @override
@@ -163,13 +193,37 @@ class OutboxRows extends Table {
   /// retried upload cannot create a second row.
   TextColumn get clientUuid => text().named('client_uuid')();
 
-  TextColumn get operation => text()();
+  /// Which of the queued actions this row is.
+  ///
+  /// The constraint earns its place: without it a mistyped code is accepted
+  /// here and only fails later in OutboxCodec, far from the line that caused
+  /// it. All seven codes are listed because the table has to accept anything
+  /// the schema allows — whether the app queues each of them yet is a separate
+  /// question.
+  TextColumn get operation => text().check(
+        // ignore: recursive_getters
+        operation.isIn(<String>[
+          'record_reading',
+          'create_consumer',
+          'update_consumer',
+          'issue_notice',
+          'record_payment',
+          'post_amount',
+          'close_notice',
+        ]),
+      )();
+
   TextColumn get payloadJson => text().named('payload_json')();
 
-  /// MTR-12: the moment of capture, not the moment of sync.
+  /// MTR-12: the moment of capture, not the moment of sync. The 48-hour
+  /// disconnection notice period is counted from it, so it carries legal
+  /// meaning and must never be replaced by the upload time.
   TextColumn get capturedAt => text().named('captured_at')();
 
-  TextColumn get status => text().withDefault(const Constant('pending'))();
+  TextColumn get status => text().withDefault(const Constant('pending')).check(
+        // ignore: recursive_getters
+        status.isIn(<String>['pending', 'syncing', 'failed', 'synced']),
+      )();
   IntColumn get attempts => integer().withDefault(const Constant(0))();
 
   /// Surfaced to the user; never silently dropped.

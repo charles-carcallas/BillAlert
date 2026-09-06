@@ -2246,6 +2246,7 @@ class $CacheOwnerTable extends CacheOwner
     'id',
     aliasedName,
     false,
+    check: () => id.equals(1),
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
@@ -2266,6 +2267,8 @@ class $CacheOwnerTable extends CacheOwner
     'role',
     aliasedName,
     false,
+    check: () =>
+        role.isIn(<String>['admin', 'meter_reader', 'cashier', 'consumer']),
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
@@ -2375,6 +2378,8 @@ class $CacheOwnerTable extends CacheOwner
 }
 
 class CacheOwnerRow extends DataClass implements Insertable<CacheOwnerRow> {
+  /// Always 1. This table holds at most one row, and the constraint says so
+  /// rather than leaving it to every caller to remember.
   final int id;
   final String profileId;
   final String role;
@@ -2938,6 +2943,15 @@ class $OutboxRowsTable extends OutboxRows
     'operation',
     aliasedName,
     false,
+    check: () => operation.isIn(<String>[
+      'record_reading',
+      'create_consumer',
+      'update_consumer',
+      'issue_notice',
+      'record_payment',
+      'post_amount',
+      'close_notice',
+    ]),
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
@@ -2969,6 +2983,8 @@ class $OutboxRowsTable extends OutboxRows
     'status',
     aliasedName,
     false,
+    check: () =>
+        status.isIn(<String>['pending', 'syncing', 'failed', 'synced']),
     type: DriftSqlType.string,
     requiredDuringInsert: false,
     defaultValue: const Constant('pending'),
@@ -3189,10 +3205,20 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
   /// The idempotency key, minted on device and sent to the server, so a
   /// retried upload cannot create a second row.
   final String clientUuid;
+
+  /// Which of the queued actions this row is.
+  ///
+  /// The constraint earns its place: without it a mistyped code is accepted
+  /// here and only fails later in OutboxCodec, far from the line that caused
+  /// it. All seven codes are listed because the table has to accept anything
+  /// the schema allows — whether the app queues each of them yet is a separate
+  /// question.
   final String operation;
   final String payloadJson;
 
-  /// MTR-12: the moment of capture, not the moment of sync.
+  /// MTR-12: the moment of capture, not the moment of sync. The 48-hour
+  /// disconnection notice period is counted from it, so it carries legal
+  /// meaning and must never be replaced by the upload time.
   final String capturedAt;
   final String status;
   final int attempts;
@@ -3834,6 +3860,26 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $OutboxRowsTable outboxRows = $OutboxRowsTable(this);
   late final $OutboxReadingKeysTable outboxReadingKeys =
       $OutboxReadingKeysTable(this);
+  late final Index idxCachedConsumersName = Index(
+    'idx_cached_consumers_name',
+    'CREATE INDEX idx_cached_consumers_name ON cached_consumers (last_name, first_name)',
+  );
+  late final Index idxCachedConsumersArea = Index(
+    'idx_cached_consumers_area',
+    'CREATE INDEX idx_cached_consumers_area ON cached_consumers (area_id)',
+  );
+  late final Index idxCachedBillsConsumer = Index(
+    'idx_cached_bills_consumer',
+    'CREATE INDEX idx_cached_bills_consumer ON cached_bills (consumer_id, due_date)',
+  );
+  late final Index idxCachedNotifUnread = Index(
+    'idx_cached_notif_unread',
+    'CREATE INDEX idx_cached_notif_unread ON cached_notifications (is_read, created_at)',
+  );
+  late final Index idxOutboxPending = Index(
+    'idx_outbox_pending',
+    'CREATE INDEX idx_outbox_pending ON outbox (status, captured_at)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3847,6 +3893,11 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     syncMeta,
     outboxRows,
     outboxReadingKeys,
+    idxCachedConsumersName,
+    idxCachedConsumersArea,
+    idxCachedBillsConsumer,
+    idxCachedNotifUnread,
+    idxOutboxPending,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
