@@ -25,6 +25,24 @@ class AuthRepositoryImpl implements AuthRepository {
 
   const AuthRepositoryImpl(this._client, this._db);
 
+  /// Turns the username a person types into the email their account was
+  /// created with: "ledesman.dormal" -> "ledesman.dormal@billalert.local".
+  ///
+  /// **This is the only mapping in the app.** It lives here, on the one class
+  /// that talks to Supabase Auth, so that no screen, view model or use case
+  /// can build an email address even by accident — they all deal in usernames,
+  /// which is the only thing staff are ever given.
+  ///
+  /// The input is trimmed and lowercased first, because a username typed on a
+  /// phone keyboard arrives as " Ledesman.Dormal " often enough that treating
+  /// it as a different account would just look like the app is broken.
+  ///
+  /// It is `static` rather than private so the mapping can be unit-tested
+  /// without constructing a SupabaseClient; see
+  /// test/data/auth_email_mapping_test.dart.
+  static String emailForUsername(String username) =>
+      '${username.trim().toLowerCase()}@${AppConfig.loginEmailDomain}';
+
   @override
   Future<Result<AppUser>> signIn({
     required String username,
@@ -32,13 +50,18 @@ class AuthRepositoryImpl implements AuthRepository {
   }) async {
     try {
       final response = await _client.auth.signInWithPassword(
-        email: AppConfig.emailForUsername(username),
+        email: emailForUsername(username),
         password: password,
       );
 
       final user = response.user;
       if (user == null) {
-        return const Err<AppUser>(AuthFailure());
+        // Same wording as the wrong-password case in FailureMapper. The user
+        // never sees the synthetic email, so an error that mentioned one would
+        // be describing something they have never been shown.
+        return const Err<AppUser>(AuthFailure(
+          'That username or password is not correct. Please try again.',
+        ));
       }
 
       final profileResult = await _loadProfile(user.id);

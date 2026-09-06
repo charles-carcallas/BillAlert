@@ -23,9 +23,13 @@ class AppConfig {
   static const String supabaseAnonKey =
       String.fromEnvironment('SUPABASE_ANON_KEY');
 
-  /// Supabase Auth signs in with an email, but the login screen shows a
-  /// username ("ledesman.dormal"). The app appends this domain to make the
-  /// synthetic email the account was created with.
+  /// The domain appended to a username to form the synthetic email that
+  /// Supabase Auth actually signs in with: "ledesman.dormal" becomes
+  /// "ledesman.dormal@billalert.local".
+  ///
+  /// This is the value only. The mapping that uses it lives in
+  /// `AuthRepositoryImpl.emailForUsername` and nowhere else, so that no screen
+  /// or use case can build an email address even by accident.
   static const String loginEmailDomain =
       String.fromEnvironment('LOGIN_EMAIL_DOMAIN', defaultValue: 'billalert.local');
 
@@ -39,8 +43,4 @@ class AppConfig {
       'This build has no Supabase settings. Run the app with '
       '--dart-define=SUPABASE_URL=... and '
       '--dart-define=SUPABASE_ANON_KEY=... (see README.md).';
-
-  /// Turns "ledesman.dormal" into the email Supabase Auth expects.
-  static String emailForUsername(String username) =>
-      '${username.trim().toLowerCase()}@$loginEmailDomain';
 }
