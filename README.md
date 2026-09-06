@@ -32,14 +32,20 @@ and ask — you have misunderstood the domain.
 |---|---|
 | Flutter | 3.44.0 (stable) |
 | Dart | 3.12.0 |
-| Android SDK | **compileSdk 37**, minSdk 24 |
+| Android SDK | **compileSdk 36**, minSdk 24 |
 
-`compileSdk` is pinned to 37 in `android/app/build.gradle.kts` rather than
-taking Flutter's default of 36, because `flutter_secure_storage` 11 requires
-it. If your first Android build says platform 37 is missing, install it once:
+`compileSdk` is pinned to 36 in `android/app/build.gradle.kts`, which is also
+Flutter 3.44's default — pinned so a Flutter upgrade cannot move it silently.
+
+**Do not raise it to 37.** `flutter_secure_storage` 11 requires 37, which is
+why this project holds that dependency at **10.3.1**. The only API 37 the SDK
+manager publishes is the preview `android-37.0`; Gradle asks for a plain
+`android-37`, which does not exist, so there is nothing to install and the
+build cannot be fixed by installing anything. Check that `android-37` is real
+before anyone tries again:
 
 ```bash
-sdkmanager "platforms;android-37"
+sdkmanager --list | grep "platforms;android-37"
 ```
 
 Target platform is **Android only**. The `ios/` and `windows/` folders are as

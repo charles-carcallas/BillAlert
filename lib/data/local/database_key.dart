@@ -15,8 +15,14 @@ class DatabaseKey {
   static const String _storageKey = 'billalert_db_key';
 
   /// Default options. On Android that means AES-GCM with the key held in the
-  /// Android Keystore, which is what flutter_secure_storage 11 uses for
-  /// everything — the older EncryptedSharedPreferences backend was removed.
+  /// Android Keystore: `AndroidOptions.encryptedSharedPreferences` defaults to
+  /// false, so the older Jetpack Security backend is not used.
+  ///
+  /// Pinned to flutter_secure_storage 10.3.1. Version 11 removed that option
+  /// entirely and made the same backend the only one, but it also requires
+  /// compileSdk 37, and the only API 37 the SDK manager publishes is the
+  /// preview `android-37.0` — so an app on 11 cannot be built. The behaviour
+  /// here is the same on either version.
   static const FlutterSecureStorage _storage = FlutterSecureStorage();
 
   const DatabaseKey._();
