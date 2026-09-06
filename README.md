@@ -67,8 +67,15 @@ dart run build_runner build
 ```
 
 The second command generates `lib/data/local/app_database.g.dart` from the
-Drift table definitions. It is **not** committed, so run it after every clone
-and after any change to `lib/data/local/tables.dart`.
+Drift table definitions.
+
+That file **is** committed, so a fresh clone runs without it and CI needs no
+codegen step. The cost is that it is 200 KB of generated code in your diffs:
+whenever you change `lib/data/local/tables.dart`, re-run `build_runner` and
+commit the regenerated file in the same commit, or the next person's build
+will disagree with the schema. If two people change `tables.dart` at once,
+resolve the conflict by re-running `build_runner` rather than by hand-merging
+the generated file.
 
 ### 3. Supply the Supabase settings
 
