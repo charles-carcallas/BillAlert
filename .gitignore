@@ -60,3 +60,7 @@ run_local.sh
 *.sqlite
 *.sqlite3
 *.db
+
+# A launch config is where the anon key most easily gets committed by
+# accident. Copy .vscode/launch.json.example and fill in your own.
+.vscode/launch.json

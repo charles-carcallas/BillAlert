@@ -86,9 +86,19 @@ flutter build apk --debug --dart-define=SUPABASE_URL=https://YOUR-PROJECT.supaba
 Building without them is not a crash: the app shows a screen naming the two
 flags it is missing.
 
-**In VS Code**, put them in `.vscode/launch.json` under `toolArgs`. **In
-Android Studio**, Run → Edit Configurations → Additional run args. Either way,
-check the file is not tracked before you commit.
+Two templates are provided so nobody has to retype the flags:
+
+```bash
+cp .vscode/launch.json.example .vscode/launch.json
+```
+
+```bash
+cp run_local.example.ps1 run_local.ps1
+```
+
+Fill in your own values. Both destinations are gitignored — `.vscode/launch.json`
+is where an anon key most easily gets committed by accident. **In Android
+Studio**, use Run → Edit Configurations → Additional run args instead.
 
 ### 4. Sign in
 
