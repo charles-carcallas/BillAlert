@@ -1,20 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-void main() {
-  runApp(const MainApp());
-}
+import 'core/config/app_config.dart';
+import 'presentation/app.dart';
 
-class MainApp extends StatelessWidget {
-  const MainApp({super.key});
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
 
-  @override
-  Widget build(BuildContext context) {
-    return const MaterialApp(
-      home: Scaffold(
-        body: Center(
-          child: Text('Hello World!'),
-        ),
-      ),
-    );
+  // The URL and the anon key arrive as --dart-define values and are read in
+  // exactly one place. Nothing about them is committed to the repository.
+  if (!AppConfig.isConfigured) {
+    runApp(const MissingConfigApp(message: AppConfig.missingConfigMessage));
+    return;
   }
+
+  await Supabase.initialize(
+    url: AppConfig.supabaseUrl,
+    // Supabase now calls this the publishable key; the dashboard and every
+    // tutorial still label it "anon key", so the dart-define keeps that name.
+    publishableKey: AppConfig.supabaseAnonKey,
+  );
+
+  runApp(const ProviderScope(child: BillAlertApp()));
 }
