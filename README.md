@@ -32,7 +32,15 @@ and ask — you have misunderstood the domain.
 |---|---|
 | Flutter | 3.44.0 (stable) |
 | Dart | 3.12.0 |
-| Android SDK | as installed by Flutter; **minSdk 24** |
+| Android SDK | **compileSdk 37**, minSdk 24 |
+
+`compileSdk` is pinned to 37 in `android/app/build.gradle.kts` rather than
+taking Flutter's default of 36, because `flutter_secure_storage` 11 requires
+it. If your first Android build says platform 37 is missing, install it once:
+
+```bash
+sdkmanager "platforms;android-37"
+```
 
 Target platform is **Android only**. The `ios/` and `windows/` folders are as
 `flutter create` left them and are not configured.

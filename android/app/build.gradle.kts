@@ -6,7 +6,16 @@ plugins {
 
 android {
     namespace = "com.example.billalert"
-    compileSdk = flutter.compileSdkVersion
+
+    // Pinned rather than `flutter.compileSdkVersion`, which is 36 in Flutter
+    // 3.44. flutter_secure_storage 11 raised its own compileSdk to 37, and
+    // an app must compile against at least the highest of its libraries.
+    //
+    // If the build says platform 37 is missing, install it once:
+    //   sdkmanager "platforms;android-37"
+    // or accept Android Studio's prompt to download it.
+    compileSdk = 37
+
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
