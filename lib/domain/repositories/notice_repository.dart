@@ -11,6 +11,29 @@ abstract class NoticeRepository {
   Future<Result<List<ActiveNotice>>> activeFor(AreaId areaId);
 
   Future<Result<ActiveNotice?>> byId(NoticeId id);
+
+  /// Calls `fn_close_disconnection_notice`. Online only - see
+  /// RecordNoticeOutcome for why this one is not queued.
+  Future<Result<void>> closeNotice({
+    required NoticeId noticeId,
+    required NoticeOutcome outcome,
+    String? notes,
+  });
+}
+
+/// How a served notice ended. The three closing values of the server side
+/// `notice_status` enum; `active` is the state it starts in, not an outcome.
+enum NoticeOutcome {
+  /// The household paid, so the notice is discharged.
+  settled,
+
+  /// Served in error, or withdrawn.
+  cancelled,
+
+  /// Handed to the cooperative for disconnection.
+  referred;
+
+  String get code => name;
 }
 
 /// A served notice still inside its period.

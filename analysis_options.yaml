@@ -1,1 +1,26 @@
+# BillAlert must pass `flutter analyze` with zero warnings.
 include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - "**/*.g.dart"          # drift generates these
+  errors:
+    # An unused import is a broken layering boundary waiting to happen.
+    unused_import: warning
+    unused_local_variable: warning
+
+linter:
+  rules:
+    # Required by the project brief.
+    prefer_final_locals: true
+    always_declare_return_types: true
+
+    # Small things that keep four people writing the same dialect.
+    prefer_single_quotes: true
+    require_trailing_commas: true
+    avoid_print: true
+    prefer_const_constructors: true
+    prefer_const_declarations: true
+    directives_ordering: true
+    unawaited_futures: true
+    always_use_package_imports: false
