@@ -47,8 +47,17 @@ class AuthController extends AsyncNotifier<AppUser?> {
     required String username,
     required String password,
   }) async {
-    state = const AsyncLoading<AppUser?>();
-
+    // Deliberately NOT `state = AsyncLoading()`.
+    //
+    // This state means "who is signed in", and the router watches it. Setting
+    // it to loading mid-attempt made the redirect think the app was still
+    // restoring a session, so it pushed the user to the splash screen, threw
+    // the LoginScreen away, and came back to a fresh one — discarding the
+    // failure message this method had just returned. The symptom was a login
+    // form that blinked and cleared instead of saying what went wrong.
+    //
+    // The spinner is the screen's own business; LoginScreen tracks it with
+    // `_isSubmitting`.
     final result = await ref.read(signInProvider)(
       username: username,
       password: password,

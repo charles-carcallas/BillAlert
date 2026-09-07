@@ -86,9 +86,16 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
       final auth = ref.read(authControllerProvider);
       final location = state.matchedLocation;
 
-      // Still restoring a saved session: hold on the splash screen rather
-      // than flashing the login form at somebody who is already signed in.
-      if (auth.isLoading) {
+      // Still restoring a saved session at startup: hold on the splash screen
+      // rather than flashing the login form at somebody already signed in.
+      //
+      // `!auth.hasValue` is what limits this to startup. Without it, any
+      // later loading state — a sign-in attempt, say — would bounce the user
+      // to splash and back, rebuilding whatever screen they were on and
+      // wiping its local state. That is a whole class of bug, not one:
+      // whoever adds a loading state to AuthController next should not have
+      // to discover it again.
+      if (auth.isLoading && !auth.hasValue) {
         return location == Routes.splash ? null : Routes.splash;
       }
 
