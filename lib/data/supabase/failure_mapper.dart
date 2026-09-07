@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/errors/app_failure.dart';
@@ -28,7 +29,33 @@ class FailureMapper {
   /// SQLSTATE 42501: insufficient privilege — Row-Level Security refused.
   static const String _insufficientPrivilege = '42501';
 
+  /// Maps the error, and in a debug build also prints what it really was.
+  ///
+  /// The friendly [AppFailure.message] is the whole point of this class, and
+  /// [AppFailure.debugDetail] never reaches a screen. That is right for the
+  /// user and useless for whoever is trying to work out why sign-in failed —
+  /// "Something went wrong on the server" is not a bug report. So in debug
+  /// builds the real cause goes to the console, where a developer will look
+  /// and a consumer never will. Release builds print nothing.
   static AppFailure from(Object error, [StackTrace? stackTrace]) {
+    final failure = _map(error);
+    if (kDebugMode) {
+      debugPrint('[BillAlert] ${failure.runtimeType}: ${failure.message}');
+      debugPrint('[BillAlert] cause: ${error.runtimeType} -> $error');
+      if (error is PostgrestException) {
+        debugPrint(
+          '[BillAlert] postgrest code=${error.code} '
+          'details=${error.details} hint=${error.hint}',
+        );
+      }
+      if (stackTrace != null) {
+        debugPrintStack(stackTrace: stackTrace, maxFrames: 8);
+      }
+    }
+    return failure;
+  }
+
+  static AppFailure _map(Object error) {
     final detail = error.toString();
 
     // ---- no network -------------------------------------------------
