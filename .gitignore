@@ -64,3 +64,8 @@ run_local.sh
 # A launch config is where the anon key most easily gets committed by
 # accident. Copy .vscode/launch.json.example and fill in your own.
 .vscode/launch.json
+
+# Throwaway probe scripts. scratch/test_supabase.dart holds a real staff
+# password in plain text, and this directory is where that kind of thing
+# lands. Ignored so `git add .` cannot commit a credential.
+scratch/
