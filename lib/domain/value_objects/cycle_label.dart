@@ -20,15 +20,51 @@ final class CycleLabel implements Comparable<CycleLabel> {
   /// The cycle a reading taken on [date] belongs to.
   factory CycleLabel.of(PhDate date) => CycleLabel(date.year, date.month);
 
-  /// Parses "2026-09". Null when malformed.
+  /// Parses either form a cycle label arrives in.
+  ///
+  /// Two forms exist because two different systems write it. The phone writes
+  /// "2026-09" into `outbox_reading_keys` and `cached_consumers`. Supabase
+  /// writes "September 2026", because `cycle_label` in every view is
+  /// `to_char(period_start, 'FMMonth YYYY')`.
+  ///
+  /// Accepting both here, rather than in two methods, is deliberate: a caller
+  /// holding a `cycle_label` should not have to know which of the two systems
+  /// produced the string it is holding. Before this accepted the second form,
+  /// every bill read from a view fell through to a fallback and displayed as
+  /// January 1970.
+  ///
+  /// Returns null when the text is neither form.
   static CycleLabel? tryParse(String text) {
     final trimmed = text.trim();
-    if (trimmed.length < 7) return null;
-    final year = int.tryParse(trimmed.substring(0, 4));
-    final month = int.tryParse(trimmed.substring(5, 7));
+    if (trimmed.isEmpty) return null;
+    return _tryParseIso(trimmed) ?? _tryParseMonthName(trimmed);
+  }
+
+  /// "2026-09", the form the device writes.
+  static CycleLabel? _tryParseIso(String text) {
+    if (text.length < 7) return null;
+    final year = int.tryParse(text.substring(0, 4));
+    final month = int.tryParse(text.substring(5, 7));
     if (year == null || month == null) return null;
     if (month < 1 || month > 12) return null;
     return CycleLabel(year, month);
+  }
+
+  /// "September 2026", the form the Supabase views return.
+  static CycleLabel? _tryParseMonthName(String text) {
+    final parts = text.split(' ');
+    if (parts.length != 2) return null;
+
+    final month = _monthNames.indexWhere(
+      (String name) => name.toLowerCase() == parts[0].toLowerCase(),
+    );
+    if (month < 0) return null;
+
+    final year = int.tryParse(parts[1]);
+    if (year == null) return null;
+
+    // indexWhere is zero-based; months are not.
+    return CycleLabel(year, month + 1);
   }
 
   /// "2026-09" — what goes in `cached_consumers.last_read_cycle` and

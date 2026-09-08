@@ -44,6 +44,25 @@ final class Bill {
     this.amountPaid = Money.zero,
   });
 
+  factory Bill.fromJson(Map<String, dynamic> json) {
+    return Bill(
+      id: BillId(json['bill_id'] as String),
+      billNo: BillNumber(json['bill_no'] as String),
+      consumerId: ConsumerId(json['consumer_id'] as String),
+      cycle: CycleLabel.tryParse(json['cycle_label'] as String) ?? const CycleLabel(1970, 1),
+      consumption: Kwh.tryParse(json['consumption'].toString()) ?? Kwh.zero,
+      totalAmount: json['total_amount'] != null
+          ? Money.tryParse(json['total_amount'].toString())
+          : null,
+      dueDate: json['due_date'] != null
+          ? PhDate.tryParse(json['due_date'].toString())
+          : null,
+      amountPaid: json['amount_paid'] != null
+          ? Money.tryParse(json['amount_paid'].toString()) ?? Money.zero
+          : Money.zero,
+    );
+  }
+
   /// The reading is in, the amount is not. The consumer can see their
   /// consumption but there is nothing to pay yet.
   bool get isUnpriced => totalAmount == null;

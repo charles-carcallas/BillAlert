@@ -4,20 +4,26 @@ import 'package:uuid/uuid.dart';
 
 import '../data/local/app_database.dart';
 import '../data/repositories/auth_repository_impl.dart';
+import '../data/repositories/bill_repository_impl.dart';
 import '../data/repositories/consumer_repository_impl.dart';
 import '../data/repositories/outbox_repository_impl.dart';
+import '../data/repositories/payment_repository_impl.dart';
 import '../data/repositories/reading_repository_impl.dart';
 import '../data/sync/supabase_outbox_gateway.dart';
 import '../data/sync/sync_service.dart';
 import '../domain/outbox/outbox_operation.dart';
 import '../domain/repositories/auth_repository.dart';
+import '../domain/repositories/bill_repository.dart';
 import '../domain/repositories/consumer_repository.dart';
 import '../domain/repositories/outbox_repository.dart';
+import '../domain/repositories/payment_repository.dart';
 import '../domain/repositories/reading_repository.dart';
 import '../domain/time/ph_clock.dart';
+import '../domain/usecases/admin/post_bill_amount.dart';
 import '../domain/usecases/auth/change_password.dart';
 import '../domain/usecases/auth/sign_in.dart';
 import '../domain/usecases/auth/sign_out.dart';
+import '../domain/usecases/cashier/record_cash_payment.dart';
 import '../domain/usecases/reader/load_area_roster.dart';
 import '../domain/usecases/reader/record_meter_reading.dart';
 import '../domain/value_objects/ids.dart';
@@ -41,8 +47,9 @@ final appDatabaseProvider = Provider<AppDatabase>((Ref ref) {
   return database;
 });
 
-final supabaseClientProvider =
-    Provider<SupabaseClient>((Ref ref) => Supabase.instance.client);
+final supabaseClientProvider = Provider<SupabaseClient>(
+  (Ref ref) => Supabase.instance.client,
+);
 
 /// SYS-07: the app's idea of "now", always in Philippine time.
 final phClockProvider = Provider<PhClock>((Ref ref) => const SystemPhClock());
@@ -68,6 +75,20 @@ final authRepositoryProvider = Provider<AuthRepository>(
 
 final consumerRepositoryProvider = Provider<ConsumerRepository>(
   (Ref ref) => ConsumerRepositoryImpl(
+    ref.watch(appDatabaseProvider),
+    ref.watch(supabaseClientProvider),
+  ),
+);
+
+final billRepositoryProvider = Provider<BillRepository>(
+  (Ref ref) => BillRepositoryImpl(
+    ref.watch(appDatabaseProvider),
+    ref.watch(supabaseClientProvider),
+  ),
+);
+
+final paymentRepositoryProvider = Provider<PaymentRepository>(
+  (Ref ref) => PaymentRepositoryImpl(
     ref.watch(appDatabaseProvider),
     ref.watch(supabaseClientProvider),
   ),
@@ -119,12 +140,29 @@ final loadAreaRosterProvider = Provider<LoadAreaRoster>(
 );
 
 final refreshAreaRosterProvider = Provider<RefreshAreaRoster>(
-  (Ref ref) => RefreshAreaRoster(consumers: ref.watch(consumerRepositoryProvider)),
+  (Ref ref) =>
+      RefreshAreaRoster(consumers: ref.watch(consumerRepositoryProvider)),
 );
 
 final recordMeterReadingProvider = Provider<RecordMeterReading>(
   (Ref ref) => RecordMeterReading(
     readings: ref.watch(readingRepositoryProvider),
+    outbox: ref.watch(outboxRepositoryProvider),
+    clock: ref.watch(phClockProvider),
+    newClientUuid: ref.watch(clientUuidFactoryProvider),
+  ),
+);
+
+final postBillAmountProvider = Provider<PostBillAmount>(
+  (Ref ref) => PostBillAmount(
+    outbox: ref.watch(outboxRepositoryProvider),
+    clock: ref.watch(phClockProvider),
+    newClientUuid: ref.watch(clientUuidFactoryProvider),
+  ),
+);
+
+final recordCashPaymentProvider = Provider<RecordCashPayment>(
+  (Ref ref) => RecordCashPayment(
     outbox: ref.watch(outboxRepositoryProvider),
     clock: ref.watch(phClockProvider),
     newClientUuid: ref.watch(clientUuidFactoryProvider),
