@@ -52,8 +52,12 @@ class BillRepositoryImpl implements BillRepository {
   /// can rename a column in the request itself (`alias:column`), so the
   /// rename happens once, here, instead of a second `fromJson` existing to
   /// cope with one different column name.
+  /// `cycle_year` and `cycle_month` are taken instead of `cycle_label`: they
+  /// are integers the server already computed, so the entity never has to
+  /// read a month back out of rendered text. `v_bill_status` is the one view
+  /// that offers them - confirmed against the live database, not assumed.
   static const String _billColumns =
-      'bill_id:id, bill_no, consumer_id, cycle_label, consumption, '
+      'bill_id:id, bill_no, consumer_id, cycle_year, cycle_month, consumption, '
       'total_amount, due_date, amount_paid';
 
   /// [refreshFor] additionally caches when the bill was generated.

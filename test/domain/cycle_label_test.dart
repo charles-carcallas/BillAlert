@@ -105,4 +105,69 @@ void main() {
       expect(unpriced.isOverdueOn(const PhDate(2027, 1, 1)), isFalse);
     });
   });
+
+  group('CycleLabel.fromRow takes the most reliable form the row offers', () {
+    test('the year and month integers win over everything else', () {
+      // The label deliberately disagrees. If the integers are being used, the
+      // label is never consulted and cannot drag the answer off.
+      final cycle = CycleLabel.fromRow(<String, dynamic>{
+        'cycle_year': 2026,
+        'cycle_month': 8,
+        'period_start': '2020-01-15',
+        'cycle_label': 'March 1999',
+      });
+
+      expect(cycle, const CycleLabel(2026, 8));
+    });
+
+    test('period_start is used when the integers are absent', () {
+      // v_consumer_current_bill has no cycle_year/cycle_month but does carry
+      // period_start, which is an ISO date and so cannot be misread.
+      final cycle = CycleLabel.fromRow(<String, dynamic>{
+        'period_start': '2026-07-15',
+        'cycle_label': 'March 1999',
+      });
+
+      expect(cycle, const CycleLabel(2026, 7));
+    });
+
+    test('the rendered label is the last resort', () {
+      // v_readings_awaiting_amount offers nothing else.
+      final cycle = CycleLabel.fromRow(<String, dynamic>{
+        'cycle_label': 'August 2026',
+      });
+
+      expect(cycle, const CycleLabel(2026, 8));
+    });
+
+    test('a month outside 1-12 is not trusted', () {
+      final cycle = CycleLabel.fromRow(<String, dynamic>{
+        'cycle_year': 2026,
+        'cycle_month': 13,
+        'cycle_label': 'August 2026',
+      });
+
+      expect(cycle, const CycleLabel(2026, 8), reason: 'falls through to the label');
+    });
+
+    test('a row carrying no cycle at all returns null', () {
+      expect(CycleLabel.fromRow(<String, dynamic>{'bill_no': 'BA-1'}), isNull);
+    });
+  });
+
+  group('a bill row with no cycle is refused, not guessed', () {
+    test('Bill.fromJson throws rather than inventing a date', () {
+      // Before this, a row the parser could not read became January 1970 and
+      // was rendered to the consumer as though it were real.
+      expect(
+        () => Bill.fromJson(<String, dynamic>{
+          'bill_id': 'bill-9',
+          'bill_no': 'BA-202608-000999',
+          'consumer_id': 'consumer-1',
+          'consumption': '58.00',
+        }),
+        throwsA(isA<FormatException>()),
+      );
+    });
+  });
 }

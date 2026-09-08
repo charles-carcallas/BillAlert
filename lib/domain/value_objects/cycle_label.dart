@@ -67,6 +67,46 @@ final class CycleLabel implements Comparable<CycleLabel> {
     return CycleLabel(year, month + 1);
   }
 
+  /// The cycle a view row belongs to, taking the most reliable form the row
+  /// offers.
+  ///
+  /// The order matters, and it is the whole reason this method exists:
+  ///
+  /// 1. `cycle_year` and `cycle_month` — integers the server already computed.
+  ///    Nothing to parse, nothing to misread.
+  /// 2. `period_start` — an ISO date. Also unambiguous, and every view that
+  ///    lacks the two integers still carries this one.
+  /// 3. `cycle_label` — the rendered text, "September 2026". Last, because
+  ///    reading a month back out of a formatted string is guesswork compared
+  ///    with reading an integer. `v_readings_awaiting_amount` offers nothing
+  ///    else, so the fallback is still needed.
+  ///
+  /// Returns null when the row carries none of the three, which means the
+  /// view cannot say which cycle its own bill belongs to. That is a real
+  /// error and the caller should treat it as one rather than substitute a
+  /// date nobody chose.
+  static CycleLabel? fromRow(Map<String, dynamic> row) {
+    final Object? year = row['cycle_year'];
+    final Object? month = row['cycle_month'];
+    if (year is num && month is num) {
+      final int monthValue = month.toInt();
+      if (monthValue >= 1 && monthValue <= 12) {
+        return CycleLabel(year.toInt(), monthValue);
+      }
+    }
+
+    final Object? periodStart = row['period_start'];
+    if (periodStart != null) {
+      final PhDate? start = PhDate.tryParse(periodStart.toString());
+      if (start != null) return CycleLabel.of(start);
+    }
+
+    final Object? label = row['cycle_label'];
+    if (label != null) return tryParse(label.toString());
+
+    return null;
+  }
+
   /// "2026-09" — what goes in `cached_consumers.last_read_cycle` and
   /// `outbox_reading_keys.cycle_label`.
   String get value => '$year-${month.toString().padLeft(2, '0')}';

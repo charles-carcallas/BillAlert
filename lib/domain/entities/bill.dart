@@ -45,11 +45,25 @@ final class Bill {
   });
 
   factory Bill.fromJson(Map<String, dynamic> json) {
+    // Asks the row for its cycle in the most reliable form it offers -
+    // the year and month integers first, the ISO period start next, and the
+    // rendered "September 2026" text only if that is all there is.
+    final CycleLabel? cycle = CycleLabel.fromRow(json);
+    if (cycle == null) {
+      // A bill that cannot say which month it belongs to is a broken row, not
+      // a bill to display with a made-up date. The repository catches this and
+      // turns it into a failure the screen can show.
+      throw const FormatException(
+        'This bill row carries no billing cycle: it has none of '
+        'cycle_year/cycle_month, period_start or cycle_label.',
+      );
+    }
+
     return Bill(
       id: BillId(json['bill_id'] as String),
       billNo: BillNumber(json['bill_no'] as String),
       consumerId: ConsumerId(json['consumer_id'] as String),
-      cycle: CycleLabel.tryParse(json['cycle_label'] as String) ?? const CycleLabel(1970, 1),
+      cycle: cycle,
       consumption: Kwh.tryParse(json['consumption'].toString()) ?? Kwh.zero,
       totalAmount: json['total_amount'] != null
           ? Money.tryParse(json['total_amount'].toString())
