@@ -180,6 +180,14 @@ final issueDisconnectionNoticeProvider = Provider<IssueDisconnectionNotice>(
   ),
 );
 
+/// Closing a served notice. Online only, unlike everything else the Admin
+/// does — see [RecordNoticeOutcome] for why it is not queued.
+final recordNoticeOutcomeProvider = Provider<RecordNoticeOutcome>(
+  (Ref ref) => RecordNoticeOutcome(
+    notices: ref.watch(noticeRepositoryProvider),
+  ),
+);
+
 final postBillAmountProvider = Provider<PostBillAmount>(
   (Ref ref) => PostBillAmount(
     outbox: ref.watch(outboxRepositoryProvider),

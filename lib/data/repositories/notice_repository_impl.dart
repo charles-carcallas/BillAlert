@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/result/result.dart';
 import '../../domain/repositories/notice_repository.dart';
 import '../../domain/value_objects/ids.dart';
+import '../../domain/value_objects/money.dart';
 import '../local/app_database.dart';
 import '../supabase/failure_mapper.dart';
 
@@ -23,9 +24,15 @@ class NoticeRepositoryImpl implements NoticeRepository {
 
   const NoticeRepositoryImpl(this._db, this._client);
 
+  /// One column list for both the list and the document.
+  ///
+  /// `issued_by_name` and `purok` come from the view's LEFT JOIN to profiles
+  /// and from consumers; both can be null, and neither absence hides a
+  /// notice.
   static const String _columns =
-      'notice_id, notice_no, consumer_id, consumer_name, consumer_no, '
-      'served_at, earliest_lawful_at, notice_period_elapsed, amount_overdue';
+      'notice_id, notice_no, consumer_id, consumer_name, consumer_no, purok, '
+      'meter_serial_no, reason, issued_by_name, served_at, '
+      'earliest_lawful_at, notice_period_elapsed, amount_overdue';
 
   @override
   Future<Result<List<ActiveNotice>>> activeFor(AreaId areaId) async {
@@ -97,11 +104,25 @@ class NoticeRepositoryImpl implements NoticeRepository {
 
     return ActiveNotice(
       id: NoticeId(row['notice_id'] as String),
+      noticeNo: row['notice_no'] as String? ?? '',
       consumerId: ConsumerId(row['consumer_id'] as String),
       consumerLabel: row['consumer_name'] as String? ??
           row['consumer_no'] as String? ??
           '',
+      consumerNo: row['consumer_no'] as String?,
+      purok: row['purok'] as String?,
+      meterSerialNo: row['meter_serial_no'] as String?,
+      reason: row['reason'] as String? ?? 'Unpaid electricity bill',
+      issuedByName: row['issued_by_name'] as String?,
       servedAt: servedAt,
+      earliestLawfulAt: lawfulAt,
+      // The SERVER's answer, not a comparison against this phone's clock. A
+      // device with a wrong date must not be able to declare a notice period
+      // over.
+      periodElapsed: row['notice_period_elapsed'] as bool? ?? false,
+      amountOverdue: row['amount_overdue'] == null
+          ? Money.zero
+          : Money.tryParse(row['amount_overdue'].toString()) ?? Money.zero,
       // Never negative: once the period has elapsed the answer is zero hours
       // left, not a negative countdown.
       hoursRemaining: hours < 0 ? 0 : hours,

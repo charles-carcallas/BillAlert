@@ -244,7 +244,16 @@ select
   c.consumer_no,
   c.first_name || ' ' || c.last_name as consumer_name,
   c.area_id,
+  c.purok,
+  c.meter_serial_no,
   dn.reason,
+  dn.issued_by,
+  -- Who served it, for the notice document. LEFT JOIN on purpose: this view
+  -- is security_invoker, so an inner join would make a whole notice vanish
+  -- from the Admin's list the moment the issuing profile stopped being
+  -- visible to them — a missing row with no error, which is the same class
+  -- of bug as the views that once bypassed RLS entirely.
+  p.first_name || ' ' || p.last_name as issued_by_name,
   dn.served_at,
   dn.earliest_lawful_at,
   dn.served_at at time zone 'Asia/Manila'          as served_at_ph,
@@ -256,6 +265,7 @@ select
                and b.status <> 'paid'), 0)         as amount_overdue
 from disconnection_notices dn
 join consumers c on c.id = dn.consumer_id
+left join profiles p on p.id = dn.issued_by
 where dn.status = 'active';
 
 
