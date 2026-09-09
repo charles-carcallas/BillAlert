@@ -83,15 +83,31 @@ so this was the live read path.
 
 ### Payment (Obiso)
 
+Virgilio Busalanan, two unpaid months, settled in one handover.
+
 | Check | Evidence | Date |
 |---|---|---|
-| Real outstanding bills selected | not yet — screen not built | |
-| Two or more settled in one call | not yet | |
-| Exactly one receipt number | not yet | |
-| Row in payment_transactions | not yet | |
+| Real outstanding bills selected | `BA-202607-000901` (₱566.95, July) and `BA-202608-000001` (₱704.20, August), both read from `v_bill_status` | 9 Sep 2026 |
+| Two or more settled in one call | **one** call: `fn_record_payment(p_bill_ids=[july, august], p_amounts=['566.95','704.20'], p_cash_tendered='1500.00')` → transaction `0cad5f7c-d093-46b5-b1c8-a364a9b288b2` | 9 Sep 2026 |
+| Exactly one receipt number | `BIEC-2026-09-004471`, verification `BIEC-4471-BU-1271`. `v_payment_history` returns 2 rows and **1** distinct receipt number | 9 Sep 2026 |
+| Row in payment_transactions | `payment_transactions` 0 → **1**; `payments` 0 → **2** (one allocation line per bill) | 9 Sep 2026 |
+| Money is exact | `total_collected=1271.15`, `cash_tendered=1500.00`, `change_due=228.85` — 566.95 + 704.20 to the centavo | 9 Sep 2026 |
+| Both bills settled | each `amount_paid` equals its `total_amount`, `balance=0.00`, `status='paid'` | 9 Sep 2026 |
+| Replay creates no second charge | same `clientUuid` replayed → **same** transaction id; counts stayed 1 and 2 | 9 Sep 2026 |
+| Daily summary | `v_cashier_daily_summary`: `receipt_count=1`, `total_collected=1271.15` | 9 Sep 2026 |
 
-Two payable bills now exist to settle: `BA-202608-000001` (₱704.20) and
-`BA-202608-000005` (₱658.30).
+The same OR number against both July and August is the correct behaviour,
+not a duplicate: the consumer handed over money once. That is what the
+mockup's Consumer History shows and why the receipt number lives on
+`payment_transactions` rather than on `payments`.
+
+**How July got its bills.** The July cycle had five meter readings but no
+bills, because the readings were seeded directly and bills are only ever
+created by `fn_record_meter_reading`. One bill per July reading was inserted
+as the meter reader — which `bills_mtr_insert` permits — born unpriced, then
+priced through the real RPC like any other. Their due dates are live rather
+than historically accurate, because `fn_post_bill_amount` refuses a due date
+already in the past.
 
 ---
 
