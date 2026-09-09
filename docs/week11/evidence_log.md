@@ -46,6 +46,25 @@ Second posting, for the consumer who has a login:
 `f75463e9…` → ₱704.20 due 2026-09-30, notification
 `ae3557ee-dcd1-4e27-a583-ef87c554a77d`. Queue now 3.
 
+**Posted from the running app**, not through PostgREST — the whole Dart
+path, screen → controller → PostBillAmount → outbox → SyncService →
+`fn_post_bill_amount`:
+
+| Check | Evidence |
+|---|---|
+| Bill priced | `BA-202608-000004` (Lumayag, 55 kWh) → `total_amount=498.75`, `due_date=2026-09-23`, `priced_at=2026-09-09T12:29:37Z`, `status='unpaid'`, `balance=498.75` |
+| Left the queue | `v_readings_awaiting_amount` 3 → **2**; Lumayag absent |
+| Alert queued | `bill_ready`, `pending`, for Teresita Lumayag |
+| Attributed to the right person | `priced_by` resolves to `mario.ombajin`, role `admin` |
+
+One detail worth keeping: `priced_at` (12:29:37.108) is *later* than the
+notification's `created_at` (12:29:36.317). That is not a bug. `priced_at`
+is `p_posted_at`, which the gateway sends as the operation's `capturedAt` —
+the device's clock at the moment the Admin tapped Post — while `created_at`
+is the server's `now()`. The sub-second gap is browser-to-server clock skew,
+and it is visible proof that capture time comes from the device rather than
+from the server, which is the whole point of MTR-12.
+
 **Blocker found and fixed:** `notifications` had a SELECT policy and two
 UPDATE policies but **no INSERT policy at all, for any role**.
 `fn_queue_notification` is SECURITY INVOKER, so the alert insert ran as the
@@ -128,8 +147,13 @@ Not vacuous: 6 consumers exist, 5 in Area 3 and 1 in Area 4.
 - **On-device offline behaviour.** Everything above went over the network.
   The outbox write, surviving an app kill, and syncing on reconnect are
   covered by unit tests but have not been exercised on a phone.
-- **The app's own Dart client path.** These checks used PostgREST directly —
-  the same endpoint and the same policies `supabase_flutter` uses, but not
-  the Dart code itself.
+- **The app's Dart client path — now partly verified.** Posting an amount was
+  done from the running app (see above), so screen → controller → use case →
+  outbox → sync → RPC is exercised for that one operation. Recording a
+  reading and taking a payment have still only been driven through PostgREST.
+- **The app was run on the web target, not Android.** Gradle could not be
+  started from the agent's environment (`Unable to establish loopback
+  connection`), though `flutter build apk` succeeds when run directly. So the
+  screens have been seen running, but not on a phone.
 - **The negative half of the meter-reading RLS test** needs a local Postgres,
   or the one-line role change to run against Supabase.
