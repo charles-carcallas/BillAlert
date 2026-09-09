@@ -6,6 +6,7 @@ import '../domain/entities/app_user.dart';
 import 'admin/accounts_screen.dart';
 import 'admin/disconnections_screen.dart';
 import 'admin/new_consumer_screen.dart';
+import 'admin/notice_document_screen.dart';
 import 'admin/post_bill_amount_screen.dart';
 import 'admin/serve_notice_screen.dart';
 import 'auth/auth_controller.dart';
@@ -49,6 +50,16 @@ class Routes {
   /// a confirmation with a Done that pops, and there is nothing to pop back
   /// to from a tab root.
   static const String newConsumer = '/admin/accounts/new';
+
+  /// One served notice, as a document, with the outcome recorded from it.
+  ///
+  /// Deliberately NOT under `/admin/disconnections/`, where `serve` already
+  /// lives: a `:noticeId` segment beside a literal `serve` means the router's
+  /// declaration order is the only thing keeping "serve" from being read as
+  /// an id. That is a trap for whoever reorders these next.
+  static const String noticeDocument = '/admin/notice/:noticeId';
+
+  static String noticeDocumentFor(String noticeId) => '/admin/notice/$noticeId';
 
   /// One receipt, as the household's own copy. Keyed by receipt number rather
   /// than passed as an object, so it opens from a link and not only from a
@@ -124,6 +135,12 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: Routes.newConsumer,
         builder: (_, _) => const AdminNewConsumerScreen(),
+      ),
+      GoRoute(
+        path: Routes.noticeDocument,
+        builder: (_, GoRouterState state) => NoticeDocumentScreen(
+          noticeId: state.pathParameters['noticeId']!,
+        ),
       ),
       GoRoute(
         path: Routes.readingEntry,

@@ -113,6 +113,7 @@ void main() {
       Routes.accountPassword,
       Routes.serveNotice,
       Routes.newConsumer,
+      Routes.noticeDocument,
       Routes.consumerReceipt,
       Routes.readingEntry,
     ]) {
@@ -127,5 +128,20 @@ void main() {
     );
     // And it matches the pattern the router declares.
     expect(Routes.consumerReceipt, '/consumer/receipt/:receiptNo');
+
+    expect(
+      Routes.noticeDocumentFor('fe59ec52-60de-4663-b301-01a7861ae213'),
+      '/admin/notice/fe59ec52-60de-4663-b301-01a7861ae213',
+    );
+  });
+
+  test('the notice document does not sit where "serve" could be read as an id',
+      () {
+    // /admin/disconnections/serve is a literal. Had the document been put at
+    // /admin/disconnections/:noticeId, only go_router's declaration order
+    // would stop "serve" matching as a notice id — and reordering routes is
+    // exactly the kind of tidying that looks harmless.
+    expect(Routes.noticeDocument.startsWith('/admin/disconnections/'), isFalse);
+    expect(Routes.serveNotice, '/admin/disconnections/serve');
   });
 }

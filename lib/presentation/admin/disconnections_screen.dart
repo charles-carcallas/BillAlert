@@ -110,7 +110,17 @@ class DisconnectionsScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 8),
                   for (final ActiveNotice notice in list)
-                    _NoticeTile(notice: notice),
+                    _NoticeTile(
+                      notice: notice,
+                      // Returning from the document refreshes the list: a
+                      // notice closed in there is no longer active, and it
+                      // must not linger here looking as though it were.
+                      onOpen: () async {
+                        await context
+                            .push(Routes.noticeDocumentFor(notice.id.value));
+                        ref.invalidate(activeNoticesProvider);
+                      },
+                    ),
                 ],
               ],
             ),
@@ -123,8 +133,9 @@ class DisconnectionsScreen extends ConsumerWidget {
 
 class _NoticeTile extends StatelessWidget {
   final ActiveNotice notice;
+  final VoidCallback onOpen;
 
-  const _NoticeTile({required this.notice});
+  const _NoticeTile({required this.notice, required this.onOpen});
 
   @override
   Widget build(BuildContext context) {
@@ -134,47 +145,62 @@ class _NoticeTile extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: Text(notice.consumerLabel, style: text.titleMedium),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: colours.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(999),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onOpen,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(notice.consumerLabel, style: text.titleMedium),
                   ),
-                  child: Text(
-                    elapsed
-                        ? 'period elapsed'
-                        : '${notice.hoursRemaining}h left',
-                    style: text.bodySmall
-                        ?.copyWith(color: colours.onSurfaceVariant),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: colours.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      elapsed
+                          ? 'period elapsed'
+                          : '${notice.hoursRemaining}h left',
+                      style: text.bodySmall
+                          ?.copyWith(color: colours.onSurfaceVariant),
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Served ${_servedOn(notice.servedAt)}',
-              style: text.bodySmall,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              elapsed
-                  ? 'The notice period has passed. Disconnection may now be '
-                      'referred to the cooperative.'
-                  : 'Disconnection is not lawful until the period is over.',
-              style: text.bodySmall,
-            ),
-          ],
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Served ${_servedOn(notice.servedAt)}',
+                style: text.bodySmall,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                elapsed
+                    ? 'The notice period has passed. Disconnection may now be '
+                        'referred to the cooperative.'
+                    : 'Disconnection is not lawful until the period is over.',
+                style: text.bodySmall,
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: <Widget>[
+                  Text(
+                    'Open notice ${notice.noticeNo}',
+                    style: text.labelLarge?.copyWith(color: colours.primary),
+                  ),
+                  const SizedBox(width: 2),
+                  Icon(Icons.chevron_right, size: 18, color: colours.primary),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

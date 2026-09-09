@@ -256,10 +256,19 @@ select
   dn.served_at at time zone 'Asia/Manila'          as served_at_ph,
   dn.earliest_lawful_at at time zone 'Asia/Manila' as earliest_lawful_at_ph,
   (now() >= dn.earliest_lawful_at)                 as notice_period_elapsed,
+  -- Genuinely OVERDUE, not merely unpaid. Without the due-date filter this
+  -- summed every payable bill, so a notice document printed "amount overdue
+  -- P1,191.75" at a household whose past-due balance was P533.45 — the rest
+  -- was a bill not yet due. A disconnection notice is the last document that
+  -- may overstate what somebody owes.
+  --
+  -- The expression may change here; the NAME may not. `create or replace
+  -- view` refuses a rename, so the filter is added in place.
   coalesce((select sum(b.balance) from bills b
              where b.consumer_id = dn.consumer_id
                and b.total_amount is not null
-               and b.status <> 'paid'), 0)         as amount_overdue,
+               and b.status <> 'paid'
+               and b.due_date < fn_ph_today()), 0) as amount_overdue,
   -- Added for the notice document (132:2), and added HERE, at the end, on
   -- purpose. `create or replace view` may only APPEND columns: inserting one
   -- mid-list renames every column after it and Postgres refuses with 42P16.
