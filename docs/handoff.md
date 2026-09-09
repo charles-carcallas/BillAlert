@@ -163,6 +163,22 @@ Graded.
   dart-defines. **Android needs a real machine** — Gradle fails with
   `Unable to establish loopback connection` inside some agent sandboxes, though
   `flutter build apk` works from an ordinary terminal.
+- **Every build needs both `--dart-define` values, including the APK.**
+  `.vscode/launch.json` is read by VS Code, not by `flutter build`. An APK
+  built without them starts on `MissingConfigApp` — the "not configured"
+  screen — which is the app refusing to run against a null URL rather than a
+  bug. README.md documents the command; from PowerShell:
+
+  ```powershell
+  $t = Get-Content -Raw .vscode/launch.json
+  $u = [regex]::Match($t, 'SUPABASE_URL=(?<v>https://[^"\s]+)').Groups['v'].Value
+  $k = [regex]::Match($t, 'SUPABASE_ANON_KEY=(?<v>[^"\s]+)').Groups['v'].Value
+  flutter build apk --release --dart-define="SUPABASE_URL=$u" --dart-define="SUPABASE_ANON_KEY=$k"
+  ```
+
+  Rebuild the APK after any commit you intend to demo; the one in
+  `build/app/outputs/` is whatever was last built and carries no version
+  marker.
 - `flutter analyze` should show only 7 issues, all in the gitignored
   `scratch/`. `flutter test` should be **124 passing**.
 - SQL lives in `supabase/migrations/` (01–05, 07) and `supabase/tests/`. That
