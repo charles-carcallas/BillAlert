@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../domain/entities/bill.dart';
 import '../../domain/value_objects/ph_date.dart';
 import '../common/failure_banner.dart';
 import '../providers.dart';
+import '../router.dart';
 import 'history_controller.dart';
 
 /// CON-07 — Consumer › History.
@@ -105,11 +107,9 @@ class _MonthTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final TextTheme text = Theme.of(context).textTheme;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
+    final Widget row = Padding(
+      padding: const EdgeInsets.all(14),
+      child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Expanded(
@@ -144,8 +144,19 @@ class _MonthTile extends StatelessWidget {
               ],
             ),
           ],
-        ),
       ),
+    );
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      // Only a settled month has a receipt to open. The rest are not
+      // tappable, rather than tappable and then apologetic.
+      child: receiptNo == null
+          ? row
+          : InkWell(
+              onTap: () => context.push(Routes.consumerReceiptFor(receiptNo!)),
+              child: row,
+            ),
     );
   }
 }

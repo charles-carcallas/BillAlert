@@ -18,6 +18,7 @@ import 'common/unbuilt_tab.dart';
 import 'consumer/current_bill_screen.dart';
 import 'consumer/history_screen.dart';
 import 'consumer/inbox_screen.dart';
+import 'consumer/receipt_screen.dart';
 import 'reader/consumers_screen.dart';
 import 'reader/reading_entry_screen.dart';
 import 'reader/roster_screen.dart';
@@ -42,6 +43,15 @@ class Routes {
   /// form: it is a task with a confirmation at the end, not somewhere to
   /// wander in and out of.
   static const String serveNotice = '/admin/disconnections/serve';
+
+  /// One receipt, as the household's own copy. Keyed by receipt number rather
+  /// than passed as an object, so it opens from a link and not only from a
+  /// tap - and RLS still decides whether the number belongs to the caller.
+  static const String consumerReceipt = '/consumer/receipt/:receiptNo';
+
+  /// The same path with a number in it, so callers never rebuild the string.
+  static String consumerReceiptFor(String receiptNo) =>
+      '/consumer/receipt/$receiptNo';
 
   // Each role's section. The first entry of that role's `permittedTabs` is
   // this same path, which is what makes the correct tab light up on arrival.
@@ -94,6 +104,12 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: Routes.accountPassword,
         builder: (_, _) => const ChangePasswordScreen(),
+      ),
+      GoRoute(
+        path: Routes.consumerReceipt,
+        builder: (_, GoRouterState state) => ConsumerReceiptScreen(
+          receiptNo: state.pathParameters['receiptNo']!,
+        ),
       ),
       GoRoute(
         path: Routes.serveNotice,
