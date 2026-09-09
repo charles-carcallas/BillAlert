@@ -234,6 +234,29 @@ create policy notif_select_scoped on notifications
     )
   );
 
+-- FR-13. Staff queue alerts as a side effect of doing their job: posting an
+-- amount sends the bill-ready alert, serving a notice sends its own. Those
+-- inserts happen inside fn_queue_notification, which is SECURITY INVOKER, so
+-- they run as the staff member who called it and need a policy of their own.
+--
+-- There was none. Not a narrow one - none at all, for any role. So every
+-- INSERT into notifications was refused, and because fn_post_bill_amount
+-- queues the alert in the same transaction as the amount, the whole posting
+-- rolled back: the Admin could not price a single bill, and the only clue was
+-- "42501 new row violates row-level security policy for table notifications".
+--
+-- Scoped the same way every other staff write is: their own service area.
+-- app.staff_in_area covers admin, meter_reader and cashier, so this one
+-- policy serves fn_post_bill_amount, fn_issue_disconnection_notice and
+-- fn_record_payment alike.
+drop policy if exists notif_staff_insert on notifications;
+create policy notif_staff_insert on notifications
+  for insert with check (
+    exists (select 1 from consumers c
+             where c.id = notifications.consumer_id
+               and app.staff_in_area(c.area_id))
+  );
+
 -- CON-05: the consumer may mark their own alerts read. Nothing else.
 drop policy if exists notif_consumer_mark_read on notifications;
 create policy notif_consumer_mark_read on notifications
