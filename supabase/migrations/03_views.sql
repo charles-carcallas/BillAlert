@@ -4,8 +4,12 @@
 -- specific Figma screen displays a number that is expensive or
 -- error-prone to assemble in Dart.
 --
--- Views inherit the RLS of their underlying tables, so a Meter Reader
--- querying v_meter_reader_progress still only sees their own area.
+-- Views do NOT inherit the RLS of their underlying tables by default.
+-- A view runs as the role that OWNS it, and these are owned by postgres,
+-- which bypasses RLS entirely. `security_invoker = on` is what makes a
+-- Meter Reader querying v_meter_reader_progress see only their own area,
+-- and it is set on every view at the foot of this file. Read that block
+-- before adding a view here.
 -- =====================================================================
 
 -- DOM-04. "Overdue" depends on today's date, so it can never be a stored
@@ -309,3 +313,59 @@ where s.id = 1
     select 1 from disconnection_notices dn
      where dn.consumer_id = b.consumer_id and dn.status = 'active'
   );
+
+
+-- =====================================================================
+-- SECURITY INVOKER — the views must run as the CALLER, not as their owner.
+--
+-- THE BUG THIS FIXES
+--
+-- The header of this file used to claim that "views inherit the RLS of
+-- their underlying tables". They do not. A Postgres view runs with the
+-- privileges of the role that OWNS it unless `security_invoker` is set,
+-- and these views are owned by `postgres`, which bypasses RLS on every
+-- table they read.
+--
+-- Measured on the live project, signed in as the consumer Virgilio
+-- Busalanan through PostgREST with the anon key:
+--
+--   select on the bills TABLE          -> 1 row   (his own)
+--   select on v_bill_status            -> 5 rows  (four other households)
+--   select on v_consumer_current_bill  -> 5 rows  (four other households)
+--   select on v_consumer_outstanding   -> 5 rows  (four other households)
+--
+-- The tables were never the problem. The views were, and the app reads
+-- through the views by design — so a consumer signed into BillAlert could
+-- read every household's consumption, bills and payment history in their
+-- service area. This is the whole of GEN-08 and the RLS criterion.
+--
+-- WHY THE TEST SUITE DID NOT CATCH IT
+--
+-- Same reason 07_api_grants.sql exists: 06_tests.sql runs as `test_app`,
+-- and the owner-privilege bypass applies whatever role is asking, so the
+-- suite could not see the difference either.
+--
+-- WHAT THIS DOES
+--
+-- `security_invoker = on` makes the view execute as the querying role, so
+-- the RLS policies on bills, consumers and payments apply normally. It
+-- grants nothing: the caller still needs SELECT on the underlying tables,
+-- which `authenticated` already has.
+--
+-- Requires PostgreSQL 15 or later. Supabase is well past that.
+--
+-- Every view is listed explicitly rather than looped over, so that adding
+-- a view and forgetting this line shows up as a missing line in a diff.
+-- =====================================================================
+alter view v_bill_status                  set (security_invoker = on);
+alter view v_consumer_current_bill        set (security_invoker = on);
+alter view v_readings_awaiting_amount     set (security_invoker = on);
+alter view v_meter_reader_progress        set (security_invoker = on);
+alter view v_cashier_collection_progress  set (security_invoker = on);
+alter view v_consumer_outstanding         set (security_invoker = on);
+alter view v_cashier_daily_summary        set (security_invoker = on);
+alter view v_payment_history              set (security_invoker = on);
+alter view v_active_disconnection_warnings set (security_invoker = on);
+alter view v_notification_status          set (security_invoker = on);
+alter view v_due_for_predue_reminder      set (security_invoker = on);
+alter view v_due_for_overdue_notice       set (security_invoker = on);

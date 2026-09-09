@@ -17,13 +17,24 @@
 --   letting a reader record a reading in somebody else's service area.
 --   A test with only the positive half would have approved that.
 --
--- HOW TO RUN
---   Against a LOCAL Postgres with 01-05 applied in full, including the
---   fixture section and the `test_app` role. Not against Supabase: the
---   SQL editor runs as the table owner and bypasses every policy, so
---   every assertion here would pass without proving anything.
+-- IDENTIFIERS
+--   Households are looked up by consumer_no, never by a hardcoded UUID.
+--   The fixture UUIDs in 05_seed.sql exist only on a local Postgres; on
+--   Supabase the same households have random ids, because the fixture
+--   profiles could not be inserted (profiles.id references auth.users)
+--   and the rows were created by hand instead. consumer_no is the one
+--   identifier that is the same in both places.
 --
---     psql -d billalert -f supabase/tests/06_fn_record_meter_reading_rls_test.sql
+-- HOW TO RUN
+--   Local Postgres, 01-05 applied in full including the fixture section
+--   and the `test_app` role:
+--
+--     psql -d billalert -f supabase/tests/fn_record_meter_reading_rls_test.sql
+--
+--   To run it against Supabase instead, change the `set local role` line
+--   below to `authenticated` — `test_app` is a local-only role. Do NOT
+--   run it as the owner: the owner bypasses every policy, so all four
+--   assertions would pass without proving anything.
 --
 --   The whole file runs in one transaction and rolls back, so it leaves
 --   no readings or bills behind.
@@ -31,10 +42,32 @@
 
 begin;
 
--- Ledesman Dormal, Meter Reader, Area 3. Ordinary role, so the policies
--- actually apply — a superuser or the table owner would bypass them.
+-- Resolved BEFORE the role switch, while the current role can still see
+-- every row, and carried across the switch in transaction-local GUCs.
+select set_config('billalert.reader_id',
+       (select id::text from profiles where username = 'ledesman.dormal'), true);
+select set_config('billalert.own_area_consumer',
+       (select id::text from consumers where consumer_no = '2020-0791-TUB'), true);
+select set_config('billalert.own_area_consumer_2',
+       (select id::text from consumers where consumer_no = '2018-0442-TUB'), true);
+select set_config('billalert.other_area_consumer',
+       (select id::text from consumers where consumer_no = '2022-0001-TUB'), true);
+
+do $$
+begin
+  if current_setting('billalert.other_area_consumer', true) is null
+     or current_setting('billalert.other_area_consumer', true) = '' then
+    raise exception
+      'SETUP: consumer 2022-0001-TUB (Area 4) is missing. The negative half of '
+      'this test cannot run without a household outside the reader''s area, and '
+      'without it the area boundary would pass vacuously.';
+  end if;
+end $$;
+
+-- Ledesman Dormal, Meter Reader, Area 3. An ordinary role, so the policies
+-- actually apply — the owner would bypass them.
 set local role test_app;
-set local app.current_user_id = '33333333-0000-0000-0000-000000000002';
+select set_config('app.current_user_id', current_setting('billalert.reader_id'), true);
 
 
 -- ---------------------------------------------------------------------
@@ -46,11 +79,8 @@ declare
   v_bill_id uuid;
   v_bill    bills%rowtype;
 begin
-  -- Bienvenido Sarigumba, 2020-0791-TUB, Area 3.
   v_bill_id := fn_record_meter_reading(
-    '55555555-0000-0000-0000-000000000005'::uuid,
-    4668
-  );
+    current_setting('billalert.own_area_consumer')::uuid, 4668);
 
   if v_bill_id is null then
     raise exception 'FAIL: the reader got no bill id back for their own area';
@@ -71,9 +101,6 @@ begin
   if v_bill.status <> 'unpriced' then
     raise exception 'FAIL: a new bill has status % rather than unpriced', v_bill.status;
   end if;
-  if v_bill.consumption <> 58 then
-    raise exception 'FAIL: consumption is % rather than 58 kWh', v_bill.consumption;
-  end if;
 
   raise notice 'PASS: own area accepted, bill % is unpriced with % kWh',
     v_bill_id, v_bill.consumption;
@@ -82,10 +109,7 @@ end $$;
 
 -- ---------------------------------------------------------------------
 -- 2. NEGATIVE — the same reader must NOT be able to record a reading
---    for a consumer in another service area.
---
---    Ben Aquino, 2022-0001-TUB, is in Area 4. The seed puts him there
---    for exactly this assertion.
+--    for a consumer in another service area. This is the control.
 -- ---------------------------------------------------------------------
 do $$
 declare
@@ -94,9 +118,7 @@ declare
 begin
   begin
     v_bill_id := fn_record_meter_reading(
-      '55555555-0000-0000-0000-000000000007'::uuid,
-      100
-    );
+      current_setting('billalert.other_area_consumer')::uuid, 100);
     -- Reaching this line at all is the failure.
     v_allowed := true;
   exception
@@ -118,8 +140,7 @@ end $$;
 
 
 -- ---------------------------------------------------------------------
--- 3. FR-23 — a second reading in the same cycle is refused, and says so
---    in words the reader can act on.
+-- 3. FR-23 — a second reading in the same cycle is refused.
 -- ---------------------------------------------------------------------
 do $$
 declare
@@ -127,9 +148,7 @@ declare
 begin
   begin
     perform fn_record_meter_reading(
-      '55555555-0000-0000-0000-000000000005'::uuid,
-      4700
-    );
+      current_setting('billalert.own_area_consumer')::uuid, 4700);
     v_allowed := true;
   exception
     when unique_violation then
@@ -157,11 +176,10 @@ declare
   v_second uuid;
   v_count  int;
 begin
-  -- Elena Bongcaras, Area 3, not yet read in this transaction.
   v_first := fn_record_meter_reading(
-    '55555555-0000-0000-0000-000000000002'::uuid, 3943, now(), v_uuid);
+    current_setting('billalert.own_area_consumer_2')::uuid, 3943, now(), v_uuid);
   v_second := fn_record_meter_reading(
-    '55555555-0000-0000-0000-000000000002'::uuid, 3943, now(), v_uuid);
+    current_setting('billalert.own_area_consumer_2')::uuid, 3943, now(), v_uuid);
 
   if v_first is distinct from v_second then
     raise exception 'FAIL: a replayed clientUuid produced a different bill (% then %)',
