@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:billalert/core/errors/app_failure.dart';
 import 'package:billalert/core/result/result.dart';
+import 'package:billalert/domain/entities/app_user.dart';
 import 'package:billalert/domain/entities/consumer.dart';
 import 'package:billalert/domain/outbox/outbox_entry.dart';
 import 'package:billalert/domain/outbox/outbox_operation.dart';
+import 'package:billalert/domain/repositories/auth_repository.dart';
 import 'package:billalert/domain/repositories/consumer_repository.dart';
 import 'package:billalert/domain/repositories/outbox_repository.dart';
 import 'package:billalert/domain/repositories/reading_repository.dart';
@@ -11,6 +15,7 @@ import 'package:billalert/domain/value_objects/cycle_label.dart';
 import 'package:billalert/domain/value_objects/ids.dart';
 import 'package:billalert/domain/value_objects/kwh.dart';
 import 'package:billalert/domain/value_objects/ph_date.dart';
+import 'package:billalert/presentation/auth/auth_controller.dart';
 
 /// Hand-written stand-ins for the real repositories.
 ///
@@ -179,3 +184,94 @@ Consumer household({
       purok: 'Purok 3',
       lastReadCycle: lastReadCycle,
     );
+
+/// Stand-in for AuthRepository to test auth flows without Supabase.
+final class FakeAuthRepository implements AuthRepository {
+  final StreamController<AppUser?> _controller =
+      StreamController<AppUser?>.broadcast();
+
+  AppUser? user;
+  AppFailure? nextSignInFailure;
+  int signInCalls = 0;
+  Duration? delay;
+
+  FakeAuthRepository({this.user});
+
+  @override
+  Future<Result<AppUser>> signIn({
+    required String username,
+    required String password,
+  }) async {
+    signInCalls++;
+    if (delay != null) {
+      await Future<void>.delayed(delay!);
+    }
+    final failure = nextSignInFailure;
+    if (failure != null) {
+      return Err<AppUser>(failure);
+    }
+    final loggedIn = user ??
+        MeterReaderUser(
+          id: const ProfileId('profile-1'),
+          username: username,
+          firstName: 'Elena',
+          lastName: 'Ravelo',
+          areaId: const AreaId('area-1'),
+          mustChangePassword: false,
+        );
+    _controller.add(loggedIn);
+    return Ok<AppUser>(loggedIn);
+  }
+
+  @override
+  Future<Result<void>> signOut() async {
+    _controller.add(null);
+    return const Ok<void>(null);
+  }
+
+  @override
+  Future<Result<AppUser?>> currentUser() async => Ok<AppUser?>(user);
+
+  @override
+  Stream<AppUser?> authChanges() => _controller.stream;
+
+  @override
+  Future<Result<void>> changePassword({required String newPassword}) async =>
+      const Ok<void>(null);
+
+  void dispose() {
+    _controller.close();
+  }
+}
+
+/// Stand-in for AuthController to test LoginScreen directly with Riverpod.
+class FakeAuthController extends AuthController {
+  int signInCalls = 0;
+  AppFailure? failureToReturn;
+  Completer<void>? pendingSignIn;
+
+  /// Who is signed in. Null - the default - means nobody, which is what the
+  /// login screen tests want. Pass a user to start a test already signed in.
+  final AppUser? signedInUser;
+
+  FakeAuthController({
+    this.failureToReturn,
+    this.pendingSignIn,
+    this.signedInUser,
+  });
+
+  @override
+  Future<AppUser?> build() async => signedInUser;
+
+  @override
+  Future<AppFailure?> signIn({
+    required String username,
+    required String password,
+  }) async {
+    signInCalls++;
+    if (pendingSignIn != null) {
+      await pendingSignIn!.future;
+    }
+    return failureToReturn;
+  }
+}

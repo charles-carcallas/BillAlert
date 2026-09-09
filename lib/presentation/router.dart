@@ -3,13 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../domain/entities/app_user.dart';
-import 'admin/admin_home_screen.dart';
+import 'admin/post_bill_amount_screen.dart';
 import 'auth/auth_controller.dart';
 import 'auth/change_password_screen.dart';
 import 'auth/login_screen.dart';
-import 'cashier/cashier_home_screen.dart';
+import 'cashier/record_payment_screen.dart';
+import 'common/role_shell.dart';
 import 'common/splash_screen.dart';
-import 'consumer/consumer_home_screen.dart';
+import 'common/unbuilt_tab.dart';
+import 'consumer/current_bill_screen.dart';
 import 'reader/reading_entry_screen.dart';
 import 'reader/roster_screen.dart';
 
@@ -19,6 +21,9 @@ class Routes {
   static const String splash = '/';
   static const String login = '/login';
   static const String changePassword = '/change-password';
+
+  // Each role's section. The first entry of that role's `permittedTabs` is
+  // this same path, which is what makes the correct tab light up on arrival.
   static const String reader = '/reader';
   static const String readingEntry = '/reader/entry/:consumerId';
   static const String admin = '/admin';
@@ -33,6 +38,12 @@ class Routes {
 /// is the whole reason AppUser is a sealed class with four subclasses instead
 /// of a role string: this switch would otherwise have to be repeated, and
 /// kept in step, in every place that cares where somebody belongs.
+///
+/// The tab panels live inside a [ShellRoute], so the bottom bar is built once
+/// and the panels swap underneath it. Anything that is a full task rather
+/// than a tab - the reading entry form - sits outside that shell on purpose:
+/// somebody halfway through recording a reading should not be offered four
+/// tabs to wander off into.
 final routerProvider = Provider<GoRouter>((Ref ref) {
   // go_router re-runs `redirect` when this notifier fires. Bumping it on
   // every auth change is what makes signing out move the app to the login
@@ -57,29 +68,140 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
         path: Routes.changePassword,
         builder: (_, _) => const ChangePasswordScreen(),
       ),
+
+      // Outside the shell: a full-screen task, no bottom navigation.
       GoRoute(
-        path: Routes.reader,
-        builder: (_, _) => const RosterScreen(),
+        path: Routes.readingEntry,
+        builder: (_, GoRouterState state) => ReadingEntryScreen(
+          consumerId: state.pathParameters['consumerId']!,
+        ),
+      ),
+
+      ShellRoute(
+        builder: (_, _, Widget child) => RoleShell(child: child),
         routes: <RouteBase>[
+          // ---- Meter Reader ------------------------------------------
           GoRoute(
-            path: 'entry/:consumerId',
-            builder: (_, GoRouterState state) => ReadingEntryScreen(
-              consumerId: state.pathParameters['consumerId']!,
+            path: Routes.reader,
+            builder: (_, _) => const RosterScreen(),
+          ),
+          GoRoute(
+            path: '/reader/consumers',
+            builder: (_, _) => const UnbuiltTab(
+              title: 'Consumers',
+              willShow: 'The households of this area, with the meter serial '
+                  'and the last reading taken for each.',
+              figmaNode: '65:1863',
+            ),
+          ),
+          GoRoute(
+            path: '/reader/profile',
+            builder: (_, _) => const UnbuiltTab(
+              title: 'Profile',
+              willShow: 'Who is signed in, which area they read, and the way '
+                  'out - change password and sign out.',
+              figmaNode: '65:2060',
+            ),
+          ),
+
+          // ---- Admin (Area President) --------------------------------
+          GoRoute(
+            path: Routes.admin,
+            builder: (_, _) => const PostBillAmountScreen(),
+          ),
+          GoRoute(
+            path: '/admin/disconnections',
+            builder: (_, _) => const UnbuiltTab(
+              title: 'Notices',
+              willShow: 'Active disconnection notices, and the earliest date '
+                  'each one may lawfully be acted on.',
+              figmaNode: '70:1226',
+            ),
+          ),
+          GoRoute(
+            path: '/admin/accounts',
+            builder: (_, _) => const UnbuiltTab(
+              title: 'Accounts',
+              willShow: 'Creating a staff account or a new consumer for this '
+                  'service area.',
+              figmaNode: '70:1436 and 70:6009',
+            ),
+          ),
+          GoRoute(
+            path: '/admin/profile',
+            builder: (_, _) => const UnbuiltTab(
+              title: 'Profile',
+              willShow: 'Who is signed in, which area they preside over, and '
+                  'the way out.',
+              figmaNode: '70:1531',
+            ),
+          ),
+
+          // ---- Cashier -----------------------------------------------
+          GoRoute(
+            path: Routes.cashier,
+            builder: (_, _) => const UnbuiltTab(
+              title: 'Consumers',
+              willShow: 'Search for the household at the counter, and what '
+                  'they owe across every unpaid month.',
+              figmaNode: '66:6108',
+            ),
+          ),
+          GoRoute(
+            path: '/cashier/payment',
+            builder: (_, _) => const RecordPaymentScreen(),
+          ),
+          GoRoute(
+            path: '/cashier/receipts',
+            builder: (_, _) => const UnbuiltTab(
+              title: 'Receipts',
+              willShow: 'The receipts issued today, one per cash handover '
+                  'however many months it settled.',
+              figmaNode: '66:4658',
+            ),
+          ),
+          GoRoute(
+            path: '/cashier/profile',
+            builder: (_, _) => const UnbuiltTab(
+              title: 'Profile',
+              willShow: 'Who is signed in, the takings for the day, and the '
+                  'way out.',
+              figmaNode: '66:4865',
+            ),
+          ),
+
+          // ---- Consumer ----------------------------------------------
+          GoRoute(
+            path: Routes.consumer,
+            builder: (_, _) => const CurrentBillScreen(),
+          ),
+          GoRoute(
+            path: '/consumer/history',
+            builder: (_, _) => const UnbuiltTab(
+              title: 'History',
+              willShow: 'Past months and the receipts that settled them.',
+              figmaNode: '20:1141',
+            ),
+          ),
+          GoRoute(
+            path: '/consumer/inbox',
+            builder: (_, _) => const UnbuiltTab(
+              title: 'Inbox',
+              willShow: 'Alerts sent to this household - bill ready, due soon, '
+                  'overdue, disconnection notice.',
+              figmaNode: '20:2315',
+            ),
+          ),
+          GoRoute(
+            path: '/consumer/profile',
+            builder: (_, _) => const UnbuiltTab(
+              title: 'Profile',
+              willShow: 'The account, the meter serial, the contact number an '
+                  'alert would reach, and the way out.',
+              figmaNode: '20:2960',
             ),
           ),
         ],
-      ),
-      GoRoute(
-        path: Routes.admin,
-        builder: (_, _) => const AdminHomeScreen(),
-      ),
-      GoRoute(
-        path: Routes.cashier,
-        builder: (_, _) => const CashierHomeScreen(),
-      ),
-      GoRoute(
-        path: Routes.consumer,
-        builder: (_, _) => const ConsumerHomeScreen(),
       ),
     ],
     redirect: (BuildContext context, GoRouterState state) {

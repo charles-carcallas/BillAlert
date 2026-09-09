@@ -34,6 +34,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _submit() async {
+    if (_isSubmitting) return;
     setState(() {
       _isSubmitting = true;
       _failure = null;
@@ -55,49 +56,92 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 420),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
+                  Center(
+                    child: Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      alignment: Alignment.center,
+                      child: const Text(
+                        '⚡',
+                        style: TextStyle(fontSize: 30, height: 1),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   Text(
                     'BillAlert',
                     textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.headlineMedium,
+                    style: textTheme.headlineMedium,
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Barangay Tubod, Clarin, Bohol',
+                    'Bohol I Electric Cooperative',
                     textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodySmall,
+                    style: textTheme.bodyMedium,
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Username',
+                    style: textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 6),
                   TextField(
                     controller: _username,
                     autocorrect: false,
                     enableSuggestions: false,
                     textInputAction: TextInputAction.next,
                     decoration: const InputDecoration(
-                      labelText: 'Username',
-                      hintText: 'firstname.lastname',
+                      hintText: 'ledesman.dormal',
                     ),
                   ),
                   const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: <Widget>[
+                      Text(
+                        'Password',
+                        style: textTheme.titleSmall,
+                      ),
+                      GestureDetector(
+                        onTap: () {},
+                        child: Text(
+                          'Forgot password?',
+                          style: textTheme.labelMedium,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
                   TextField(
                     controller: _password,
                     obscureText: _obscure,
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) => _isSubmitting ? null : _submit(),
                     decoration: InputDecoration(
-                      labelText: 'Password',
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscure ? Icons.visibility : Icons.visibility_off,
+                          _obscure
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                          color: colorScheme.onSurfaceVariant,
                         ),
                         onPressed: () => setState(() => _obscure = !_obscure),
                       ),
@@ -107,16 +151,51 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const SizedBox(height: 16),
                     FailureBanner(failure: _failure!),
                   ],
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
                   FilledButton(
                     onPressed: _isSubmitting ? null : _submit,
                     child: _isSubmitting
-                        ? const SizedBox(
+                        ? SizedBox(
                             height: 20,
                             width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: colorScheme.onPrimary,
+                            ),
                           )
-                        : const Text('Sign in'),
+                        : const Text('Log in'),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: <Widget>[
+                      const Expanded(child: Divider()),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text(
+                          'or',
+                          style: textTheme.bodySmall,
+                        ),
+                      ),
+                      const Expanded(child: Divider()),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  OutlinedButton.icon(
+                    onPressed: () {},
+                    icon: const Icon(Icons.fingerprint, size: 22),
+                    label: const Text('Unlock with fingerprint'),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "For devices you've signed in on before. Your fingerprint never leaves this device.",
+                    textAlign: TextAlign.center,
+                    style: textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 32),
+                  Text(
+                    'v1.0 · Bohol I Electric Cooperative',
+                    textAlign: TextAlign.center,
+                    style: textTheme.labelSmall,
                   ),
                 ],
               ),

@@ -3,7 +3,19 @@ import '../value_objects/ids.dart';
 /// An icon slot, named rather than drawn. The domain layer cannot import
 /// Flutter, so it names the icon and `presentation/` decides what it looks
 /// like.
-enum NavIcon { home, roster, amounts, collect, bill, history, alerts, profile }
+enum NavIcon {
+  readings,
+  consumers,
+  amounts,
+  disconnections,
+  accounts,
+  payment,
+  receipts,
+  bill,
+  history,
+  inbox,
+  profile,
+}
 
 /// One destination in a role's bottom navigation.
 final class AppTab {
@@ -82,10 +94,17 @@ final class AdminUser extends AppUser {
   @override
   String get roleLabel => 'Area President';
 
+  /// The four Admin tabs of the mockup. Posting amounts is first because it
+  /// is the job that has a queue waiting on it.
   @override
   List<AppTab> get permittedTabs => const <AppTab>[
-        AppTab(label: 'Home', route: '/admin', icon: NavIcon.home),
-        AppTab(label: 'Amounts', route: '/admin/amounts', icon: NavIcon.amounts),
+        AppTab(label: 'Amounts', route: '/admin', icon: NavIcon.amounts),
+        AppTab(
+          label: 'Notices',
+          route: '/admin/disconnections',
+          icon: NavIcon.disconnections,
+        ),
+        AppTab(label: 'Accounts', route: '/admin/accounts', icon: NavIcon.accounts),
         AppTab(label: 'Profile', route: '/admin/profile', icon: NavIcon.profile),
       ];
 }
@@ -112,7 +131,12 @@ final class MeterReaderUser extends AppUser {
 
   @override
   List<AppTab> get permittedTabs => const <AppTab>[
-        AppTab(label: 'Roster', route: '/reader', icon: NavIcon.roster),
+        AppTab(label: 'Readings', route: '/reader', icon: NavIcon.readings),
+        AppTab(
+          label: 'Consumers',
+          route: '/reader/consumers',
+          icon: NavIcon.consumers,
+        ),
         AppTab(label: 'Profile', route: '/reader/profile', icon: NavIcon.profile),
       ];
 }
@@ -137,9 +161,17 @@ final class CashierUser extends AppUser {
   @override
   String get roleLabel => 'Cashier';
 
+  /// Consumers comes first because a payment starts by finding the household
+  /// standing at the counter; the payment screen is reached from there.
   @override
   List<AppTab> get permittedTabs => const <AppTab>[
-        AppTab(label: 'Collect', route: '/cashier', icon: NavIcon.collect),
+        AppTab(label: 'Consumers', route: '/cashier', icon: NavIcon.consumers),
+        AppTab(label: 'Payment', route: '/cashier/payment', icon: NavIcon.payment),
+        AppTab(
+          label: 'Receipts',
+          route: '/cashier/receipts',
+          icon: NavIcon.receipts,
+        ),
         AppTab(label: 'Profile', route: '/cashier/profile', icon: NavIcon.profile),
       ];
 }
@@ -165,9 +197,9 @@ final class ConsumerUser extends AppUser {
 
   @override
   List<AppTab> get permittedTabs => const <AppTab>[
-        AppTab(label: 'My Bill', route: '/consumer', icon: NavIcon.bill),
+        AppTab(label: 'Bill', route: '/consumer', icon: NavIcon.bill),
         AppTab(label: 'History', route: '/consumer/history', icon: NavIcon.history),
-        AppTab(label: 'Alerts', route: '/consumer/alerts', icon: NavIcon.alerts),
+        AppTab(label: 'Inbox', route: '/consumer/inbox', icon: NavIcon.inbox),
         AppTab(label: 'Profile', route: '/consumer/profile', icon: NavIcon.profile),
       ];
 }
