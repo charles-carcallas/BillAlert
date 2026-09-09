@@ -176,3 +176,71 @@ Not vacuous: 6 consumers exist, 5 in Area 3 and 1 in Area 4.
   screens have been seen running, but not on a phone.
 - **The negative half of the meter-reading RLS test** needs a local Postgres,
   or the one-line role change to run against Supabase.
+
+---
+
+## 10 September 2026 — the billing cycle, and a defect it was hiding
+
+### The cycle was defined twice, differently
+
+`settings.cycle_start_day` was **15**, taken from the mockup's
+"15 July 2026 – 14 August 2026". The Dart side never agreed with it:
+
+```dart
+// lib/domain/usecases/reader/load_area_roster.dart
+final cycle = CycleLabel.of(clock.today());
+// lib/domain/value_objects/cycle_label.dart
+factory CycleLabel.of(PhDate date) => CycleLabel(date.year, date.month);
+```
+
+The app has always taken a cycle to be a **calendar month**. The database took
+it to be the 15th to the 14th. On any day from the 1st to the 14th the two
+disagreed about which cycle it was.
+
+**What that would have done on 10 September**, the day of the demo:
+
+| | |
+|---|---|
+| Roster header | "September 2026" |
+| `fn_ensure_billing_cycle(now)` | day 10 < 15 → period **15 Aug – 14 Sep** = the **August** cycle |
+| Every household's August reading | already recorded |
+| Result | the reader opens a round for September with five households listed, and **every one is refused** by FR-23 as already read this cycle |
+
+An unreadable round, with an error message about a cycle the screen never
+mentioned. Found by asking why nothing was overdue, not by a test.
+
+### Fixed — `08_calendar_cycles.sql`
+
+`cycle_start_day` 1, existing cycles moved onto calendar months, readings on
+the 7th of the following month and due dates on the 28th. `cycle_year` and
+`cycle_month` untouched, so issued bill numbers and every `cycle_label` are
+unchanged.
+
+**Deliberate departure from the design.** The 15th–14th window is what the
+Figma shows. It was overridden by the domain owner.
+
+| Cycle | Period | Read | Due | Readings | Overdue |
+|---|---|---|---|---|---|
+| July 2026 | 1–31 Jul | 7 Aug | 28 Aug | 5 | **3** |
+| August 2026 | 1–31 Aug | 7 Sep | 28 Sep | 5 | 0 |
+| September 2026 | — | — | — | **0** | — |
+
+The app and the database now name the same cycle on the same day, and the
+September round is genuinely empty — so the reading flow and the offline test
+have real subjects without a row being deleted.
+
+### Disconnection notice (DOM-05, ADM-17)
+
+Verified as `mario.ombajin` through PostgREST, never the SQL editor.
+
+| Check | Evidence |
+|---|---|
+| Overdue condition is real | `v_consumer_outstanding` → `overdue_count` 1 for Bongcaras, Amistad, Sarigumba |
+| `fn_issue_disconnection_notice` accepted | notice `fe59ec52-60de-4663-b301-01a7861ae213` → **`DN-2026-0910-0033`** |
+| Notice document has every field | `notice_no`, `consumer_name`, `consumer_no`, `purok` (Purok 1), `meter_serial_no` (BIEC-08319), `reason`, `issued_by_name` (**Mario Ombajin**), `served_at`, `earliest_lawful_at`, `notice_period_elapsed`, `amount_overdue` (₱541.20) |
+| The LEFT JOIN to profiles resolves | `issued_by_name` populated, not null |
+| 48h + Sunday + window is server-side | served 10 Sep 04:55 PH → earliest lawful **14 Sep 08:00 PH**. 48h lands Sat 12 Sep, Sunday 13 Sep is skipped, and the time is pushed into the 08:00 disconnection window. The app never computes this. |
+
+**Still not exercised:** `fn_close_disconnection_notice` — the last of the five
+app-callable RPCs never called from anywhere. The notice document screen
+(`132:2`) is what will call it.
