@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../domain/entities/app_user.dart';
+import 'admin/accounts_screen.dart';
 import 'admin/disconnections_screen.dart';
+import 'admin/new_consumer_screen.dart';
 import 'admin/post_bill_amount_screen.dart';
 import 'admin/serve_notice_screen.dart';
 import 'auth/auth_controller.dart';
@@ -14,7 +16,6 @@ import 'cashier/record_payment_screen.dart';
 import 'common/profile_screen.dart';
 import 'common/role_shell.dart';
 import 'common/splash_screen.dart';
-import 'common/unbuilt_tab.dart';
 import 'consumer/current_bill_screen.dart';
 import 'consumer/history_screen.dart';
 import 'consumer/inbox_screen.dart';
@@ -43,6 +44,11 @@ class Routes {
   /// form: it is a task with a confirmation at the end, not somewhere to
   /// wander in and out of.
   static const String serveNotice = '/admin/disconnections/serve';
+
+  /// Creating a household. Outside the shell for the same reason: it ends in
+  /// a confirmation with a Done that pops, and there is nothing to pop back
+  /// to from a tab root.
+  static const String newConsumer = '/admin/accounts/new';
 
   /// One receipt, as the household's own copy. Keyed by receipt number rather
   /// than passed as an object, so it opens from a link and not only from a
@@ -116,6 +122,10 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
         builder: (_, _) => const ServeNoticeScreen(),
       ),
       GoRoute(
+        path: Routes.newConsumer,
+        builder: (_, _) => const AdminNewConsumerScreen(),
+      ),
+      GoRoute(
         path: Routes.readingEntry,
         builder: (_, GoRouterState state) => ReadingEntryScreen(
           consumerId: state.pathParameters['consumerId']!,
@@ -150,12 +160,7 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
           ),
           GoRoute(
             path: '/admin/accounts',
-            builder: (_, _) => const UnbuiltTab(
-              title: 'Accounts',
-              willShow: 'Creating a staff account or a new consumer for this '
-                  'service area.',
-              figmaNode: '70:1436 and 70:6009',
-            ),
+            builder: (_, _) => const AdminAccountsScreen(),
           ),
           GoRoute(
             path: '/admin/profile',
