@@ -69,3 +69,7 @@ run_local.sh
 # password in plain text, and this directory is where that kind of thing
 # lands. Ignored so `git add .` cannot commit a credential.
 scratch/
+
+# Built from .vscode/launch.json for --dart-define-from-file. Same values,
+# not a second secret, but keep it out of the repo all the same.
+env.json
