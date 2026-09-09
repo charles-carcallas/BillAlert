@@ -95,7 +95,12 @@ create table if not exists settings (
   -- ADM-11 billing cycle. The mockup shows "15 July 2026 – 14 August 2026".
   -- NOTE: there is no days_to_due. The due date arrives from the cooperative
   -- with the amount (FR-21b); BillAlert never derives one.
-  cycle_start_day          smallint not null default 15 check (cycle_start_day between 1 and 28),
+  -- A cycle is a calendar month: an August cycle covers August. This was
+  -- 15 because the mockup shows "15 July 2026 - 14 August 2026", which
+  -- makes the "August" cycle cover half of September while every screen
+  -- prints "August 2026" over it. Changed deliberately — see
+  -- 08_calendar_cycles.sql.
+  cycle_start_day          smallint not null default 1  check (cycle_start_day between 1 and 28),
   -- ADM-16 automated reminder schedule.
   -- Objective 3: push carries no per-message cost, so reminders go by push
   -- and SMS is reserved for overdue and disconnection.
