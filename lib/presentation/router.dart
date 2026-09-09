@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../domain/entities/app_user.dart';
 import 'admin/disconnections_screen.dart';
 import 'admin/post_bill_amount_screen.dart';
+import 'admin/serve_notice_screen.dart';
 import 'auth/auth_controller.dart';
 import 'auth/change_password_screen.dart';
 import 'auth/login_screen.dart';
@@ -36,6 +37,11 @@ class Routes {
   /// deliberate visit could never land there. This path is not in that bounce
   /// list, so it can.
   static const String accountPassword = '/account/password';
+
+  /// Serving a disconnection notice. Outside the tab shell, like the reading
+  /// form: it is a task with a confirmation at the end, not somewhere to
+  /// wander in and out of.
+  static const String serveNotice = '/admin/disconnections/serve';
 
   // Each role's section. The first entry of that role's `permittedTabs` is
   // this same path, which is what makes the correct tab light up on arrival.
@@ -88,6 +94,10 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: Routes.accountPassword,
         builder: (_, _) => const ChangePasswordScreen(),
+      ),
+      GoRoute(
+        path: Routes.serveNotice,
+        builder: (_, _) => const ServeNoticeScreen(),
       ),
       GoRoute(
         path: Routes.readingEntry,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/errors/app_failure.dart';
 import '../../core/result/result.dart';
@@ -8,6 +9,7 @@ import '../../domain/value_objects/ph_date.dart';
 import '../auth/auth_controller.dart';
 import '../common/failure_banner.dart';
 import '../providers.dart';
+import '../router.dart';
 
 /// Active disconnection notices for this Admin's area.
 final activeNoticesProvider = FutureProvider<List<ActiveNotice>>((Ref ref) async {
@@ -47,6 +49,16 @@ class DisconnectionsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Notices')),
+      floatingActionButton: FloatingActionButton.extended(
+        // `push`, so the back arrow returns to this list, and the list
+        // refreshes when the notice lands.
+        onPressed: () async {
+          await context.push(Routes.serveNotice);
+          ref.invalidate(activeNoticesProvider);
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('Serve a notice'),
+      ),
       body: SafeArea(
         child: notices.when(
           loading: () => const Center(child: CircularProgressIndicator()),

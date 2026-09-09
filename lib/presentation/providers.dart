@@ -23,6 +23,7 @@ import '../domain/repositories/outbox_repository.dart';
 import '../domain/repositories/payment_repository.dart';
 import '../domain/repositories/reading_repository.dart';
 import '../domain/time/ph_clock.dart';
+import '../domain/usecases/admin/issue_disconnection_notice.dart';
 import '../domain/usecases/admin/post_bill_amount.dart';
 import '../domain/usecases/auth/change_password.dart';
 import '../domain/usecases/auth/sign_in.dart';
@@ -165,6 +166,14 @@ final refreshAreaRosterProvider = Provider<RefreshAreaRoster>(
 final recordMeterReadingProvider = Provider<RecordMeterReading>(
   (Ref ref) => RecordMeterReading(
     readings: ref.watch(readingRepositoryProvider),
+    outbox: ref.watch(outboxRepositoryProvider),
+    clock: ref.watch(phClockProvider),
+    newClientUuid: ref.watch(clientUuidFactoryProvider),
+  ),
+);
+
+final issueDisconnectionNoticeProvider = Provider<IssueDisconnectionNotice>(
+  (Ref ref) => IssueDisconnectionNotice(
     outbox: ref.watch(outboxRepositoryProvider),
     clock: ref.watch(phClockProvider),
     newClientUuid: ref.watch(clientUuidFactoryProvider),
