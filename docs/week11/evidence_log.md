@@ -115,6 +115,24 @@ Virgilio Busalanan, two unpaid months, settled in one handover.
 | Replay creates no second charge | same `clientUuid` replayed → **same** transaction id; counts stayed 1 and 2 | 9 Sep 2026 |
 | Daily summary | `v_cashier_daily_summary`: `receipt_count=1`, `total_collected=1271.15` | 9 Sep 2026 |
 
+**Recorded from the running app** — the whole Dart path, screen →
+RecordPaymentController → RecordCashPayment → outbox → SyncService →
+`fn_record_payment`. Teresita Lumayag, two months, one handover:
+
+| Check | Evidence |
+|---|---|
+| One transaction | `e2e4174b-b88a-4350-8f54-317b3a290b55`; `payment_transactions` 1 → **2**, `payments` 2 → **4** |
+| One receipt | **`BIEC-2026-09-004472`**, verification `BIEC-4472-LU-1005`; `v_payment_history` returns 2 rows and **1** distinct receipt number |
+| Money exact | `total_collected=1004.55`, `cash_tendered=1500.00`, `change_due=495.45` — 505.80 + 498.75, and change to the centavo |
+| Both months settled | `BA-202607-000904` and `BA-202608-000004` both `balance=0.00`, `status='paid'` |
+| Attributed correctly | `cashier_id` resolves to `mercedita.gales`, role `cashier` |
+| Idempotency key present | `client_uuid=b7163c69-7765-4609-9538-ff81ffa1ab86`, minted by the app's ClientUuidFactory and carried through the outbox — which is what makes a retried sync safe |
+| Daily takings | `v_cashier_daily_summary`: `receipt_count=2`, `total_collected=2275.70` |
+
+Teresita's August bill is the one an Admin priced from the app minutes
+earlier, so this single household was carried through pricing and
+collection entirely by the real client.
+
 The same OR number against both July and August is the correct behaviour,
 not a duplicate: the consumer handed over money once. That is what the
 mockup's Consumer History shows and why the receipt number lives on
@@ -147,10 +165,11 @@ Not vacuous: 6 consumers exist, 5 in Area 3 and 1 in Area 4.
 - **On-device offline behaviour.** Everything above went over the network.
   The outbox write, surviving an app kill, and syncing on reconnect are
   covered by unit tests but have not been exercised on a phone.
-- **The app's Dart client path — now partly verified.** Posting an amount was
-  done from the running app (see above), so screen → controller → use case →
-  outbox → sync → RPC is exercised for that one operation. Recording a
-  reading and taking a payment have still only been driven through PostgREST.
+- **The app's Dart client path — verified for posting and for payment.**
+  Both were driven from the running app, so screen → controller → use case →
+  outbox → SyncService → RPC is exercised end to end for each. **Recording a
+  reading has still only been driven through PostgREST**, never from the
+  app itself.
 - **The app was run on the web target, not Android.** Gradle could not be
   started from the agent's environment (`Unable to establish loopback
   connection`), though `flutter build apk` succeeds when run directly. So the
