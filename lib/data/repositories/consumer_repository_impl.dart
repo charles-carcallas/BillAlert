@@ -27,6 +27,53 @@ class ConsumerRepositoryImpl implements ConsumerRepository {
   static const String _syncKey = 'cached_consumers';
 
   @override
+  Future<Result<Consumer>> create({
+    required ConsumerNumber consumerNo,
+    required String firstName,
+    required String lastName,
+    required AreaId areaId,
+    required ProfileId createdBy,
+    String? contactNumber,
+    String? purok,
+  }) async {
+    try {
+      final row = await _client
+          .from('consumers')
+          .insert(<String, Object?>{
+            'consumer_no': consumerNo.value,
+            'first_name': firstName,
+            'last_name': lastName,
+            // Sent exactly as typed. trg_consumers_normalize_contact owns
+            // Philippine mobile normalisation on the server.
+            'contact_number': contactNumber,
+            'area_id': areaId.value,
+            'purok': purok,
+            'created_by': createdBy.value,
+          })
+          .select(
+            'id, consumer_no, first_name, last_name, contact_number, '
+            'meter_serial_no, area_id, purok, account_status',
+          )
+          .single();
+
+      return Ok<Consumer>(_fromSupabaseRow(row));
+    } on PostgrestException catch (error, stackTrace) {
+      if (error.code == '23505') {
+        return Err<Consumer>(
+          ConflictFailure(
+            'Consumer number ${consumerNo.value} is already in use. Please '
+            'check the number on the household record.',
+            error.toString(),
+          ),
+        );
+      }
+      return Err<Consumer>(FailureMapper.from(error, stackTrace));
+    } catch (error, stackTrace) {
+      return Err<Consumer>(FailureMapper.from(error, stackTrace));
+    }
+  }
+
+  @override
   Future<Result<List<Consumer>>> areaRoster(AreaId areaId) async {
     try {
       final query = _db.select(_db.cachedConsumers)
@@ -79,8 +126,16 @@ class ConsumerRepositoryImpl implements ConsumerRepository {
 
       if (rows.length != 1) return const Ok<Consumer?>(null);
 
-      final Map<String, dynamic> row = rows.first;
-      return Ok<Consumer?>(Consumer(
+      return Ok<Consumer?>(_fromSupabaseRow(rows.first));
+    } catch (error, stackTrace) {
+      return Err<Consumer?>(FailureMapper.from(error, stackTrace));
+    }
+  }
+
+  /// A consumers-table row has no reading joined onto it. New households and
+  /// the signed-in household therefore start at zero rather than inventing a
+  /// reading that the server did not return.
+  static Consumer _fromSupabaseRow(Map<String, dynamic> row) => Consumer(
         id: ConsumerId(row['id'] as String),
         consumerNo: ConsumerNumber(row['consumer_no'] as String),
         firstName: row['first_name'] as String,
@@ -90,14 +145,8 @@ class ConsumerRepositoryImpl implements ConsumerRepository {
         areaId: AreaId(row['area_id'] as String),
         purok: row['purok'] as String?,
         accountStatus: AccountStatus.fromCode(row['account_status'] as String),
-        // Not needed to identify a household, and the consumer screens do not
-        // show it. Left at zero rather than guessed.
         previousReading: Kwh.zero,
-      ));
-    } catch (error, stackTrace) {
-      return Err<Consumer?>(FailureMapper.from(error, stackTrace));
-    }
-  }
+      );
 
   @override
   Future<Result<DateTime?>> lastRefreshedAt() async {

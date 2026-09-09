@@ -128,8 +128,50 @@ final class FakeConsumerRepository implements ConsumerRepository {
   final List<Consumer> households;
   DateTime? refreshedAt;
   int refreshCount = 0;
+  int createCount = 0;
+  ConsumerNumber? createdConsumerNo;
+  String? createdFirstName;
+  String? createdLastName;
+  String? createdContactNumber;
+  AreaId? createdAreaId;
+  String? createdPurok;
+  ProfileId? createdBy;
 
   FakeConsumerRepository(this.households);
+
+  @override
+  Future<Result<Consumer>> create({
+    required ConsumerNumber consumerNo,
+    required String firstName,
+    required String lastName,
+    required AreaId areaId,
+    required ProfileId createdBy,
+    String? contactNumber,
+    String? purok,
+  }) async {
+    createCount++;
+    createdConsumerNo = consumerNo;
+    createdFirstName = firstName;
+    createdLastName = lastName;
+    createdContactNumber = contactNumber;
+    createdAreaId = areaId;
+    createdPurok = purok;
+    this.createdBy = createdBy;
+
+    return Ok<Consumer>(
+      Consumer(
+        id: const ConsumerId('created-consumer'),
+        consumerNo: consumerNo,
+        firstName: firstName,
+        lastName: lastName,
+        contactNumber: contactNumber,
+        areaId: areaId,
+        purok: purok,
+        accountStatus: AccountStatus.active,
+        previousReading: Kwh.zero,
+      ),
+    );
+  }
 
   @override
   Future<Result<List<Consumer>>> areaRoster(AreaId areaId) async =>

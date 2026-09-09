@@ -9,6 +9,21 @@ import '../value_objects/ids.dart';
 /// with nothing. [refreshAreaRoster] is the separate, explicitly online call
 /// that fills that cache.
 abstract class ConsumerRepository {
+  /// Creates a household record in the signed-in Area President's area.
+  ///
+  /// This does not create an authentication account. Consumer authentication
+  /// needs a server-side provisioning path with service-role credentials,
+  /// which must never be present in the client application.
+  Future<Result<Consumer>> create({
+    required ConsumerNumber consumerNo,
+    required String firstName,
+    required String lastName,
+    required AreaId areaId,
+    required ProfileId createdBy,
+    String? contactNumber,
+    String? purok,
+  });
+
   /// MTR-02: the reader's assigned area only. Row-Level Security enforces
   /// the same boundary server-side, so this is a convenience, not the guard.
   Future<Result<List<Consumer>>> areaRoster(AreaId areaId);
