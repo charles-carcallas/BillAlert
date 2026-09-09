@@ -69,24 +69,7 @@ class FailureMapper {
 
     // ---- authentication --------------------------------------------
     if (error is AuthException) {
-      final message = error.message.toLowerCase();
-      if (message.contains('invalid login credentials')) {
-        return AuthFailure(
-          'That username or password is not correct. Please try again.',
-          detail,
-        );
-      }
-      if (message.contains('email not confirmed')) {
-        return AuthFailure(
-          'This account has not been activated yet. Ask your Area President '
-          'to activate it.',
-          detail,
-        );
-      }
-      return AuthFailure(
-        'You have been signed out. Please sign in again.',
-        detail,
-      );
+      return _fromAuth(error, detail);
     }
 
     // ---- the database ----------------------------------------------
@@ -96,6 +79,85 @@ class FailureMapper {
 
     if (error is StorageException) {
       return ServerFailure(ServerFailure.defaultMessage, detail);
+    }
+
+    return ServerFailure(ServerFailure.defaultMessage, detail);
+  }
+
+  /// Not every AuthException means the session is gone.
+  ///
+  /// This used to end in "You have been signed out. Please sign in again."
+  /// for anything it did not recognise, and changing a password is where that
+  /// went wrong: GoTrue refuses a password identical to the current one with
+  /// a 422, the mapper called it a lost session, and the change-password
+  /// screen told a signed-in user to sign in again. They were never signed
+  /// out — the message sent them round a loop with no way through.
+  ///
+  /// So the code is read first, and only 401 and 403 are allowed to claim
+  /// the session has ended.
+  static AppFailure _fromAuth(AuthException error, String detail) {
+    // GoTrue names its failures. The code is preferred over the prose
+    // because the wording changes between releases and the code does not.
+    switch (error.code) {
+      case 'same_password':
+        return ValidationFailure(
+          'Your new password has to be different from the one you are using '
+          'now.',
+          detail,
+        );
+      case 'weak_password':
+        return ValidationFailure(
+          'That password is too easy to guess. Please choose a longer one.',
+          detail,
+        );
+      case 'invalid_credentials':
+        return AuthFailure(
+          'That username or password is not correct. Please try again.',
+          detail,
+        );
+      case 'email_not_confirmed':
+        return AuthFailure(
+          'This account has not been activated yet. Ask your Area President '
+          'to activate it.',
+          detail,
+        );
+      case 'over_request_rate_limit':
+        return ValidationFailure(
+          'Too many attempts just now. Please wait a moment and try again.',
+          detail,
+        );
+    }
+
+    // Older servers describe themselves only in prose.
+    final String message = error.message.toLowerCase();
+    if (message.contains('invalid login credentials')) {
+      return AuthFailure(
+        'That username or password is not correct. Please try again.',
+        detail,
+      );
+    }
+    if (message.contains('email not confirmed')) {
+      return AuthFailure(
+        'This account has not been activated yet. Ask your Area President '
+        'to activate it.',
+        detail,
+      );
+    }
+    if (message.contains('different from the old password')) {
+      return ValidationFailure(
+        'Your new password has to be different from the one you are using '
+        'now.',
+        detail,
+      );
+    }
+
+    // 401 and 403 are the only codes that actually mean "your session has
+    // ended". A 422 is about what was typed.
+    if (error.statusCode == '401' || error.statusCode == '403') {
+      return AuthFailure(
+        'You have been signed out. Please sign in again.',
+        detail,
+      );
     }
 
     return ServerFailure(ServerFailure.defaultMessage, detail);
