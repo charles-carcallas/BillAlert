@@ -182,6 +182,14 @@ class _Picker extends StatelessWidget {
               onRetry: controller.refreshFromServer,
             ),
           ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Text(
+            'A notice can only be served on a household with an overdue '
+            'bill. Those are listed first.',
+            style: text.bodySmall,
+          ),
+        ),
         Expanded(
           child: state.isLoading && state.households.isEmpty
               ? const Center(child: CircularProgressIndicator())
@@ -210,20 +218,35 @@ class _Picker extends StatelessWidget {
                           separatorBuilder: (_, _) => const Divider(height: 1),
                           itemBuilder: (BuildContext context, int index) {
                             final Consumer c = visible[index];
+                            final int overdue = state.overdueCountFor(c);
+                            // The server refuses a household with nothing
+                            // overdue, and refuses an inactive account. Both
+                            // are shown here rather than discovered by being
+                            // told no after choosing a name.
+                            final bool allowed = state.canServe(c);
+
                             return ListTile(
                               contentPadding: EdgeInsets.zero,
                               title:
                                   Text(c.fullName, style: text.titleMedium),
                               subtitle: Text(
-                                '${c.consumerNo.value}'
-                                '${c.purok == null ? '' : ' · ${c.purok}'}',
+                                <String>[
+                                  c.consumerNo.value,
+                                  if (c.purok != null) c.purok!,
+                                  if (!c.isActive)
+                                    'not an active account'
+                                  else if (overdue == 0)
+                                    'nothing overdue'
+                                  else
+                                    '$overdue overdue bill'
+                                        '${overdue == 1 ? '' : 's'}',
+                                ].join(' · '),
                                 style: text.bodySmall,
                               ),
-                              trailing: const Icon(Icons.chevron_right),
-                              // FR: a notice only applies to an active
-                              // account. The use case refuses otherwise; the
-                              // list says so before they tap.
-                              enabled: c.isActive,
+                              trailing: allowed
+                                  ? const Icon(Icons.chevron_right)
+                                  : null,
+                              enabled: allowed,
                               onTap: () => controller.select(c),
                             );
                           },

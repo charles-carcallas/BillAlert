@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart' hide Consumer;
 import '../../core/errors/app_failure.dart';
 import '../../core/result/result.dart';
 import '../../domain/entities/consumer.dart';
+import '../../domain/repositories/bill_repository.dart';
 import '../../domain/value_objects/ids.dart';
 import '../auth/auth_controller.dart';
 import '../providers.dart';
@@ -14,6 +15,13 @@ import '../providers.dart';
 /// Serving a disconnection notice.
 final class ServeNoticeState {
   final List<Consumer> households;
+
+  /// What each household owes, by consumer id.
+  ///
+  /// `fn_issue_disconnection_notice` refuses a household with no overdue
+  /// bill, so without this the Admin picks a name and is told no. The screen
+  /// shows the same fact the server will check.
+  final Map<String, ConsumerOutstanding> outstanding;
   final String query;
   final Consumer? selected;
   final bool isLoading;
@@ -25,6 +33,7 @@ final class ServeNoticeState {
 
   const ServeNoticeState({
     this.households = const <Consumer>[],
+    this.outstanding = const <String, ConsumerOutstanding>{},
     this.query = '',
     this.selected,
     this.isLoading = false,
@@ -35,6 +44,7 @@ final class ServeNoticeState {
 
   ServeNoticeState copyWith({
     List<Consumer>? households,
+    Map<String, ConsumerOutstanding>? outstanding,
     String? query,
     Consumer? selected,
     bool? isLoading,
@@ -45,6 +55,7 @@ final class ServeNoticeState {
   }) {
     return ServeNoticeState(
       households: households ?? this.households,
+      outstanding: outstanding ?? this.outstanding,
       query: query ?? this.query,
       selected: clearSelected ? null : (selected ?? this.selected),
       isLoading: isLoading ?? this.isLoading,
@@ -56,13 +67,29 @@ final class ServeNoticeState {
 
   List<Consumer> get visible {
     final q = query.trim().toLowerCase();
-    if (q.isEmpty) return households;
-    return households
-        .where((Consumer c) =>
-            c.fullName.toLowerCase().contains(q) ||
-            c.consumerNo.value.toLowerCase().contains(q))
-        .toList();
+    final matched = q.isEmpty
+        ? households
+        : households
+            .where((Consumer c) =>
+                c.fullName.toLowerCase().contains(q) ||
+                c.consumerNo.value.toLowerCase().contains(q))
+            .toList();
+
+    // Overdue households first: they are the only ones a notice can be served
+    // against, and the reason the Admin opened this screen.
+    final sorted = <Consumer>[...matched];
+    sorted.sort((Consumer a, Consumer b) {
+      final int byOverdue =
+          overdueCountFor(b).compareTo(overdueCountFor(a));
+      return byOverdue != 0 ? byOverdue : a.lastName.compareTo(b.lastName);
+    });
+    return sorted;
   }
+
+  int overdueCountFor(Consumer c) => outstanding[c.id.value]?.overdueCount ?? 0;
+
+  /// The server's rule, asked before the Admin commits to a name.
+  bool canServe(Consumer c) => c.isActive && overdueCountFor(c) > 0;
 }
 
 /// DOM-05 — the Area President serves a disconnection notice.
@@ -111,10 +138,25 @@ class ServeNoticeController extends Notifier<ServeNoticeState> {
       await consumers.refreshAreaRoster(areaId);
     }
 
-    switch (await consumers.areaRoster(areaId)) {
+    final rosterResult = await consumers.areaRoster(areaId);
+
+    // Who is actually overdue. A failure here is not worth blocking the list
+    // for - the server still refuses a household with nothing overdue - so it
+    // degrades to an empty map and every row simply shows no badge.
+    final owed = <String, ConsumerOutstanding>{};
+    final owedResult =
+        await ref.read(billRepositoryProvider).outstandingInArea(areaId);
+    if (owedResult case Ok(:final value)) {
+      for (final ConsumerOutstanding c in value) {
+        owed[c.consumerId.value] = c;
+      }
+    }
+
+    switch (rosterResult) {
       case Ok(:final value):
         state = state.copyWith(
           households: value,
+          outstanding: owed,
           isLoading: false,
           selected: state.selected,
         );
