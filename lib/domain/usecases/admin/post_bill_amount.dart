@@ -45,10 +45,24 @@ final class PostBillAmount {
         '${bill.totalAmount!.format()}.',
       ));
     }
-    if (amount.isNegative) {
+    // `fn_post_bill_amount` refuses anything at or below zero, and refuses a
+    // due date already in the past. Both are checked here too - not to
+    // replace the server, which stays the authority, but because the Admin
+    // may be offline: without these, a nonsense amount would sit in the
+    // outbox looking accepted and fail hours later at sync, with nobody
+    // watching.
+    if (amount <= Money.zero) {
       return const Err(ValidationFailure(
-        'The amount cannot be negative. Please check the figure on the '
-        'cooperative printout.',
+        'The amount due must be more than zero. Please check the figure on '
+        'the cooperative printout.',
+      ));
+    }
+
+    final PhDate today = PhDate.at(clock.nowUtc());
+    if (dueDate.isBefore(today)) {
+      return Err(ValidationFailure(
+        'The due date ${dueDate.toIso()} has already passed. Please use the '
+        'date printed on the cooperative statement.',
       ));
     }
 

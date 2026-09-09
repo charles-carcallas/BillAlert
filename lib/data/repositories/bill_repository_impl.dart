@@ -68,8 +68,11 @@ class BillRepositoryImpl implements BillRepository {
   /// The view carries no `total_amount`, `due_date` or `amount_paid` column
   /// at all - by definition these bills have none - and [Bill.fromJson] reads
   /// those missing keys as null, which is exactly what `isUnpriced` means.
+  /// Returns the queue row, not a bare [Bill]: the Admin has to see whose
+  /// bill they are pricing and what it consumed, and the view already
+  /// returns both alongside the bill columns.
   @override
-  Future<Result<List<Bill>>> awaitingAmount(AreaId areaId) async {
+  Future<Result<List<AwaitingAmountEntry>>> awaitingAmount(AreaId areaId) async {
     try {
       final rows = await _client
           .from('v_readings_awaiting_amount')
@@ -79,9 +82,13 @@ class BillRepositoryImpl implements BillRepository {
           // first, and that wait is what the screen leads with.
           .order('reading_date', ascending: true);
 
-      return Ok<List<Bill>>(rows.map(Bill.fromJson).toList());
+      return Ok<List<AwaitingAmountEntry>>(
+        rows.map(AwaitingAmountEntry.fromJson).toList(),
+      );
     } catch (error, stackTrace) {
-      return Err<List<Bill>>(FailureMapper.from(error, stackTrace));
+      return Err<List<AwaitingAmountEntry>>(
+        FailureMapper.from(error, stackTrace),
+      );
     }
   }
 

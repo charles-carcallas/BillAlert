@@ -2,11 +2,14 @@ import 'dart:async';
 
 import 'package:billalert/core/errors/app_failure.dart';
 import 'package:billalert/core/result/result.dart';
+import 'package:billalert/data/sync/sync_service.dart';
 import 'package:billalert/domain/entities/app_user.dart';
+import 'package:billalert/domain/entities/bill.dart';
 import 'package:billalert/domain/entities/consumer.dart';
 import 'package:billalert/domain/outbox/outbox_entry.dart';
 import 'package:billalert/domain/outbox/outbox_operation.dart';
 import 'package:billalert/domain/repositories/auth_repository.dart';
+import 'package:billalert/domain/repositories/bill_repository.dart';
 import 'package:billalert/domain/repositories/consumer_repository.dart';
 import 'package:billalert/domain/repositories/outbox_repository.dart';
 import 'package:billalert/domain/repositories/reading_repository.dart';
@@ -274,4 +277,83 @@ class FakeAuthController extends AuthController {
     }
     return failureToReturn;
   }
+}
+
+/// Bills, without a database. Only the methods the screens under test call
+/// are given behaviour; the rest answer honestly that they were not set up.
+final class FakeBillRepository implements BillRepository {
+  List<AwaitingAmountEntry> queue = <AwaitingAmountEntry>[];
+  AppFailure? awaitingFailure;
+  int awaitingCalls = 0;
+
+  @override
+  Future<Result<List<AwaitingAmountEntry>>> awaitingAmount(AreaId areaId) async {
+    awaitingCalls++;
+    final failure = awaitingFailure;
+    if (failure != null) return Err<List<AwaitingAmountEntry>>(failure);
+    return Ok<List<AwaitingAmountEntry>>(queue);
+  }
+
+  @override
+  Future<Result<Bill?>> currentBillFor(ConsumerId consumerId) async =>
+      const Ok<Bill?>(null);
+
+  @override
+  Future<Result<List<Bill>>> historyFor(ConsumerId consumerId, {int limit = 12}) async =>
+      const Ok<List<Bill>>(<Bill>[]);
+
+  @override
+  Future<Result<Bill?>> byId(BillId id) async => const Ok<Bill?>(null);
+
+  @override
+  Future<Result<List<Bill>>> payableFor(ConsumerId consumerId) async =>
+      const Ok<List<Bill>>(<Bill>[]);
+
+  @override
+  Future<Result<void>> refreshFor(ConsumerId consumerId, CycleLabel cycle) async =>
+      const Ok<void>(null);
+}
+
+/// A sync service that counts calls instead of touching the network.
+///
+/// SyncService is concrete, so this subclasses it and overrides the three
+/// methods that would reach outside the test. The real one checks
+/// connectivity, which a widget test cannot answer.
+final class FakeSyncService extends SyncService {
+  FakeSyncService()
+      : super(FakeOutboxRepository(), const _NoopOutboxGateway());
+
+  int syncCalls = 0;
+
+  @override
+  void start() {}
+
+  @override
+  Future<void> stop() async {}
+
+  @override
+  Future<Result<SyncReport>> syncNow() async {
+    syncCalls++;
+    return const Ok<SyncReport>(SyncReport.nothingToDo);
+  }
+}
+
+final class _NoopOutboxGateway implements OutboxGateway {
+  const _NoopOutboxGateway();
+
+  @override
+  Future<Result<String>> submitReading(RecordReadingOperation o) async =>
+      const Ok<String>('');
+
+  @override
+  Future<Result<String>> submitPostedAmount(PostAmountOperation o) async =>
+      const Ok<String>('');
+
+  @override
+  Future<Result<String>> submitPayment(RecordPaymentOperation o) async =>
+      const Ok<String>('');
+
+  @override
+  Future<Result<String>> submitNotice(IssueNoticeOperation o) async =>
+      const Ok<String>('');
 }
