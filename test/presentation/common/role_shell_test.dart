@@ -75,19 +75,17 @@ void main() {
   // two different users, produces two different bars. Kept as two tests
   // rather than one, because swapping the router underneath a live tree
   // tests the harness rather than the shell.
-  testWidgets('a cashier gets their four tabs', (WidgetTester tester) async {
+  testWidgets('a cashier gets their three tabs', (WidgetTester tester) async {
     await tester.pumpWidget(shellUnderTest(user: cashier, at: '/cashier'));
     await tester.pumpAndSettle();
 
-    expect(barOf(tester).destinations.length, 4);
-    for (final String label in <String>[
-      'Consumers',
-      'Payment',
-      'Receipts',
-      'Profile',
-    ]) {
+    // Three, matching CashierNav. Payment is not a tab: it is a step reached
+    // from Consumers, so there is no way to tab away mid-payment.
+    expect(barOf(tester).destinations.length, 3);
+    for (final String label in <String>['Consumers', 'Receipts', 'Profile']) {
       expect(find.text(label), findsOneWidget, reason: 'missing tab $label');
     }
+    expect(find.text('Payment'), findsNothing);
   });
 
   testWidgets('a meter reader gets their three, from the same widget',
@@ -108,11 +106,11 @@ void main() {
     // Every cashier route begins with "/cashier", so a first-match search
     // would light up Consumers while the Payment screen is on show.
     await tester.pumpWidget(
-      shellUnderTest(user: cashier, at: '/cashier/payment'),
+      shellUnderTest(user: cashier, at: '/cashier/receipts'),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('panel:Payment'), findsOneWidget);
+    expect(find.text('panel:Receipts'), findsOneWidget);
     expect(barOf(tester).selectedIndex, 1);
   });
 
@@ -129,10 +127,10 @@ void main() {
     await tester.pumpWidget(shellUnderTest(user: cashier, at: '/cashier'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Receipts'));
+    await tester.tap(find.text('Profile'));
     await tester.pumpAndSettle();
 
-    expect(find.text('panel:Receipts'), findsOneWidget);
+    expect(find.text('panel:Profile'), findsOneWidget);
     expect(barOf(tester).selectedIndex, 2);
   });
 

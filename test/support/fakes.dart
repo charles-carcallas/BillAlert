@@ -312,6 +312,16 @@ final class FakeBillRepository implements BillRepository {
   @override
   Future<Result<void>> refreshFor(ConsumerId consumerId, CycleLabel cycle) async =>
       const Ok<void>(null);
+
+  List<ConsumerOutstanding> outstanding = <ConsumerOutstanding>[];
+  AppFailure? outstandingFailure;
+
+  @override
+  Future<Result<List<ConsumerOutstanding>>> outstandingInArea(AreaId areaId) async {
+    final failure = outstandingFailure;
+    if (failure != null) return Err<List<ConsumerOutstanding>>(failure);
+    return Ok<List<ConsumerOutstanding>>(outstanding);
+  }
 }
 
 /// A sync service that counts calls instead of touching the network.

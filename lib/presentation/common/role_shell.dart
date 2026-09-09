@@ -88,7 +88,6 @@ class RoleShell extends ConsumerWidget {
         NavIcon.amounts => Icons.request_quote_outlined,
         NavIcon.disconnections => Icons.power_off_outlined,
         NavIcon.accounts => Icons.person_add_alt_outlined,
-        NavIcon.payment => Icons.payments_outlined,
         NavIcon.receipts => Icons.receipt_long_outlined,
         NavIcon.bill => Icons.description_outlined,
         NavIcon.history => Icons.history_outlined,

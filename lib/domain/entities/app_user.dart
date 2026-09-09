@@ -9,7 +9,6 @@ enum NavIcon {
   amounts,
   disconnections,
   accounts,
-  payment,
   receipts,
   bill,
   history,
@@ -161,12 +160,14 @@ final class CashierUser extends AppUser {
   @override
   String get roleLabel => 'Cashier';
 
-  /// Consumers comes first because a payment starts by finding the household
-  /// standing at the counter; the payment screen is reached from there.
+  /// Three tabs, matching CashierNav in the mockup. Payment is deliberately
+  /// NOT one of them: a payment starts by finding the household at the
+  /// counter, so it is a step reached from Consumers, and a tab bar offering
+  /// to leave halfway through counting cash would be a mistake waiting to
+  /// happen.
   @override
   List<AppTab> get permittedTabs => const <AppTab>[
         AppTab(label: 'Consumers', route: '/cashier', icon: NavIcon.consumers),
-        AppTab(label: 'Payment', route: '/cashier/payment', icon: NavIcon.payment),
         AppTab(
           label: 'Receipts',
           route: '/cashier/receipts',

@@ -180,6 +180,32 @@ class BillRepositoryImpl implements BillRepository {
     }
   }
 
+  /// CSH-02. Who owes what, for the Cashier's consumer list.
+  ///
+  /// This is the one place `v_consumer_outstanding` belongs: it is a
+  /// per-consumer roll-up, so it answers "who owes what" and cannot answer
+  /// "which bills" - that is [payableFor], against `v_bill_status`.
+  @override
+  Future<Result<List<ConsumerOutstanding>>> outstandingInArea(
+    AreaId areaId,
+  ) async {
+    try {
+      final rows = await _client
+          .from('v_consumer_outstanding')
+          .select()
+          .eq('area_id', areaId.value)
+          .order('consumer_name', ascending: true);
+
+      return Ok<List<ConsumerOutstanding>>(
+        rows.map(ConsumerOutstanding.fromJson).toList(),
+      );
+    } catch (error, stackTrace) {
+      return Err<List<ConsumerOutstanding>>(
+        FailureMapper.from(error, stackTrace),
+      );
+    }
+  }
+
   /// Refreshes the cached bills for one consumer and one cycle.
   ///
   /// Filtered on `cycle_year` and `cycle_month` rather than on `cycle_label`,

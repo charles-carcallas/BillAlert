@@ -3,6 +3,7 @@ import '../entities/bill.dart';
 import '../value_objects/cycle_label.dart';
 import '../value_objects/ids.dart';
 import '../value_objects/kwh.dart';
+import '../value_objects/money.dart';
 import '../value_objects/ph_date.dart';
 
 /// Bills, priced and unpriced.
@@ -34,6 +35,76 @@ abstract class BillRepository {
 
   /// Refreshes the cached bills for one consumer and cycle.
   Future<Result<void>> refreshFor(ConsumerId consumerId, CycleLabel cycle);
+
+  /// CSH-02, the Cashier's consumer list: every household in the area with
+  /// something outstanding, rolled up. Backed by `v_consumer_outstanding`,
+  /// which is a per-consumer aggregate and cannot produce a [Bill] - it is
+  /// the answer to "who owes what", not "which bills".
+  Future<Result<List<ConsumerOutstanding>>> outstandingInArea(AreaId areaId);
+}
+
+/// What one household owes, across every unpaid month.
+///
+/// The row behind "₱1,975.35 · 3 bills · oldest June · 2 overdue" on the
+/// Cashier's Consumers screen. It is a roll-up, so it carries counts and a
+/// total but no bill: choosing which bills to settle is the next screen's
+/// job, and it asks [BillRepository.payableFor] for them.
+final class ConsumerOutstanding {
+  final ConsumerId consumerId;
+  final ConsumerNumber consumerNo;
+  final String consumerName;
+  final String? purok;
+
+  /// Bills that have an amount and are not settled. Only these can be paid.
+  final int payableBillCount;
+
+  /// Readings still waiting on the cooperative. Shown so the cashier can say
+  /// "that month has no figure yet" instead of "there is nothing there".
+  final int unpricedBillCount;
+
+  final int overdueCount;
+
+  /// The sum of the balances. Unpriced bills contribute nothing, because
+  /// nothing is owed on a reading nobody has priced.
+  final Money totalOutstanding;
+
+  const ConsumerOutstanding({
+    required this.consumerId,
+    required this.consumerNo,
+    required this.consumerName,
+    required this.payableBillCount,
+    required this.unpricedBillCount,
+    required this.overdueCount,
+    required this.totalOutstanding,
+    this.purok,
+  });
+
+  factory ConsumerOutstanding.fromJson(Map<String, dynamic> json) {
+    return ConsumerOutstanding(
+      consumerId: ConsumerId(json['consumer_id'] as String),
+      consumerNo: ConsumerNumber(json['consumer_no'] as String? ?? ''),
+      consumerName: json['consumer_name'] as String? ?? '',
+      purok: json['purok'] as String?,
+      payableBillCount: (json['payable_bill_count'] as num?)?.toInt() ?? 0,
+      unpricedBillCount: (json['unpriced_bill_count'] as num?)?.toInt() ?? 0,
+      overdueCount: (json['overdue_count'] as num?)?.toInt() ?? 0,
+      totalOutstanding: json['total_outstanding'] == null
+          ? Money.zero
+          : Money.tryParse(json['total_outstanding'].toString()) ?? Money.zero,
+    );
+  }
+
+  /// True when there is something a cashier can actually collect.
+  bool get hasPayableBills => payableBillCount > 0;
+
+  /// Matches a typed search against the number or the name, so the cashier
+  /// can use whichever the person at the counter says first.
+  bool matches(String query) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return true;
+    return consumerNo.value.toLowerCase().contains(q) ||
+        consumerName.toLowerCase().contains(q);
+  }
 }
 
 /// One row of the Admin's "readings awaiting an amount" queue.

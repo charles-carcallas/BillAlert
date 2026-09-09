@@ -138,17 +138,11 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
           ),
 
           // ---- Cashier -----------------------------------------------
+          // Consumers, the payment and the receipt are three steps of ONE
+          // screen, because they are one task: find the household, take the
+          // cash, hand over the receipt. CashierNav has no Payment tab.
           GoRoute(
             path: Routes.cashier,
-            builder: (_, _) => const UnbuiltTab(
-              title: 'Consumers',
-              willShow: 'Search for the household at the counter, and what '
-                  'they owe across every unpaid month.',
-              figmaNode: '66:6108',
-            ),
-          ),
-          GoRoute(
-            path: '/cashier/payment',
             builder: (_, _) => const RecordPaymentScreen(),
           ),
           GoRoute(
