@@ -14,6 +14,7 @@ import 'common/role_shell.dart';
 import 'common/splash_screen.dart';
 import 'common/unbuilt_tab.dart';
 import 'consumer/current_bill_screen.dart';
+import 'consumer/history_screen.dart';
 import 'reader/reading_entry_screen.dart';
 import 'reader/roster_screen.dart';
 
@@ -23,6 +24,15 @@ class Routes {
   static const String splash = '/';
   static const String login = '/login';
   static const String changePassword = '/change-password';
+
+  /// The VOLUNTARY change-password screen, reached from a Profile tab.
+  ///
+  /// A separate path from [changePassword] on purpose. The redirect below
+  /// bounces a signed-in user off that one to their home route — which is
+  /// exactly what carries somebody out after a forced change — so a
+  /// deliberate visit could never land there. This path is not in that bounce
+  /// list, so it can.
+  static const String accountPassword = '/account/password';
 
   // Each role's section. The first entry of that role's `permittedTabs` is
   // this same path, which is what makes the correct tab light up on arrival.
@@ -71,7 +81,11 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
         builder: (_, _) => const ChangePasswordScreen(),
       ),
 
-      // Outside the shell: a full-screen task, no bottom navigation.
+      // Outside the shell: full-screen tasks, no bottom navigation.
+      GoRoute(
+        path: Routes.accountPassword,
+        builder: (_, _) => const ChangePasswordScreen(),
+      ),
       GoRoute(
         path: Routes.readingEntry,
         builder: (_, GoRouterState state) => ReadingEntryScreen(
@@ -153,11 +167,7 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
           ),
           GoRoute(
             path: '/consumer/history',
-            builder: (_, _) => const UnbuiltTab(
-              title: 'History',
-              willShow: 'Past months and the receipts that settled them.',
-              figmaNode: '20:1141',
-            ),
+            builder: (_, _) => const HistoryScreen(),
           ),
           GoRoute(
             path: '/consumer/inbox',

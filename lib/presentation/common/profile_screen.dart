@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/result/result.dart';
 import '../../domain/entities/app_user.dart';
 import '../../domain/outbox/outbox_entry.dart';
 import '../auth/auth_controller.dart';
 import '../providers.dart';
+import '../router.dart';
 
 /// Work the app is holding that has not reached the server yet.
 ///
@@ -74,6 +76,20 @@ class ProfileScreen extends ConsumerWidget {
                       _Row(label: 'Role', value: user.roleLabel),
                     ],
                   ),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+              Text('Security', style: text.titleSmall),
+              const SizedBox(height: 8),
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.lock_outline),
+                  title: const Text('Change password'),
+                  trailing: const Icon(Icons.chevron_right),
+                  // `push`, not `go`: this is a task on top of the tab, and
+                  // the back arrow has to return to it.
+                  onTap: () => context.push(Routes.accountPassword),
                 ),
               ),
 
