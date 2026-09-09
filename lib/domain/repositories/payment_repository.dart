@@ -38,10 +38,10 @@ abstract class PaymentRepository {
 final class PaymentSummary {
   final String receiptNo;
 
-  /// Who paid. The receipt list would rather show their name, but
-  /// `v_payment_history` does not carry one - see the note on
-  /// PaymentRepositoryImpl.recentInArea.
+  /// Who paid, as both an identifier and the name shown on the Cashier's
+  /// receipt list.
   final ConsumerId consumerId;
+  final String consumerName;
 
   /// Printed on the receipt and scanned at the counter to check it is real.
   final String verificationCode;
@@ -61,6 +61,7 @@ final class PaymentSummary {
   const PaymentSummary({
     required this.receiptNo,
     required this.consumerId,
+    required this.consumerName,
     required this.verificationCode,
     required this.paidAt,
     required this.totalCollected,

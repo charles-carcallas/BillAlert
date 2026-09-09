@@ -86,12 +86,8 @@ class PaymentRepositoryImpl implements PaymentRepository {
 
   /// CSH-03. Every receipt issued in this area, newest first.
   ///
-  /// NOTE for whoever builds the receipt list against the mockup: it shows
-  /// each receipt under the payer's name, and `v_payment_history` does not
-  /// carry one. It has `consumer_id` but no `consumer_name`, so the name has
-  /// to come from somewhere else or be added to the view - the same one-line
-  /// change that `cycle_year` and `cycle_month` needed. Until then this
-  /// returns the receipt without a name rather than joining in Dart.
+  /// The payer's name comes from `v_payment_history`; keeping that read in
+  /// the view avoids a second query or a join in Dart.
   @override
   Future<Result<List<PaymentSummary>>> recentInArea(
     AreaId areaId, {
@@ -133,6 +129,7 @@ class PaymentRepositoryImpl implements PaymentRepository {
       return PaymentSummary(
         receiptNo: entry.key,
         consumerId: ConsumerId(first['consumer_id'] as String),
+        consumerName: first['consumer_name'] as String? ?? '',
         verificationCode: first['verification_code'] as String? ?? '',
         paidAt: DateTime.parse(first['paid_at'] as String),
         totalCollected: _money(first['transaction_total']),

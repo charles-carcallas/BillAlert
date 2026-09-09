@@ -226,7 +226,8 @@ select
   pt.change_due,
   pay.paid_at,
   pt.cashier_id,
-  c.area_id
+  c.area_id,
+  c.first_name || ' ' || c.last_name as consumer_name
 from payments pay
 join payment_transactions pt on pt.id = pay.transaction_id
 join bills b                 on b.id  = pay.bill_id

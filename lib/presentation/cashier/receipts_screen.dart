@@ -188,6 +188,10 @@ class _ReceiptTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
+                  if (receipt.consumerName.isNotEmpty) ...<Widget>[
+                    Text(receipt.consumerName, style: text.titleSmall),
+                    const SizedBox(height: 2),
+                  ],
                   Text(receipt.receiptNo, style: text.titleSmall),
                   const SizedBox(height: 2),
                   Text(
