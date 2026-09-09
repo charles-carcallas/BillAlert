@@ -109,7 +109,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     enableSuggestions: false,
                     textInputAction: TextInputAction.next,
                     decoration: const InputDecoration(
-                      hintText: 'ledesman.dormal',
+                      // The mockup shows a real staff username here. A hint is
+                      // only an example, but printing a valid account on the
+                      // sign-in screen hands anyone holding the phone half of
+                      // a login. The shape is what the hint is for.
+                      hintText: 'firstname.lastname',
                     ),
                   ),
                   const SizedBox(height: 16),

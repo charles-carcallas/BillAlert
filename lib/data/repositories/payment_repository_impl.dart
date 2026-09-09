@@ -84,6 +84,36 @@ class PaymentRepositoryImpl implements PaymentRepository {
     }
   }
 
+  /// CSH-03. Every receipt issued in this area, newest first.
+  ///
+  /// NOTE for whoever builds the receipt list against the mockup: it shows
+  /// each receipt under the payer's name, and `v_payment_history` does not
+  /// carry one. It has `consumer_id` but no `consumer_name`, so the name has
+  /// to come from somewhere else or be added to the view - the same one-line
+  /// change that `cycle_year` and `cycle_month` needed. Until then this
+  /// returns the receipt without a name rather than joining in Dart.
+  @override
+  Future<Result<List<PaymentSummary>>> recentInArea(
+    AreaId areaId, {
+    int limit = 50,
+  }) async {
+    try {
+      final rows = await _client
+          .from('v_payment_history')
+          .select()
+          .eq('area_id', areaId.value)
+          .order('paid_at', ascending: false)
+          // The limit counts ROWS, and a row is one bill settled, so a
+          // handover covering three months uses three of them. Erring high
+          // is cheaper than a receipt appearing with a month missing.
+          .limit(limit);
+
+      return Ok<List<PaymentSummary>>(_groupIntoReceipts(rows));
+    } catch (error, stackTrace) {
+      return Err<List<PaymentSummary>>(FailureMapper.from(error, stackTrace));
+    }
+  }
+
   /// Collapses the per-bill rows of `v_payment_history` into one summary per
   /// receipt, keeping the order the rows arrived in (newest first).
   static List<PaymentSummary> _groupIntoReceipts(List<Map<String, dynamic>> rows) {
@@ -102,6 +132,7 @@ class PaymentRepositoryImpl implements PaymentRepository {
 
       return PaymentSummary(
         receiptNo: entry.key,
+        consumerId: ConsumerId(first['consumer_id'] as String),
         verificationCode: first['verification_code'] as String? ?? '',
         paidAt: DateTime.parse(first['paid_at'] as String),
         totalCollected: _money(first['transaction_total']),

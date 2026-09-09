@@ -15,6 +15,13 @@ abstract class PaymentRepository {
 
   /// The takings for the day. Backed by `v_cashier_daily_summary`.
   Future<Result<CollectionSummary>> dailySummary(AreaId areaId);
+
+  /// CSH-03, the Cashier's receipt list: every receipt issued in this area,
+  /// newest first. Backed by `v_payment_history`.
+  Future<Result<List<PaymentSummary>>> recentInArea(
+    AreaId areaId, {
+    int limit = 50,
+  });
 }
 
 /// One cash handover: one receipt, however many bills it settled.
@@ -30,6 +37,11 @@ abstract class PaymentRepository {
 /// [SettledBill].
 final class PaymentSummary {
   final String receiptNo;
+
+  /// Who paid. The receipt list would rather show their name, but
+  /// `v_payment_history` does not carry one - see the note on
+  /// PaymentRepositoryImpl.recentInArea.
+  final ConsumerId consumerId;
 
   /// Printed on the receipt and scanned at the counter to check it is real.
   final String verificationCode;
@@ -48,6 +60,7 @@ final class PaymentSummary {
 
   const PaymentSummary({
     required this.receiptNo,
+    required this.consumerId,
     required this.verificationCode,
     required this.paidAt,
     required this.totalCollected,

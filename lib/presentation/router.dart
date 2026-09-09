@@ -7,7 +7,9 @@ import 'admin/post_bill_amount_screen.dart';
 import 'auth/auth_controller.dart';
 import 'auth/change_password_screen.dart';
 import 'auth/login_screen.dart';
+import 'cashier/receipts_screen.dart';
 import 'cashier/record_payment_screen.dart';
+import 'common/profile_screen.dart';
 import 'common/role_shell.dart';
 import 'common/splash_screen.dart';
 import 'common/unbuilt_tab.dart';
@@ -96,12 +98,7 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
           ),
           GoRoute(
             path: '/reader/profile',
-            builder: (_, _) => const UnbuiltTab(
-              title: 'Profile',
-              willShow: 'Who is signed in, which area they read, and the way '
-                  'out - change password and sign out.',
-              figmaNode: '65:2060',
-            ),
+            builder: (_, _) => const ProfileScreen(),
           ),
 
           // ---- Admin (Area President) --------------------------------
@@ -129,12 +126,7 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
           ),
           GoRoute(
             path: '/admin/profile',
-            builder: (_, _) => const UnbuiltTab(
-              title: 'Profile',
-              willShow: 'Who is signed in, which area they preside over, and '
-                  'the way out.',
-              figmaNode: '70:1531',
-            ),
+            builder: (_, _) => const ProfileScreen(),
           ),
 
           // ---- Cashier -----------------------------------------------
@@ -147,21 +139,11 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
           ),
           GoRoute(
             path: '/cashier/receipts',
-            builder: (_, _) => const UnbuiltTab(
-              title: 'Receipts',
-              willShow: 'The receipts issued today, one per cash handover '
-                  'however many months it settled.',
-              figmaNode: '66:4658',
-            ),
+            builder: (_, _) => const ReceiptsScreen(),
           ),
           GoRoute(
             path: '/cashier/profile',
-            builder: (_, _) => const UnbuiltTab(
-              title: 'Profile',
-              willShow: 'Who is signed in, the takings for the day, and the '
-                  'way out.',
-              figmaNode: '66:4865',
-            ),
+            builder: (_, _) => const ProfileScreen(),
           ),
 
           // ---- Consumer ----------------------------------------------
@@ -188,12 +170,7 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
           ),
           GoRoute(
             path: '/consumer/profile',
-            builder: (_, _) => const UnbuiltTab(
-              title: 'Profile',
-              willShow: 'The account, the meter serial, the contact number an '
-                  'alert would reach, and the way out.',
-              figmaNode: '20:2960',
-            ),
+            builder: (_, _) => const ProfileScreen(),
           ),
         ],
       ),
