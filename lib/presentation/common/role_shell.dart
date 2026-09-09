@@ -48,11 +48,7 @@ class RoleShell extends ConsumerWidget {
           if (route != location) context.go(route);
         },
         destinations: <NavigationDestination>[
-          for (final AppTab tab in tabs)
-            NavigationDestination(
-              icon: Icon(_glyphFor(tab.icon)),
-              label: tab.label,
-            ),
+          for (final AppTab tab in tabs) _destinationFor(tab),
         ],
       ),
     );
@@ -80,18 +76,67 @@ class RoleShell extends ConsumerWidget {
     return best;
   }
 
-  /// The glyph for a named slot. A `switch` with no default on purpose: add a
-  /// [NavIcon] and the compiler names this line as the place to finish the job.
-  static IconData _glyphFor(NavIcon icon) => switch (icon) {
-        NavIcon.readings => Icons.speed_outlined,
-        NavIcon.consumers => Icons.people_outline,
-        NavIcon.amounts => Icons.request_quote_outlined,
-        NavIcon.disconnections => Icons.power_off_outlined,
-        NavIcon.accounts => Icons.person_add_alt_outlined,
-        NavIcon.receipts => Icons.receipt_long_outlined,
-        NavIcon.bill => Icons.description_outlined,
-        NavIcon.history => Icons.history_outlined,
-        NavIcon.inbox => Icons.notifications_outlined,
-        NavIcon.profile => Icons.person_outline,
+  static NavigationDestination _destinationFor(AppTab tab) {
+    final ({IconData outlined, IconData filled}) glyphs = _glyphsFor(tab.icon);
+
+    return NavigationDestination(
+      icon: Icon(glyphs.outlined),
+      // The selected tab is drawn filled. Weight and colour already change
+      // in the theme, but a filled glyph survives a bright screen outdoors
+      // and colour blindness, and neither of those is unusual for a meter
+      // reader holding this at midday.
+      selectedIcon: Icon(glyphs.filled),
+      label: tab.label,
+    );
+  }
+
+  /// The pair of glyphs for a named slot: outlined when the tab is not the
+  /// current one, filled when it is.
+  ///
+  /// Both come from one `switch` with no default, so a new [NavIcon] makes
+  /// the compiler name this line — and there is no way to add the outlined
+  /// glyph and forget the filled one.
+  static ({IconData outlined, IconData filled}) _glyphsFor(NavIcon icon) =>
+      switch (icon) {
+        NavIcon.readings => (
+            outlined: Icons.speed_outlined,
+            filled: Icons.speed,
+          ),
+        NavIcon.consumers => (
+            outlined: Icons.people_outline,
+            filled: Icons.people,
+          ),
+        NavIcon.amounts => (
+            outlined: Icons.request_quote_outlined,
+            filled: Icons.request_quote,
+          ),
+        NavIcon.disconnections => (
+            outlined: Icons.power_off_outlined,
+            filled: Icons.power_off,
+          ),
+        NavIcon.accounts => (
+            outlined: Icons.person_add_alt,
+            filled: Icons.person_add,
+          ),
+        NavIcon.receipts => (
+            outlined: Icons.receipt_long_outlined,
+            filled: Icons.receipt_long,
+          ),
+        NavIcon.bill => (
+            outlined: Icons.description_outlined,
+            filled: Icons.description,
+          ),
+        NavIcon.history => (
+            outlined: Icons.history_outlined,
+            filled: Icons.history,
+          ),
+        NavIcon.inbox => (
+            outlined: Icons.notifications_outlined,
+            filled: Icons.notifications,
+          ),
+        NavIcon.profile => (
+            outlined: Icons.person_outline,
+            filled: Icons.person,
+          ),
       };
 }

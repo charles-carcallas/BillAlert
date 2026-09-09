@@ -53,6 +53,22 @@ class AppTheme {
       colorScheme: scheme,
       scaffoldBackgroundColor: surface,
       useMaterial3: true,
+      appBarTheme: const AppBarTheme(
+        backgroundColor: surfaceWhite,
+        foregroundColor: textPrimary,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: outlineVariant,
+        elevation: 0,
+        scrolledUnderElevation: 2,
+        toolbarHeight: 64,
+        centerTitle: false,
+        titleTextStyle: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          color: textPrimary,
+        ),
+        shape: Border(bottom: BorderSide(color: outlineVariant)),
+      ),
       textTheme: const TextTheme(
         // Title ("BillAlert"): Bold, 24px, line-height 32px, tracking -0.6px
         headlineMedium: TextStyle(
@@ -120,7 +136,10 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: surfaceWhite,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12,
+        ),
         hintStyle: const TextStyle(
           color: textSecondary,
           fontSize: 16,
@@ -189,6 +208,51 @@ class AppTheme {
       ),
       listTileTheme: const ListTileThemeData(
         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      ),
+      // The selected tab has to be obvious at a glance, and Material 3's
+      // defaults are not. Left alone, the selected LABEL is `onSurface` and
+      // the unselected one is `onSurfaceVariant` — #1A1C18 against #5B5F54,
+      // two dark greys, on 12px text. Only the icon appeared to change, and
+      // a meter reader glancing down mid-round could not tell which tab they
+      // were on.
+      //
+      // So the selected state now carries three signals rather than one:
+      // brand colour, heavier weight, and a filled icon (RoleShell supplies
+      // the filled glyph). Colour alone is never the only cue.
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: surfaceWhite,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: Colors.transparent,
+        elevation: 0,
+        height: 68,
+        indicatorColor: primaryContainer.withValues(alpha: 0.16),
+        indicatorShape: const StadiumBorder(),
+        // Always show every label. The default hides unselected labels on
+        // narrow screens, which turns four tabs into four unlabelled glyphs.
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        iconTheme: WidgetStateProperty.resolveWith<IconThemeData>(
+          (Set<WidgetState> states) => IconThemeData(
+            size: 24,
+            color: states.contains(WidgetState.selected)
+                ? primary
+                : textSecondary,
+          ),
+        ),
+        labelTextStyle: WidgetStateProperty.resolveWith<TextStyle>(
+          (Set<WidgetState> states) => states.contains(WidgetState.selected)
+              ? const TextStyle(
+                  fontSize: 12,
+                  height: 16 / 12,
+                  fontWeight: FontWeight.w700,
+                  color: primary,
+                )
+              : const TextStyle(
+                  fontSize: 12,
+                  height: 16 / 12,
+                  fontWeight: FontWeight.w500,
+                  color: textSecondary,
+                ),
+        ),
       ),
     );
   }
