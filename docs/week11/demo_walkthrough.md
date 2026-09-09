@@ -1,165 +1,177 @@
 # Demo walkthrough — all four roles on the phone
 
-Everything in BillAlert is now built and wired. What has *not* happened is a
-person holding a phone and walking the whole thing end to end. Nine of these
-screens have never run on a device, and the three worst bugs of this project
-so far — the missing INTERNET permission, the views that bypassed RLS, the
-"you have been signed out" on a correct password — were all found by *using*
-the app, not by testing it.
+Every screen is built and routed. What has *not* happened is a person holding
+a phone and walking the whole thing end to end. The three worst bugs of this
+project — the missing INTERNET permission, the views that bypassed RLS, and
+the billing cycle the app and database disagreed about — were all found by
+*using* the app or its data, not by testing it.
 
-Work down this list. Tick as you go. Anything that misbehaves, write down what
-you did and what it said, not just "broken".
+Work down this list in order. Anything that misbehaves, write down what you
+did and what it said, not just "broken".
 
 ---
 
-## 0. Build the APK
+## 0. Before you build
+
+- [ ] `supabase/migrations/03_views.sql` re-run — the `amount_overdue` fix.
+      Without it the notice document overstates what a household owes.
 
 ```bash
 flutter build apk --release --dart-define-from-file=env.json
 ```
 
 `env.json` holds `SUPABASE_URL` and `SUPABASE_ANON_KEY`, generated from
-`.vscode/launch.json` and gitignored. Use it rather than typing two
-`--dart-define` flags: an APK built without them installs and runs perfectly,
-then fails **every** sign-in with "Something went wrong on the server" — which
-looks like a backend problem and is not. That mistake has already cost one
-build.
+`.vscode/launch.json` and gitignored. Use it rather than two `--dart-define`
+flags: an APK built without them installs and runs perfectly, then fails
+**every** sign-in with "Something went wrong on the server" — which looks like
+a backend problem and is not. That has already cost one build.
 
-The APK lands at `build/app/outputs/flutter-apk/app-release.apk`.
+- [ ] Built and installed
 
-- [ ] Built with `--dart-define-from-file=env.json`
-- [ ] Installed on the phone
+---
+
+## The data you are walking into
+
+| Household | State | Used for |
+|---|---|---|
+| Elena Bongcaras | overdue ₱541.20, **active notice DN-2026-0910-0033** | the notice document |
+| Rodel Amistad | overdue ₱612.35, no notice | serving a notice live |
+| B. Sarigumba | overdue ₱533.45, Aug bill ₱658.30 unpaid | cashier collection |
+| Busalanan, Lumayag | paid in full | the eligibility guard |
+
+The **September cycle is empty** — no household has been read. That is what
+steps 1 and 5 need.
 
 ---
 
 ## 1. Meter Reader — `ledesman.dormal`
 
-- [ ] Sign in. Lands on **Readings**, not on somebody else's home screen.
-- [ ] The round shows real households for Area 3 with their last reading.
-- [ ] Tap a household → the entry form opens with the previous reading shown.
-- [ ] Type a reading **above** the previous one → Save → confirmation.
-- [ ] Go back in and try that **same household again** → refused.
-      *(FR-23, one reading per household per cycle.)*
-- [ ] Try a reading **below** the previous one on another household → refused.
-      *(MTR-08, a meter does not run backwards.)*
-- [ ] **Consumers** tab lists the area; **Profile** shows "Meter Reader".
+- [ ] Sign in. Lands on **Readings**.
+- [ ] The round says **September 2026** and lists all five households unread.
+- [ ] Tap one household → the form opens with its previous reading.
+- [ ] Type a reading **above** the previous → Save → confirmation.
 
-Write down: the household you read, and the number you typed. The Admin needs
-it in step 2.
+**Read ONE household only.** Steps 5 needs unread households left, and once
+a household is read this cycle FR-23 will not let you read it again.
+
+- [ ] Go back into that same household → refused. *(FR-23.)*
+- [ ] On a different household, try a reading **below** the previous → refused.
+      *(MTR-08, a meter does not run backwards.)*
+- [ ] **Consumers** tab lists the area; **Profile** says "Meter Reader".
+
+Write down which household you read and the number you typed.
 
 ---
 
 ## 2. Admin (Area President) — `mario.ombajin`
 
-- [ ] Sign in. Lands on **Amounts**.
-- [ ] The reading from step 1 is in the queue, with how long it has waited.
-- [ ] Type the peso amount and a due date → Post.
-      **The amount comes from the cooperative's own bill.** BillAlert never
-      computes one — there is no tariff anywhere in this codebase, by design.
+**Amounts:**
+
+- [ ] The reading from step 1 is in the queue with how long it has waited.
+- [ ] Type the peso amount and a due date → Post. **The amount comes from the
+      cooperative's bill.** BillAlert computes no amount — there is no tariff
+      anywhere in this codebase, by design.
 - [ ] It leaves the queue.
 
-**Accounts tab — new, never run on a device:**
+**Accounts:**
 
 - [ ] Opens on the households of Area 3, with a count.
-- [ ] Pull down to refresh — the list comes from the server.
-- [ ] Tap **New consumer** → fill in a consumer number, first and last name →
-      Create.
+- [ ] Pull down to refresh.
+- [ ] **New consumer** → consumer number, first and last name → Create.
 - [ ] Confirmation shows the name and number back.
-- [ ] **Done** → you are back on the list and *the new household is in it.*
-      This is the bit worth watching: the record is written to Supabase, not
-      to the phone's cache, so the list refreshes from the server on the way
-      back. If the new name is missing, that refresh is broken.
-- [ ] Try creating one with a consumer number that already exists → it should
-      say the number is in use, not "something went wrong".
-- [ ] The card at the foot says staff sign-ins cannot be created here. That is
-      the honest answer, not a missing screen: creating an auth user needs the
-      service-role key, and that key must never be inside an app anyone can
-      install.
+- [ ] **Done** → back on the list, and *the new household is in it.* If it is
+      missing, the server refresh on return is broken.
+- [ ] Try a consumer number that already exists → it should say the number is
+      in use, not "something went wrong".
+- [ ] The foot of the tab says staff sign-ins cannot be created here. That is
+      the honest answer, not a missing screen — it needs the service-role key,
+      which must never be inside an app anyone can install.
 
-**Notices tab:**
+**Notices:**
 
-- [ ] Lists active notices, or says plainly there are none.
-- [ ] **Serve a notice** → households with overdue bills are listed first,
-      households with nothing overdue are greyed out and untappable.
-- [ ] Pick an overdue one → confirm dialog → serve.
-- [ ] It appears under Notices with hours remaining. That countdown comes from
-      the server (48 hours from service, then past any Sunday or holiday) —
-      the app never works out a legal deadline itself.
+- [ ] Elena's notice is listed with hours remaining.
+- [ ] **Tap it** → the notice document opens: notice number, her address and
+      meter serial, the reason, when it was served, the earliest lawful
+      moment, and what she owes.
+- [ ] Check the amount reads **₱541.20** — her overdue balance, not her total
+      unpaid. If it shows more, `03_views.sql` was not re-run.
+- [ ] Read the line saying BillAlert never authorises, schedules, or executes
+      a disconnection. "Referred" records a handover to the cooperative.
+- [ ] **Do not close Elena's notice yet** — closing it removes it from the
+      list, and you want it there if you demo this twice.
+- [ ] Back → **Serve a notice** → Rodel and Sarigumba are listed first;
+      Busalanan and Lumayag are greyed out with "nothing overdue".
+- [ ] Serve one on **Rodel** → confirm → it appears in the list.
+- [ ] Open Rodel's document → record the outcome as **settled** → it leaves
+      the list. That is `fn_close_disconnection_notice`, the last RPC.
+
+The countdown is worked out server-side: 48 hours from service, then past any
+Sunday or holiday, then into the 08:00 window. Elena's was served 10 Sep
+04:55 and is lawful from **14 Sep 08:00** — Saturday skipped, Sunday skipped.
+The app never computes that.
 
 ---
 
 ## 3. Cashier — `mercedita.gales`
 
 - [ ] Sign in. Lands on the payment screen.
-- [ ] Search for the household whose amount was posted in step 2.
-- [ ] Its unpaid bills are listed with the real amounts.
+- [ ] Search for the household whose amount you posted in step 2.
+- [ ] Its unpaid bills are listed with real amounts.
 - [ ] Select the bills, enter cash tendered → Record payment.
-- [ ] A receipt number and a verification code come back, with the change due.
+- [ ] A receipt number, a verification code, and the change due come back.
 - [ ] **Receipts** tab shows it in today's collection.
 
-**Write down the receipt number.** You need it in step 4.
+**Write down the receipt number.**
 
 ---
 
 ## 4. Consumer — the household you just took money from
 
-The seeded consumer logins are `virgilio.busalanan`, `teresita.lumayag`, and
-so on. First sign-in forces a password change (GEN-04) unless it has been
-changed already.
-
 - [ ] Sign in. If it demands a new password, there is nowhere else to go —
-      that is deliberate.
-- [ ] **Bill** shows the current bill: priced, with the amount and due date, or
-      an honest "waiting for the amount" if it has not been posted.
+      that is deliberate (GEN-04).
+- [ ] **Bill** shows the current bill, or an honest "waiting for the amount".
 - [ ] **History** lists past months with their status.
-- [ ] Tap the month that was just settled → **the receipt opens**, and the
-      receipt number matches what the cashier read out in step 3. That match
-      is the whole system in one glance: reader → admin → cashier → consumer.
-- [ ] The verification code is printed as text. The mockup shows a QR; the
-      screen says why it does not, rather than pretending.
+- [ ] Tap the settled month → **the receipt opens**, and its number matches
+      what the cashier read out. Reader → Admin → Cashier → Consumer, in one
+      glance.
+- [ ] The verification code is text, not a QR, and the screen says why.
 - [ ] **Inbox** shows notifications, or says there are none.
-- [ ] **Profile** → change password → change it, sign out, sign back in with
-      the new one. Then put it back to the demo password.
-- [ ] While in there: try changing it to the *same* password it already is.
-      It must say the new password has to be different — **not** "you have
-      been signed out". That bug is fixed and regression-tested; confirm it on
-      the device.
+- [ ] **Profile** → change password → sign out → sign back in → change it back.
+- [ ] Try changing it to the password it already is. It must say the new one
+      has to be different — **not** "you have been signed out".
 
 ---
 
 ## 5. The offline test — this is the graded one
 
-NFR-05 and MTR-11/12. It is the only requirement with no evidence at all, and
-it is the requirement this whole outbox architecture exists for. Do it last,
-and do it carefully.
+NFR-05 and MTR-11/12. The only requirement with no evidence at all, and the
+reason the outbox exists. Do it last, and carefully.
 
 - [ ] Sign in as `ledesman.dormal` **with signal**, so the roster caches.
 - [ ] Turn on **airplane mode**.
-- [ ] Open **Consumers** — the households are still there. (From the encrypted
-      cache. This is the point.)
-- [ ] Record a reading on a household not yet read this cycle.
-- [ ] It **saves** and says it is queued. It must not show a network error and
-      it must not lose the reading.
+- [ ] Open **Consumers** — the households are still there. From the encrypted
+      cache. This is the point.
+- [ ] Record a reading on a household you did **not** read in step 1.
+- [ ] It **saves** and says it is queued. No network error, no lost reading.
 - [ ] **Force-stop the app** from Android settings. Not just background it.
-- [ ] Reopen it, still in airplane mode → the queued reading is still queued.
-      *(This is the "survives restart" line in the evidence log.)*
+- [ ] Reopen, still in airplane mode → the reading is still queued.
+      *(This replaces "survives restart — not verified" in the evidence log.)*
 - [ ] Turn airplane mode **off**.
-- [ ] The queue drains. The reading syncs.
-- [ ] Sign in as `mario.ombajin` → that household is now in the Amounts queue
-      as an unpriced bill.
+- [ ] The queue drains and the reading syncs.
+- [ ] Sign in as `mario.ombajin` → that household is in the Amounts queue.
 
-The time on the reading should be **when you typed it in airplane mode**, not
-when it synced. That is `capturedAt`, and it is why the bill lands in the right
-billing cycle even when a reader walks a whole barangay with no signal.
+The reading's time should be **when you typed it in airplane mode**, not when
+it synced. That is `capturedAt`, and it is why a reading lands in the right
+billing cycle when a reader walks a whole barangay with no signal.
 
 ---
 
 ## What to record
 
 For `evidence_log.md`, per step: what you did, what the app showed, and the
-identifier it produced — bill number, receipt number, consumer number. An
-identifier is what makes it evidence rather than a claim; it can be looked up
-in the database afterwards.
+identifier it produced — bill number, receipt number, notice number, consumer
+number. An identifier is what makes it evidence rather than a claim, because
+it can be looked up in the database afterwards.
 
-Two lines in that log currently read **not verified — needs a device**. Step 5
-is what replaces them.
+Two lines in that log still read **not verified — needs a device**. Step 5 is
+what replaces them.
