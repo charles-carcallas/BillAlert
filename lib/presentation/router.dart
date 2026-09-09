@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../domain/entities/app_user.dart';
+import 'admin/disconnections_screen.dart';
 import 'admin/post_bill_amount_screen.dart';
 import 'auth/auth_controller.dart';
 import 'auth/change_password_screen.dart';
@@ -15,6 +16,8 @@ import 'common/splash_screen.dart';
 import 'common/unbuilt_tab.dart';
 import 'consumer/current_bill_screen.dart';
 import 'consumer/history_screen.dart';
+import 'consumer/inbox_screen.dart';
+import 'reader/consumers_screen.dart';
 import 'reader/reading_entry_screen.dart';
 import 'reader/roster_screen.dart';
 
@@ -103,12 +106,7 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
           ),
           GoRoute(
             path: '/reader/consumers',
-            builder: (_, _) => const UnbuiltTab(
-              title: 'Consumers',
-              willShow: 'The households of this area, with the meter serial '
-                  'and the last reading taken for each.',
-              figmaNode: '65:1863',
-            ),
+            builder: (_, _) => const ReaderConsumersScreen(),
           ),
           GoRoute(
             path: '/reader/profile',
@@ -122,12 +120,7 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
           ),
           GoRoute(
             path: '/admin/disconnections',
-            builder: (_, _) => const UnbuiltTab(
-              title: 'Notices',
-              willShow: 'Active disconnection notices, and the earliest date '
-                  'each one may lawfully be acted on.',
-              figmaNode: '70:1226',
-            ),
+            builder: (_, _) => const DisconnectionsScreen(),
           ),
           GoRoute(
             path: '/admin/accounts',
@@ -171,12 +164,7 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
           ),
           GoRoute(
             path: '/consumer/inbox',
-            builder: (_, _) => const UnbuiltTab(
-              title: 'Inbox',
-              willShow: 'Alerts sent to this household - bill ready, due soon, '
-                  'overdue, disconnection notice.',
-              figmaNode: '20:2315',
-            ),
+            builder: (_, _) => const InboxScreen(),
           ),
           GoRoute(
             path: '/consumer/profile',

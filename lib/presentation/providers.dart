@@ -6,6 +6,8 @@ import '../data/local/app_database.dart';
 import '../data/repositories/auth_repository_impl.dart';
 import '../data/repositories/bill_repository_impl.dart';
 import '../data/repositories/consumer_repository_impl.dart';
+import '../data/repositories/notice_repository_impl.dart';
+import '../data/repositories/notification_repository_impl.dart';
 import '../data/repositories/outbox_repository_impl.dart';
 import '../data/repositories/payment_repository_impl.dart';
 import '../data/repositories/reading_repository_impl.dart';
@@ -15,6 +17,8 @@ import '../domain/outbox/outbox_operation.dart';
 import '../domain/repositories/auth_repository.dart';
 import '../domain/repositories/bill_repository.dart';
 import '../domain/repositories/consumer_repository.dart';
+import '../domain/repositories/notice_repository.dart';
+import '../domain/repositories/notification_repository.dart';
 import '../domain/repositories/outbox_repository.dart';
 import '../domain/repositories/payment_repository.dart';
 import '../domain/repositories/reading_repository.dart';
@@ -89,6 +93,20 @@ final billRepositoryProvider = Provider<BillRepository>(
 
 final paymentRepositoryProvider = Provider<PaymentRepository>(
   (Ref ref) => PaymentRepositoryImpl(
+    ref.watch(appDatabaseProvider),
+    ref.watch(supabaseClientProvider),
+  ),
+);
+
+final noticeRepositoryProvider = Provider<NoticeRepository>(
+  (Ref ref) => NoticeRepositoryImpl(
+    ref.watch(appDatabaseProvider),
+    ref.watch(supabaseClientProvider),
+  ),
+);
+
+final notificationRepositoryProvider = Provider<NotificationRepository>(
+  (Ref ref) => NotificationRepositoryImpl(
     ref.watch(appDatabaseProvider),
     ref.watch(supabaseClientProvider),
   ),
