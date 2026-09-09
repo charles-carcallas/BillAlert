@@ -1,0 +1,54 @@
+{
+  "views": [
+    "v_active_disconnection_warnings",
+    "v_bill_status",
+    "v_cashier_collection_progress",
+    "v_cashier_daily_summary",
+    "v_consumer_current_bill",
+    "v_consumer_outstanding",
+    "v_due_for_overdue_notice",
+    "v_due_for_predue_reminder",
+    "v_meter_reader_progress",
+    "v_notification_status",
+    "v_payment_history",
+    "v_readings_awaiting_amount"
+  ],
+  "tables": [
+    "areas",
+    "billing_cycles",
+    "bills",
+    "consumers",
+    "disconnection_notices",
+    "meter_readings",
+    "notifications",
+    "payment_transactions",
+    "payments",
+    "ph_holidays",
+    "profiles",
+    "settings",
+    "sms_providers"
+  ],
+  "rpc_callable": [
+    "fn_close_disconnection_notice",
+    "fn_issue_disconnection_notice",
+    "fn_post_bill_amount",
+    "fn_record_meter_reading",
+    "fn_record_payment"
+  ],
+  "rpc_internal": [
+    "current_area",
+    "current_consumer_id",
+    "current_role",
+    "current_user_id",
+    "fn_bills_sync_derived",
+    "fn_earliest_lawful_disconnection",
+    "fn_ensure_billing_cycle",
+    "fn_normalize_contact",
+    "fn_normalize_ph_mobile",
+    "fn_ph_today",
+    "fn_queue_notification",
+    "fn_render_bill_message",
+    "is_admin",
+    "staff_in_area"
+  ]
+}
