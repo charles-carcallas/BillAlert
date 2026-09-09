@@ -10,6 +10,12 @@
 -- Meter Reader querying v_meter_reader_progress see only their own area,
 -- and it is set on every view at the foot of this file. Read that block
 -- before adding a view here.
+--
+-- ADDING A COLUMN TO AN EXISTING VIEW: put it at the END of the select
+-- list. `create or replace view` may only APPEND. Inserting a column
+-- mid-list renames every column after it, and Postgres refuses the whole
+-- script with 42P16 "cannot change name of view column". Order does not
+-- matter to PostgREST, which selects by name.
 -- =====================================================================
 
 -- DOM-04. "Overdue" depends on today's date, so it can never be a stored
@@ -244,16 +250,7 @@ select
   c.consumer_no,
   c.first_name || ' ' || c.last_name as consumer_name,
   c.area_id,
-  c.purok,
-  c.meter_serial_no,
   dn.reason,
-  dn.issued_by,
-  -- Who served it, for the notice document. LEFT JOIN on purpose: this view
-  -- is security_invoker, so an inner join would make a whole notice vanish
-  -- from the Admin's list the moment the issuing profile stopped being
-  -- visible to them — a missing row with no error, which is the same class
-  -- of bug as the views that once bypassed RLS entirely.
-  p.first_name || ' ' || p.last_name as issued_by_name,
   dn.served_at,
   dn.earliest_lawful_at,
   dn.served_at at time zone 'Asia/Manila'          as served_at_ph,
@@ -262,7 +259,20 @@ select
   coalesce((select sum(b.balance) from bills b
              where b.consumer_id = dn.consumer_id
                and b.total_amount is not null
-               and b.status <> 'paid'), 0)         as amount_overdue
+               and b.status <> 'paid'), 0)         as amount_overdue,
+  -- Added for the notice document (132:2), and added HERE, at the end, on
+  -- purpose. `create or replace view` may only APPEND columns: inserting one
+  -- mid-list renames every column after it and Postgres refuses with 42P16.
+  -- Anything added later goes below this line, never above it.
+  c.purok,
+  c.meter_serial_no,
+  dn.issued_by,
+  -- Who served it. LEFT JOIN on purpose: this view is security_invoker, so an
+  -- inner join would make a whole notice vanish from the Admin's list the
+  -- moment the issuing profile stopped being visible to them — a missing row
+  -- with no error, the same class of bug as the views that once bypassed RLS
+  -- entirely.
+  p.first_name || ' ' || p.last_name as issued_by_name
 from disconnection_notices dn
 join consumers c on c.id = dn.consumer_id
 left join profiles p on p.id = dn.issued_by
