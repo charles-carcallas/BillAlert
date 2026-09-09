@@ -96,6 +96,16 @@ class FailureMapper {
   /// So the code is read first, and only 401 and 403 are allowed to claim
   /// the session has ended.
   static AppFailure _fromAuth(AuthException error, String detail) {
+    // A lost connection during sign-in reaches us as an AuthException, not as
+    // a SocketException: gotrue catches the transport failure and rethrows it
+    // as AuthRetryableFetchException. So `isNetworkError` above never sees it,
+    // and without this line a meter reader with no signal is told the server
+    // is broken instead of that they are offline — on an app whose whole
+    // premise is working without signal.
+    if (error is AuthRetryableFetchException) {
+      return NetworkFailure(NetworkFailure.defaultMessage, detail);
+    }
+
     // GoTrue names its failures. The code is preferred over the prose
     // because the wording changes between releases and the code does not.
     switch (error.code) {

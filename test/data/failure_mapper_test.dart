@@ -87,6 +87,23 @@ void main() {
     });
   });
 
+  group('no signal', () {
+    test('a lost connection during sign-in is a network failure, not a server one',
+        () {
+      // gotrue catches the transport failure and rethrows it as an
+      // AuthException subclass, so the SocketException check never sees it.
+      // Before this was handled, a meter reader with no signal was told the
+      // server was broken - on an app built to work without signal.
+      final failure = FailureMapper.from(
+        AuthRetryableFetchException(message: 'Failed host lookup'),
+      );
+
+      expect(failure, isA<NetworkFailure>());
+      expect(failure.message, contains('No connection'));
+      expect(failure.message, isNot(contains('server')));
+    });
+  });
+
   group('a session that really has ended', () {
     test('401 says so', () {
       final failure = FailureMapper.from(

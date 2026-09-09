@@ -1,4 +1,18 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      BillAlert talks to Supabase, so it needs this in EVERY build.
+
+      Flutter's template declares INTERNET only in src/debug and src/profile,
+      because the tooling needs it to reach a running app for hot reload. The
+      main manifest is left to the developer - and a release APK built without
+      this line cannot open a single socket. Sign-in fails with correct
+      credentials, and every other build works, which makes it look like
+      anything but a permission.
+
+      Do not move this into a build-type manifest.
+    -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <application
         android:label="billalert"
         android:name="${applicationName}"
