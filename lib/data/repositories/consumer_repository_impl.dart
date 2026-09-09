@@ -63,6 +63,43 @@ class ConsumerRepositoryImpl implements ConsumerRepository {
   }
 
   @override
+  Future<Result<Consumer?>> signedInConsumer() async {
+    try {
+      // No `.eq` filter, deliberately. `consumers_select_scoped` lets a
+      // consumer see one row - theirs - so asking for "the row" is both the
+      // simplest query and the correct one. Staff see their whole area, which
+      // is why this returns null for them rather than an arbitrary household.
+      final rows = await _client
+          .from('consumers')
+          .select(
+            'id, consumer_no, first_name, last_name, contact_number, '
+            'meter_serial_no, area_id, purok, account_status',
+          )
+          .limit(2);
+
+      if (rows.length != 1) return const Ok<Consumer?>(null);
+
+      final Map<String, dynamic> row = rows.first;
+      return Ok<Consumer?>(Consumer(
+        id: ConsumerId(row['id'] as String),
+        consumerNo: ConsumerNumber(row['consumer_no'] as String),
+        firstName: row['first_name'] as String,
+        lastName: row['last_name'] as String,
+        contactNumber: row['contact_number'] as String?,
+        meterSerialNo: row['meter_serial_no'] as String?,
+        areaId: AreaId(row['area_id'] as String),
+        purok: row['purok'] as String?,
+        accountStatus: AccountStatus.fromCode(row['account_status'] as String),
+        // Not needed to identify a household, and the consumer screens do not
+        // show it. Left at zero rather than guessed.
+        previousReading: Kwh.zero,
+      ));
+    } catch (error, stackTrace) {
+      return Err<Consumer?>(FailureMapper.from(error, stackTrace));
+    }
+  }
+
+  @override
   Future<Result<DateTime?>> lastRefreshedAt() async {
     try {
       final query = _db.select(_db.syncMeta)

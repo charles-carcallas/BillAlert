@@ -147,6 +147,13 @@ final class FakeConsumerRepository implements ConsumerRepository {
     return const Ok<Consumer?>(null);
   }
 
+  /// The household the signed-in consumer belongs to, when the test is
+  /// standing in for a consumer rather than staff.
+  Consumer? me;
+
+  @override
+  Future<Result<Consumer?>> signedInConsumer() async => Ok<Consumer?>(me);
+
   @override
   Future<Result<DateTime?>> lastRefreshedAt() async =>
       Ok<DateTime?>(refreshedAt);

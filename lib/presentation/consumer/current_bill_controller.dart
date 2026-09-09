@@ -76,21 +76,33 @@ class CurrentBillController extends Notifier<CurrentBillState> {
   Future<void> _load() async {
     state = state.copyWith(isLoading: true, failure: null);
     
-    final profileId = ref.read(authControllerProvider).value?.id;
-    if (profileId == null) {
+    // Which household is this? A consumer signs in with a `profiles` row, but
+    // bills hang off a `consumers` row and the two have different ids. This
+    // used to pass the profile id straight in, which matched nothing once the
+    // repository started filtering on consumer_id - the screen went silently
+    // empty for a consumer who did have a bill.
+    final consumerResult =
+        await ref.read(consumerRepositoryProvider).signedInConsumer();
+
+    final ConsumerId? consumerId = switch (consumerResult) {
+      Ok(:final value) => value?.id,
+      Err() => null,
+    };
+
+    if (consumerId == null) {
       state = state.copyWith(
         isLoading: false,
-        failure: const ValidationFailure('Not logged in'),
+        failure: const PermissionFailure(
+          'This screen shows a household its own bill, and the account you '
+          'are signed in with is not attached to one.',
+        ),
       );
       return;
     }
 
     final billRepo = ref.read(billRepositoryProvider);
-    // The consumer ID argument is ignored by the repository for currentBillFor
-    // because RLS handles scoping to the consumer.
-    final dummyConsumerId = ConsumerId(profileId.value);
-    
-    final billResult = await billRepo.currentBillFor(dummyConsumerId);
+
+    final billResult = await billRepo.currentBillFor(consumerId);
     Bill? currentBill;
     switch (billResult) {
       case Ok(:final value):
@@ -103,7 +115,7 @@ class CurrentBillController extends Notifier<CurrentBillState> {
         return;
     }
 
-    final historyResult = await billRepo.historyFor(dummyConsumerId);
+    final historyResult = await billRepo.historyFor(consumerId);
     List<Bill> history = [];
     switch (historyResult) {
       case Ok(:final value):

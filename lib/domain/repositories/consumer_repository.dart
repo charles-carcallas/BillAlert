@@ -21,6 +21,21 @@ abstract class ConsumerRepository {
   /// One household, from the cache.
   Future<Result<Consumer?>> byId(ConsumerId id);
 
+  /// The household of the signed-in consumer.
+  ///
+  /// A consumer signs in with a `profiles` row, but bills, readings and
+  /// payments all hang off a `consumers` row, and the two have different ids.
+  /// Without this the consumer screens have no way to ask "which household am
+  /// I?", and passing the profile id where a consumer id belongs matches
+  /// nothing at all.
+  ///
+  /// Row-Level Security is what makes this safe and simple: a consumer can
+  /// see exactly one row of `consumers` - their own - so the query needs no
+  /// filter and cannot return somebody else's household.
+  ///
+  /// Null when the signed-in user is staff, who have no household.
+  Future<Result<Consumer?>> signedInConsumer();
+
   /// When the cache was last filled, so a screen can say so. GEN-11 requires
   /// every screen showing cached data to show this, in case someone acts on
   /// a stale figure believing it is live.
