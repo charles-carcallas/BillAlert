@@ -259,7 +259,16 @@ class _SavedConfirmation extends ConsumerWidget {
                   ref
                       .read(readingEntryControllerProvider.notifier)
                       .dismissFailure();
-                  context.go('/reader');
+                  // Pop, because the round is still underneath — the form is
+                  // pushed on top of it now rather than replacing it, so the
+                  // back arrow and Android's back button both work. `go` is
+                  // kept as the fallback for arriving here by deep link,
+                  // where there is nothing to pop back to.
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.go('/reader');
+                  }
                 },
                 child: const Text('Back to my round'),
               ),

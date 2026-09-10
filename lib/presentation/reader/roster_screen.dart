@@ -99,6 +99,11 @@ class _RosterBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final roster = view.roster;
 
+    final List<RosterEntry> pending =
+        roster.entries.where((RosterEntry e) => !e.isDone).toList();
+    final List<RosterEntry> done =
+        roster.entries.where((RosterEntry e) => e.isDone).toList();
+
     return RefreshIndicator(
       onRefresh: () async {
         final failure = await ref
@@ -119,11 +124,6 @@ class _RosterBody extends ConsumerWidget {
             _WaitingToSyncCard(count: roster.waitingToSync),
           ],
           const SizedBox(height: 16),
-          Text(
-            'Households (${roster.totalConsumers})',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
           if (roster.entries.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 32),
@@ -133,11 +133,55 @@ class _RosterBody extends ConsumerWidget {
                 textAlign: TextAlign.center,
               ),
             ),
-          for (final RosterEntry entry in roster.entries)
-            _HouseholdTile(entry: entry),
+
+          // Still to read, first. A reader works down this list on foot, and
+          // as the round progresses the finished houses would otherwise pile
+          // up above the next one they actually have to walk to.
+          if (pending.isNotEmpty) ...<Widget>[
+            Text(
+              'Still to read (${pending.length})',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            for (final RosterEntry entry in pending)
+              _HouseholdTile(
+                entry: entry,
+                onOpen: () => _openEntry(context, ref, entry),
+              ),
+          ],
+
+          if (done.isNotEmpty) ...<Widget>[
+            if (pending.isNotEmpty) const SizedBox(height: 20),
+            Text(
+              'Done this cycle (${done.length})',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            for (final RosterEntry entry in done)
+              _HouseholdTile(entry: entry, onOpen: null),
+          ],
         ],
       ),
     );
+  }
+
+  /// Opens the reading form and refreshes the round on the way back.
+  ///
+  /// `push`, not `go`. With `go` the form replaced the round instead of
+  /// sitting on top of it, so it had no back arrow and Android's back button
+  /// had nothing to pop — a reader who tapped the wrong house could only get
+  /// out by recording a reading they did not mean to take.
+  ///
+  /// The round then has to be refreshed by hand: with the form pushed on top,
+  /// the list underneath is still alive and would show the household as
+  /// unread after it had just been recorded.
+  static Future<void> _openEntry(
+    BuildContext context,
+    WidgetRef ref,
+    RosterEntry entry,
+  ) async {
+    await context.push('/reader/entry/${entry.consumer.id.value}');
+    ref.invalidate(rosterControllerProvider);
   }
 }
 
@@ -249,7 +293,11 @@ class _WaitingToSyncCard extends ConsumerWidget {
 class _HouseholdTile extends StatelessWidget {
   final RosterEntry entry;
 
-  const _HouseholdTile({required this.entry});
+  /// Null for a household already done this cycle. FR-23 refuses a second
+  /// reading anyway; not offering the tap is kinder than refusing it after.
+  final VoidCallback? onOpen;
+
+  const _HouseholdTile({required this.entry, required this.onOpen});
 
   @override
   Widget build(BuildContext context) {
@@ -276,11 +324,7 @@ class _HouseholdTile extends StatelessWidget {
                 backgroundColor: scheme.secondaryContainer,
               )
             : const Icon(Icons.chevron_right),
-        // A household already done this cycle cannot be opened again. FR-23
-        // is refused by the use case anyway; not offering it is kinder.
-        onTap: entry.isDone
-            ? null
-            : () => context.go('/reader/entry/${consumer.id.value}'),
+        onTap: onOpen,
       ),
     );
   }
