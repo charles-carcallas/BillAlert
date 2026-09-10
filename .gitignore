@@ -73,3 +73,7 @@ scratch/
 # Built from .vscode/launch.json for --dart-define-from-file. Same values,
 # not a second secret, but keep it out of the repo all the same.
 env.json
+
+# Editor backups. .vscode/launch.json is ignored but launch.json.bak was
+# not, so a copy of the Supabase key could sit untracked beside it.
+*.bak
