@@ -34,13 +34,28 @@ a backend problem and is not. That has already cost one build.
 
 | Household | State | Used for |
 |---|---|---|
+| **Virgilio Busalanan** | paid in full, **the only household that can sign in** | the whole live chain |
 | Elena Bongcaras | overdue ₱541.20, **active notice DN-2026-0910-0033** | the notice document |
 | Rodel Amistad | overdue ₱612.35, no notice | serving a notice live |
 | B. Sarigumba | overdue ₱533.45, Aug bill ₱658.30 unpaid | cashier collection |
-| Busalanan, Lumayag | paid in full | the eligibility guard |
+| Teresita Lumayag | paid in full | the eligibility guard |
 
 The **September cycle is empty** — no household has been read. That is what
 steps 1 and 5 need.
+
+### Read BUSALANAN's meter in step 1
+
+`virgilio.busalanan` is the only consumer login that exists. Every other
+household has `profile_id` null and cannot sign in, so a receipt handed to
+any of them can never be opened by a consumer.
+
+Read his meter, post his amount, collect his payment — and step 4 signs in
+as him and watches the receipt appear. That is the entire system in one
+unbroken pass, and it needs no new account.
+
+He already has one receipt from earlier — `BIEC-2026-09-004471`, settling
+two months on one number. After step 3 he will have two, which also shows
+History with more than a single row in it.
 
 ---
 
@@ -48,11 +63,14 @@ steps 1 and 5 need.
 
 - [ ] Sign in. Lands on **Readings**.
 - [ ] The round says **September 2026** and lists all five households unread.
-- [ ] Tap one household → the form opens with its previous reading.
-- [ ] Type a reading **above** the previous → Save → confirmation.
+- [ ] Tap **Virgilio Busalanan** (2019-0917-TUB) → the form opens with his
+      previous reading, 3475.
+- [ ] Type a reading **above** it — 3538 gives 63 kWh — → Save → confirmation.
 
-**Read ONE household only.** Steps 5 needs unread households left, and once
-a household is read this cycle FR-23 will not let you read it again.
+**Read ONE household only, and make it Busalanan.** He is the only consumer
+who can sign in, so he is the only one who can open the receipt in step 4.
+Step 5 needs unread households left, and once a household is read this cycle
+FR-23 will not let you read it again.
 
 - [ ] Go back into that same household → refused. *(FR-23.)*
 - [ ] On a different household, try a reading **below** the previous → refused.
@@ -115,7 +133,7 @@ The app never computes that.
 ## 3. Cashier — `mercedita.gales`
 
 - [ ] Sign in. Lands on the payment screen.
-- [ ] Search for the household whose amount you posted in step 2.
+- [ ] Search for **Busalanan** — the household whose amount you posted in step 2.
 - [ ] Its unpaid bills are listed with real amounts.
 - [ ] Select the bills, enter cash tendered → Record payment.
 - [ ] A receipt number, a verification code, and the change due come back.
@@ -125,15 +143,23 @@ The app never computes that.
 
 ---
 
-## 4. Consumer — the household you just took money from
+## 4. Consumer — `virgilio.busalanan`
+
+The only consumer login that exists, which is why steps 1 to 3 were all done
+against his household.
 
 - [ ] Sign in. If it demands a new password, there is nowhere else to go —
       that is deliberate (GEN-04).
 - [ ] **Bill** shows the current bill, or an honest "waiting for the amount".
-- [ ] **History** lists past months with their status.
-- [ ] Tap the settled month → **the receipt opens**, and its number matches
+- [ ] **History** lists **three** months now: July and August settled on
+      receipt `BIEC-2026-09-004471`, and September on the receipt you just
+      created.
+- [ ] Tap the September row → **the receipt opens**, and its number matches
       what the cashier read out. Reader → Admin → Cashier → Consumer, in one
       glance.
+- [ ] Tap the July row → the OLDER receipt opens, and July and August share
+      one number. That is correct: the money changed hands once, so there is
+      one receipt covering both months.
 - [ ] The verification code is text, not a QR, and the screen says why.
 - [ ] **Inbox** shows notifications, or says there are none.
 - [ ] **Profile** → change password → sign out → sign back in → change it back.
