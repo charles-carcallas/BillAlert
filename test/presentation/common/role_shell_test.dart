@@ -68,8 +68,27 @@ void main() {
     );
   }
 
-  NavigationBar barOf(WidgetTester tester) =>
-      tester.widget<NavigationBar>(find.byType(NavigationBar));
+  /// The tabs the bar is currently showing, in order.
+  ///
+  /// Asserts on [RoleTab] rather than on NavigationBar: the bar is built
+  /// directly, because Material 3's selection indicator sits behind the icon
+  /// only and cannot be made to cover the label.
+  List<RoleTab> tabsOf(WidgetTester tester) =>
+      tester.widgetList<RoleTab>(find.byType(RoleTab)).toList();
+
+  /// The index of the tab that reports itself selected, or -1.
+  int selectedIndexOf(WidgetTester tester) {
+    final List<RoleTab> tabs = tabsOf(tester);
+    final int index = tabs.indexWhere((RoleTab tab) => tab.selected);
+    // Exactly one, always. Two highlighted tabs would be a worse bug than
+    // none, and neither would fail the index assertions on their own.
+    expect(
+      tabs.where((RoleTab tab) => tab.selected).length,
+      1,
+      reason: 'exactly one tab must be selected',
+    );
+    return index;
+  }
 
   // The pair below is the point of the whole class: the same widget, given
   // two different users, produces two different bars. Kept as two tests
@@ -81,7 +100,7 @@ void main() {
 
     // Three, matching CashierNav. Payment is not a tab: it is a step reached
     // from Consumers, so there is no way to tab away mid-payment.
-    expect(barOf(tester).destinations.length, 3);
+    expect(tabsOf(tester).length, 3);
     for (final String label in <String>['Consumers', 'Receipts', 'Profile']) {
       expect(find.text(label), findsOneWidget, reason: 'missing tab $label');
     }
@@ -93,7 +112,7 @@ void main() {
     await tester.pumpWidget(shellUnderTest(user: reader, at: '/reader'));
     await tester.pumpAndSettle();
 
-    expect(barOf(tester).destinations.length, 3);
+    expect(tabsOf(tester).length, 3);
     expect(find.text('Readings'), findsOneWidget);
     expect(find.text('Consumers'), findsOneWidget);
     expect(find.text('Profile'), findsOneWidget);
@@ -111,7 +130,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('panel:Receipts'), findsOneWidget);
-    expect(barOf(tester).selectedIndex, 1);
+    expect(selectedIndexOf(tester), 1);
   });
 
   testWidgets('the home route selects the first tab', (WidgetTester tester) async {
@@ -119,7 +138,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('panel:Consumers'), findsOneWidget);
-    expect(barOf(tester).selectedIndex, 0);
+    expect(selectedIndexOf(tester), 0);
   });
 
   testWidgets('tapping a tab moves to it and moves the selection',
@@ -131,7 +150,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('panel:Profile'), findsOneWidget);
-    expect(barOf(tester).selectedIndex, 2);
+    expect(selectedIndexOf(tester), 2);
   });
 
   testWidgets('every tab a role offers can actually be reached',

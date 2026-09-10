@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../domain/entities/app_user.dart';
 import '../auth/auth_controller.dart';
+import '../theme.dart';
 
 /// The bottom navigation every signed-in role sits inside.
 ///
@@ -38,18 +39,42 @@ class RoleShell extends ConsumerWidget {
       // Each panel brings its own Scaffold and AppBar, so this one supplies
       // only the bar along the bottom and the surface behind it.
       body: child,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: selected,
-        onDestinationSelected: (int index) {
-          final String route = tabs[index].route;
-          // `go`, not `push`: tapping a tab replaces where you are rather
-          // than stacking another copy of it behind you. Otherwise the back
-          // button walks you through every tab you have ever tapped.
-          if (route != location) context.go(route);
-        },
-        destinations: <NavigationDestination>[
-          for (final AppTab tab in tabs) _destinationFor(tab),
-        ],
+      // Built directly rather than with NavigationBar. Material 3 draws its
+      // selection indicator behind the ICON only and gives no way to extend
+      // it around the label, so the selected tab read as a highlighted glyph
+      // with some ordinary text underneath it.
+      bottomNavigationBar: Material(
+        color: AppTheme.surfaceWhite,
+        child: SafeArea(
+          top: false,
+          child: DecoratedBox(
+            decoration: const BoxDecoration(
+              border: Border(top: BorderSide(color: AppTheme.outlineVariant)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: Row(
+                children: <Widget>[
+                  for (int i = 0; i < tabs.length; i++)
+                    Expanded(
+                      child: RoleTab(
+                        tab: tabs[i],
+                        selected: i == selected,
+                        onTap: () {
+                          final String route = tabs[i].route;
+                          // `go`, not `push`: tapping a tab replaces where
+                          // you are rather than stacking another copy behind
+                          // you. Otherwise the back button walks you through
+                          // every tab you have ever tapped.
+                          if (route != location) context.go(route);
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -74,20 +99,6 @@ class RoleShell extends ConsumerWidget {
     }
 
     return best;
-  }
-
-  static NavigationDestination _destinationFor(AppTab tab) {
-    final ({IconData outlined, IconData filled}) glyphs = _glyphsFor(tab.icon);
-
-    return NavigationDestination(
-      icon: Icon(glyphs.outlined),
-      // The selected tab is drawn filled. Weight and colour already change
-      // in the theme, but a filled glyph survives a bright screen outdoors
-      // and colour blindness, and neither of those is unusual for a meter
-      // reader holding this at midday.
-      selectedIcon: Icon(glyphs.filled),
-      label: tab.label,
-    );
   }
 
   /// The pair of glyphs for a named slot: outlined when the tab is not the
@@ -139,4 +150,80 @@ class RoleShell extends ConsumerWidget {
             filled: Icons.person,
           ),
       };
+}
+
+/// One tab in the bottom bar.
+///
+/// The selected state is a filled shape around BOTH the icon and the label,
+/// not a pill behind the glyph. That is the whole reason this exists instead
+/// of a NavigationDestination.
+///
+/// Public because [RoleShell]'s tests assert on it: how many tabs a role
+/// gets, and which one reports itself selected.
+class RoleTab extends StatelessWidget {
+  final AppTab tab;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const RoleTab({
+    required this.tab,
+    required this.selected,
+    required this.onTap,
+    super.key,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme colours = Theme.of(context).colorScheme;
+    final ({IconData outlined, IconData filled}) glyphs =
+        RoleShell._glyphsFor(tab.icon);
+
+    // Three signals, never colour alone: the filled shape, the brand colour,
+    // and a filled glyph. A meter reader reads this at midday on a bright
+    // screen, and colour blindness is not unusual.
+    final Color foreground = selected ? colours.primary : AppTheme.textSecondary;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          decoration: BoxDecoration(
+            color: selected
+                ? colours.primary.withValues(alpha: 0.12)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Icon(
+                selected ? glyphs.filled : glyphs.outlined,
+                size: 22,
+                color: foreground,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                tab.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 16 / 12,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: foreground,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
