@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/config/app_config.dart';
+import 'demo/demo_environment.dart';
 import 'presentation/app.dart';
 
 Future<void> main() async {
@@ -15,12 +17,22 @@ Future<void> main() async {
     return;
   }
 
-  await Supabase.initialize(
-    url: AppConfig.supabaseUrl,
-    // Supabase now calls this the publishable key; the dashboard and every
-    // tutorial still label it "anon key", so the dart-define keeps that name.
-    publishableKey: AppConfig.supabaseAnonKey,
-  );
+  if (!AppConfig.demoMode) {
+    await Supabase.initialize(
+      url: AppConfig.supabaseUrl,
+      // Supabase now calls this the publishable key; the dashboard and every
+      // tutorial still label it "anon key", so the dart-define keeps that
+      // name.
+      publishableKey: AppConfig.supabaseAnonKey,
+    );
+  }
 
-  runApp(const ProviderScope(child: BillAlertApp()));
+  runApp(
+    ProviderScope(
+      overrides: AppConfig.demoMode
+          ? demoProviderOverrides()
+          : const <Override>[],
+      child: const BillAlertApp(),
+    ),
+  );
 }

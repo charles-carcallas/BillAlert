@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart' hide Consumer;
 import '../../core/errors/app_failure.dart';
 import '../../core/result/result.dart';
 import '../../domain/entities/consumer.dart';
+import '../../domain/value_objects/ph_date.dart';
 import '../auth/auth_controller.dart';
 import '../common/failure_banner.dart';
 import '../providers.dart';
@@ -16,7 +17,9 @@ import '../providers.dart';
 /// Reads the cache, not the network. The meter reader opens this standing in
 /// a barangay with no signal, which is the whole reason the cache exists —
 /// pull to refresh is the only thing here that goes online.
-final readerHouseholdsProvider = FutureProvider<List<Consumer>>((Ref ref) async {
+final readerHouseholdsProvider = FutureProvider<List<Consumer>>((
+  Ref ref,
+) async {
   final user = await ref.watch(authControllerProvider.future);
   final areaId = user?.areaId;
   if (areaId == null) {
@@ -74,9 +77,9 @@ class ReaderConsumersScreen extends ConsumerWidget {
                   .refreshAreaRoster(areaId);
               if (result case Err(:final failure)) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(failure.message)),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(failure.message)));
                 }
               }
               ref.invalidate(readerHouseholdsProvider);
@@ -91,9 +94,9 @@ class ReaderConsumersScreen extends ConsumerWidget {
                             Icon(
                               Icons.people_outline,
                               size: 40,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                             ),
                             const SizedBox(height: 12),
                             Text(
@@ -162,9 +165,32 @@ class _HouseholdTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: <Widget>[
           Text(household.previousReading.format(), style: text.bodyLarge),
-          Text('last reading', style: text.bodySmall),
+          Text(
+            household.previousReadingDate == null
+                ? 'No previous reading'
+                : 'Last read ${_formatReadingDate(household.previousReadingDate!)}',
+            style: text.bodySmall,
+          ),
         ],
       ),
     );
   }
+}
+
+String _formatReadingDate(PhDate date) {
+  const months = <String>[
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return '${date.day} ${months[date.month - 1]} ${date.year}';
 }

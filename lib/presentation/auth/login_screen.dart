@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/config/app_config.dart';
 import '../../core/errors/app_failure.dart';
 import '../common/failure_banner.dart';
 import 'auth_controller.dart';
@@ -40,10 +41,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _failure = null;
     });
 
-    final failure = await ref.read(authControllerProvider.notifier).signIn(
-          username: _username.text,
-          password: _password.text,
-        );
+    final failure = await ref
+        .read(authControllerProvider.notifier)
+        .signIn(username: _username.text, password: _password.text);
 
     if (!mounted) return;
     setState(() {
@@ -97,11 +97,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     textAlign: TextAlign.center,
                     style: textTheme.bodyMedium,
                   ),
+                  if (AppConfig.demoMode) ...<Widget>[
+                    const SizedBox(height: 16),
+                    Card(
+                      color: colorScheme.secondaryContainer,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Text(
+                          'Demo data · Username: admin, reader, cashier, or '
+                          'consumer · Password: demo',
+                          textAlign: TextAlign.center,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSecondaryContainer,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 24),
-                  Text(
-                    'Username',
-                    style: textTheme.titleSmall,
-                  ),
+                  Text('Username', style: textTheme.titleSmall),
                   const SizedBox(height: 6),
                   TextField(
                     controller: _username,
@@ -120,10 +134,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: <Widget>[
-                      Text(
-                        'Password',
-                        style: textTheme.titleSmall,
-                      ),
+                      Text('Password', style: textTheme.titleSmall),
                       GestureDetector(
                         onTap: () {},
                         child: Text(
@@ -175,10 +186,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       const Expanded(child: Divider()),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text(
-                          'or',
-                          style: textTheme.bodySmall,
-                        ),
+                        child: Text('or', style: textTheme.bodySmall),
                       ),
                       const Expanded(child: Divider()),
                     ],

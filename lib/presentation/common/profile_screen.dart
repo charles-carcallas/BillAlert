@@ -4,16 +4,21 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/result/result.dart';
 import '../../domain/entities/app_user.dart';
+import '../../domain/entities/consumer.dart' as domain;
 import '../../domain/outbox/outbox_entry.dart';
 import '../auth/auth_controller.dart';
+import '../consumer/consumer_app_bar.dart';
 import '../providers.dart';
 import '../router.dart';
+import 'staff_app_bar.dart';
 
 /// Work the app is holding that has not reached the server yet.
 ///
 /// Read here rather than passed in, so the number on the Profile screen is
 /// the outbox's own answer and cannot drift from it.
-final pendingOutboxProvider = FutureProvider<List<OutboxEntry>>((Ref ref) async {
+final pendingOutboxProvider = FutureProvider<List<OutboxEntry>>((
+  Ref ref,
+) async {
   final result = await ref.watch(outboxRepositoryProvider).pending();
   return switch (result) {
     Ok(:final value) => value,
@@ -21,6 +26,18 @@ final pendingOutboxProvider = FutureProvider<List<OutboxEntry>>((Ref ref) async 
     // error: the Profile screen's job is signing out, and it must not become
     // unusable because a count failed.
     Err() => const <OutboxEntry>[],
+  };
+});
+
+/// The household record supplies details that are not stored on the auth
+/// profile, such as the consumer number and SMS contact.
+final profileConsumerProvider = FutureProvider<domain.Consumer?>((
+  Ref ref,
+) async {
+  final result = await ref.watch(consumerRepositoryProvider).signedInConsumer();
+  return switch (result) {
+    Ok(:final value) => value,
+    Err() => null,
   };
 });
 
@@ -41,7 +58,9 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final AppUser? user = ref.watch(authControllerProvider).value;
     final pending = ref.watch(pendingOutboxProvider);
-    final TextTheme text = Theme.of(context).textTheme;
+    final AsyncValue<domain.Consumer?>? consumer = user is ConsumerUser
+        ? ref.watch(profileConsumerProvider)
+        : null;
 
     if (user == null) {
       // Signing out; the router is already moving.
@@ -49,62 +68,94 @@ class ProfileScreen extends ConsumerWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
+      appBar: user is ConsumerUser
+          ? const ConsumerAppBar(title: 'Profile')
+          : user is CashierUser
+          ? const StaffAppBar(title: 'Profile')
+          : AppBar(title: const Text('Profile')),
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: () async => ref.invalidate(pendingOutboxProvider),
+          onRefresh: () async {
+            ref.invalidate(pendingOutboxProvider);
+            if (user is ConsumerUser) ref.invalidate(profileConsumerProvider);
+          },
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: <Widget>[
-              _Identity(user: user),
-              const SizedBox(height: 24),
-
-              Text('Waiting to sync', style: text.titleSmall),
-              const SizedBox(height: 8),
-              _SyncCard(pending: pending),
-
-              const SizedBox(height: 24),
-              Text('Account', style: text.titleSmall),
-              const SizedBox(height: 8),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    children: <Widget>[
-                      _Row(label: 'Username', value: user.username),
-                      const SizedBox(height: 8),
-                      _Row(label: 'Role', value: user.roleLabel),
-                    ],
+              _Identity(user: user, consumer: consumer?.value),
+              if (user is ConsumerUser) ...<Widget>[
+                const SizedBox(height: 18),
+                const _SectionHeader(
+                  icon: Icons.notifications_none,
+                  label: 'Notifications',
+                ),
+                const SizedBox(height: 6),
+                const _Panel(
+                  children: <Widget>[
+                    _SettingRow(
+                      title: 'Inbox alerts',
+                      subtitle:
+                          'Bill ready, payment reminders, overdue alerts, and notices',
+                      trailing: Icon(Icons.check_circle_outline),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                const _SectionHeader(
+                  icon: Icons.sms_outlined,
+                  label: 'SMS delivery',
+                ),
+                const SizedBox(height: 6),
+                _SmsPanel(consumer: consumer),
+              ],
+              const SizedBox(height: 18),
+              const _SectionHeader(icon: Icons.sync, label: 'Sync'),
+              const SizedBox(height: 6),
+              _SyncPanel(pending: pending),
+              const SizedBox(height: 18),
+              const _SectionHeader(
+                icon: Icons.manage_accounts_outlined,
+                label: 'Account',
+              ),
+              const SizedBox(height: 6),
+              _Panel(
+                children: <Widget>[
+                  _DetailRow(label: 'Username', value: user.username),
+                  const Divider(),
+                  _DetailRow(label: 'Role', value: user.roleLabel),
+                ],
+              ),
+              const SizedBox(height: 18),
+              const _SectionHeader(icon: Icons.lock_outline, label: 'Security'),
+              const SizedBox(height: 6),
+              _Panel(
+                children: <Widget>[
+                  _SettingRow(
+                    title: 'Change password',
+                    subtitle: 'Update the password used to sign in',
+                    trailing: const Icon(Icons.chevron_right),
+                    // `push`, not `go`: this is a task on top of the tab, and
+                    // the back arrow has to return to it.
+                    onTap: () => context.push(Routes.accountPassword),
                   ),
-                ),
+                ],
               ),
-
               const SizedBox(height: 24),
-              Text('Security', style: text.titleSmall),
-              const SizedBox(height: 8),
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.lock_outline),
-                  title: const Text('Change password'),
-                  trailing: const Icon(Icons.chevron_right),
-                  // `push`, not `go`: this is a task on top of the tab, and
-                  // the back arrow has to return to it.
-                  onTap: () => context.push(Routes.accountPassword),
-                ),
-              ),
-
-              const SizedBox(height: 28),
               OutlinedButton.icon(
                 onPressed: () => _confirmSignOut(context, ref, pending),
                 icon: const Icon(Icons.logout),
                 label: const Text('Sign out'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.error,
+                  side: BorderSide(color: Theme.of(context).colorScheme.error),
+                ),
               ),
               const SizedBox(height: 8),
               Text(
                 'Signing out clears the data cached on this device. Anything '
                 'still waiting to sync stays saved and is sent when you sign '
                 'in again.',
-                style: text.bodySmall,
+                style: Theme.of(context).textTheme.bodySmall,
                 textAlign: TextAlign.center,
               ),
             ],
@@ -131,8 +182,8 @@ class ProfileScreen extends ConsumerWidget {
           waiting == 0
               ? 'Everything you have recorded has been sent.'
               : 'You still have $waiting item${waiting == 1 ? '' : 's'} '
-                  'waiting to sync. They stay saved on this phone and are '
-                  'sent when you sign in again.',
+                    'waiting to sync. They stay saved on this phone and are '
+                    'sent when you sign in again.',
         ),
         actions: <Widget>[
           TextButton(
@@ -155,51 +206,140 @@ class ProfileScreen extends ConsumerWidget {
   }
 }
 
+class _SmsPanel extends StatelessWidget {
+  final AsyncValue<domain.Consumer?>? consumer;
+
+  const _SmsPanel({required this.consumer});
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final colours = Theme.of(context).colorScheme;
+    final String number =
+        consumer?.when(
+          data: (value) => value?.contactNumber ?? 'No mobile number on file',
+          loading: () => 'Loading contact number…',
+          error: (_, _) => 'Contact number unavailable',
+        ) ??
+        'Contact number unavailable';
+
+    return _Panel(
+      children: <Widget>[
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Container(
+                width: 38,
+                height: 38,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: colours.primary.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.sms_outlined, color: colours.primary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Alerts are also sent to this number. Keep it current '
+                      'so important notices still arrive.',
+                      style: text.bodySmall,
+                    ),
+                    const SizedBox(height: 9),
+                    SelectableText(
+                      number,
+                      style: text.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _Identity extends StatelessWidget {
   final AppUser user;
+  final domain.Consumer? consumer;
 
-  const _Identity({required this.user});
+  const _Identity({required this.user, this.consumer});
 
   @override
   Widget build(BuildContext context) {
     final TextTheme text = Theme.of(context).textTheme;
     final ColorScheme colours = Theme.of(context).colorScheme;
 
-    return Row(
-      children: <Widget>[
-        Container(
-          height: 56,
-          width: 56,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: colours.primaryContainer,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Text(
-            _initials(user),
-            style: text.titleLarge?.copyWith(color: colours.onPrimaryContainer),
-          ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(user.fullName, style: text.titleLarge),
-              Text('Bohol I Electric Cooperative', style: text.bodySmall),
-              const SizedBox(height: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                decoration: BoxDecoration(
-                  color: colours.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(user.roleLabel, style: text.bodySmall),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colours.surfaceContainerLowest,
+        border: Border.all(color: colours.outlineVariant),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: <Widget>[
+          Container(
+            height: 56,
+            width: 56,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: colours.primary.withValues(alpha: 0.14),
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              _initials(user),
+              style: text.titleLarge?.copyWith(
+                color: colours.primary,
+                fontWeight: FontWeight.w700,
               ),
-            ],
+            ),
           ),
-        ),
-      ],
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(user.fullName, style: text.titleLarge),
+                Text(
+                  user is ConsumerUser
+                      ? consumer?.consumerNo.value ?? user.username
+                      : 'Bohol I Electric Cooperative',
+                  style: text.bodySmall?.copyWith(letterSpacing: 0.3),
+                ),
+                const SizedBox(height: 7),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colours.primary.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    user.roleLabel.toUpperCase(),
+                    style: text.labelSmall?.copyWith(
+                      color: colours.primary,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -213,97 +353,211 @@ class _Identity extends StatelessWidget {
   }
 }
 
-class _SyncCard extends StatelessWidget {
-  final AsyncValue<List<OutboxEntry>> pending;
+class _SectionHeader extends StatelessWidget {
+  final IconData icon;
+  final String label;
 
-  const _SyncCard({required this.pending});
+  const _SectionHeader({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
-    final TextTheme text = Theme.of(context).textTheme;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: pending.when(
-          loading: () => const Center(
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
+    final colours = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        children: <Widget>[
+          Icon(icon, size: 15, color: colours.onSurfaceVariant),
+          const SizedBox(width: 6),
+          Text(
+            label.toUpperCase(),
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: colours.onSurfaceVariant,
+              letterSpacing: 0.4,
             ),
           ),
-          error: (_, _) => Text(
-            'Could not read the queue on this phone.',
-            style: text.bodyMedium,
-          ),
-          data: (List<OutboxEntry> entries) {
-            if (entries.isEmpty) {
-              return Row(
-                children: <Widget>[
-                  const Icon(Icons.cloud_done_outlined, size: 20),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text('Everything has been sent.',
-                        style: text.bodyMedium),
-                  ),
-                ],
-              );
-            }
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Row(
-                  children: <Widget>[
-                    const Icon(Icons.cloud_upload_outlined, size: 20),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        '${entries.length} item'
-                        '${entries.length == 1 ? '' : 's'} waiting to sync',
-                        style: text.titleSmall,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                // Each queued action can say what it is - OutboxOperation
-                // carries its own description - so the list needs no switch
-                // on the operation code.
-                for (final OutboxEntry entry in entries)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Text('· ${entry.description}', style: text.bodySmall),
-                  ),
-              ],
-            );
-          },
-        ),
+        ],
       ),
     );
   }
 }
 
-class _Row extends StatelessWidget {
-  final String label;
-  final String value;
+class _Panel extends StatelessWidget {
+  final List<Widget> children;
 
-  const _Row({required this.label, required this.value});
+  const _Panel({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    final colours = Theme.of(context).colorScheme;
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: colours.surfaceContainerLowest,
+        border: Border.all(color: colours.outlineVariant),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(children: children),
+    );
+  }
+}
+
+class _SyncPanel extends StatelessWidget {
+  final AsyncValue<List<OutboxEntry>> pending;
+
+  const _SyncPanel({required this.pending});
 
   @override
   Widget build(BuildContext context) {
     final TextTheme text = Theme.of(context).textTheme;
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return _Panel(
       children: <Widget>[
-        Text(label, style: text.bodyMedium),
-        Text(value, style: text.bodyLarge),
+        Padding(
+          padding: const EdgeInsets.all(14),
+          child: pending.when(
+            loading: () => const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
+            error: (_, _) => Text(
+              'Could not read the queue on this phone.',
+              style: text.bodyMedium,
+            ),
+            data: (List<OutboxEntry> entries) {
+              if (entries.isEmpty) {
+                return Row(
+                  children: <Widget>[
+                    const Icon(Icons.cloud_done_outlined, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Everything has been sent.',
+                        style: text.bodyMedium,
+                      ),
+                    ),
+                  ],
+                );
+              }
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Row(
+                    children: <Widget>[
+                      const Icon(Icons.cloud_upload_outlined, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '${entries.length} item'
+                          '${entries.length == 1 ? '' : 's'} waiting to sync',
+                          style: text.titleSmall,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // Each queued action can say what it is - OutboxOperation
+                  // carries its own description - so the list needs no switch
+                  // on the operation code.
+                  for (final OutboxEntry entry in entries)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        '· ${entry.description}',
+                        style: text.bodySmall,
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ),
       ],
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _DetailRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme text = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: <Widget>[
+          Text(label, style: text.bodyMedium),
+          const SizedBox(width: 16),
+          Flexible(
+            child: Text(
+              value,
+              style: text.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+              textAlign: TextAlign.end,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingRow extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final Widget trailing;
+  final VoidCallback? onTap;
+
+  const _SettingRow({
+    required this.title,
+    required this.subtitle,
+    required this.trailing,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colours = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: <Widget>[
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(title, style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            IconTheme(
+              data: IconThemeData(
+                color: onTap == null
+                    ? colours.primary
+                    : colours.onSurfaceVariant,
+                size: 20,
+              ),
+              child: trailing,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

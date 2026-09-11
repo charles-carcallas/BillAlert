@@ -63,15 +63,36 @@ class _AdminNewConsumerScreenState
     final TextTheme text = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('New consumer')),
+      appBar: AppBar(title: const Text('New consumer account')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
           children: <Widget>[
-            Text(
-              'Create a household record in your service area. Sign-in access '
-              'is provisioned separately and is not created on this phone.',
-              style: text.bodySmall,
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Icon(
+                    Icons.person_add_alt_1_outlined,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Create a household record in your service area. '
+                      'Sign-in access is provisioned separately.',
+                      style: text.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
             ),
 
             if (state.failure != null) ...<Widget>[
@@ -79,7 +100,12 @@ class _AdminNewConsumerScreenState
               FailureBanner(failure: state.failure!),
             ],
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 22),
+            Text(
+              'HOUSEHOLD DETAILS',
+              style: text.labelMedium?.copyWith(letterSpacing: 0.6),
+            ),
+            const SizedBox(height: 12),
             _FieldLabel('Consumer number', style: text.titleSmall),
             const SizedBox(height: 6),
             TextField(
@@ -141,7 +167,7 @@ class _AdminNewConsumerScreenState
                       width: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Create consumer'),
+                  : const Text('Create consumer account'),
             ),
           ],
         ),
@@ -202,10 +228,19 @@ class _CreatedConsumer extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               const SizedBox(height: 24),
-              Icon(
-                Icons.check_circle_outline,
-                size: 44,
-                color: Theme.of(context).colorScheme.primary,
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.check,
+                  size: 32,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
               ),
               const SizedBox(height: 16),
               Text(

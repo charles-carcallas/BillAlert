@@ -6,6 +6,7 @@ import '../../domain/repositories/bill_repository.dart';
 import '../../domain/value_objects/money.dart';
 import '../../domain/value_objects/ph_date.dart';
 import '../common/failure_banner.dart';
+import '../common/staff_app_bar.dart';
 import 'post_bill_amount_controller.dart';
 
 /// FR-21b — Admin › Amounts.
@@ -38,14 +39,17 @@ class _PostBillAmountScreenState extends ConsumerState<PostBillAmountScreen> {
     final TextTheme text = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Amounts')),
+      appBar: const StaffAppBar(title: 'Post bill amount'),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: controller.refresh,
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: <Widget>[
-              _Header(count: state.queue.length, cycleLabel: _cycleLabel(state)),
+              _Header(
+                count: state.queue.length,
+                cycleLabel: _cycleLabel(state),
+              ),
 
               if (state.failure != null) ...<Widget>[
                 const SizedBox(height: 12),
@@ -107,10 +111,10 @@ class _PostBillAmountScreenState extends ConsumerState<PostBillAmountScreen> {
                       }),
                       onPost: (String amountText, PhDate? dueDate) =>
                           controller.post(
-                        entry: entry,
-                        amountText: amountText,
-                        dueDate: dueDate,
-                      ),
+                            entry: entry,
+                            amountText: amountText,
+                            dueDate: dueDate,
+                          ),
                     ),
                   ),
             ],
@@ -136,23 +140,46 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     final TextTheme text = Theme.of(context).textTheme;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        if (cycleLabel != null)
-          Text(cycleLabel!.toUpperCase(), style: text.labelSmall),
-        const SizedBox(height: 6),
-        Text(
-          '$count reading${count == 1 ? '' : 's'} awaiting an amount',
-          style: text.titleLarge,
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'Transcribe the amount and the due date from what the cooperative '
-          'returned. BillAlert does not calculate either one.',
-          style: text.bodyMedium,
-        ),
-      ],
+    final colours = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: colours.surfaceContainerLowest,
+        border: Border.all(color: colours.outlineVariant),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          if (cycleLabel != null)
+            Text(
+              cycleLabel!.toUpperCase(),
+              style: text.labelSmall?.copyWith(
+                color: colours.primary,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1,
+              ),
+            ),
+          const SizedBox(height: 6),
+          Text.rich(
+            TextSpan(
+              children: <InlineSpan>[
+                TextSpan(text: '$count', style: text.headlineMedium),
+                TextSpan(
+                  text: ' reading${count == 1 ? '' : 's'} awaiting an amount',
+                  style: text.bodyMedium,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Transcribe the amount and the due date from what the cooperative '
+            'returned. BillAlert does not calculate either one.',
+            style: text.bodyMedium,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -224,8 +251,16 @@ class _QueueCardState extends State<_QueueCard> {
     final TextTheme text = Theme.of(context).textTheme;
     final ColorScheme colours = Theme.of(context).colorScheme;
 
-    return Card(
+    return Container(
       clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: colours.surfaceContainerLowest,
+        border: Border.all(
+          color: widget.isExpanded ? colours.primary : colours.outlineVariant,
+          width: widget.isExpanded ? 1.4 : 1,
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -236,6 +271,18 @@ class _QueueCardState extends State<_QueueCard> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
+                  Container(
+                    width: 10,
+                    height: 10,
+                    margin: const EdgeInsets.only(top: 5),
+                    decoration: BoxDecoration(
+                      color: entry.daysWaiting <= 0
+                          ? colours.primaryContainer
+                          : const Color(0xFFAE6900),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -295,8 +342,9 @@ class _QueueCardState extends State<_QueueCard> {
                   TextField(
                     controller: _amount,
                     enabled: !widget.isPosting,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     // Money is parsed from this text, never from a double, so
                     // the field only needs to let the digits and one point
                     // through.
@@ -380,8 +428,18 @@ class _QueueCardState extends State<_QueueCard> {
   void _submit() => widget.onPost(_amount.text, _dueDate);
 
   static const List<String> _months = <String>[
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
 
   static String _shortDate(PhDate date) =>
@@ -408,10 +466,9 @@ class _WaitBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: Theme.of(context)
-            .textTheme
-            .bodySmall
-            ?.copyWith(color: colours.onSurfaceVariant),
+        style: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(color: colours.onSurfaceVariant),
       ),
     );
   }
@@ -426,43 +483,51 @@ class _ReadingDetail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: <Widget>[
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: _Fact(
-                term: 'Previous',
-                value: entry.previousReading.format(),
+    final colours = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colours.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: _Fact(
+                  term: 'Previous',
+                  value: entry.previousReading.format(),
+                ),
               ),
-            ),
-            Expanded(
-              child: _Fact(
-                term: 'Present',
-                value: entry.currentReading.format(),
+              Expanded(
+                child: _Fact(
+                  term: 'Present',
+                  value: entry.currentReading.format(),
+                ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: _Fact(
-                term: 'Consumption',
-                value: entry.bill.consumption.format(),
-                emphasise: true,
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: _Fact(
+                  term: 'Consumption',
+                  value: entry.bill.consumption.format(),
+                  emphasise: true,
+                ),
               ),
-            ),
-            Expanded(
-              child: _Fact(
-                term: 'Read on',
-                value: _QueueCardState._shortDate(entry.readingDate),
+              Expanded(
+                child: _Fact(
+                  term: 'Read on',
+                  value: _QueueCardState._shortDate(entry.readingDate),
+                ),
               ),
-            ),
-          ],
-        ),
-      ],
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -487,12 +552,7 @@ class _Fact extends StatelessWidget {
       children: <Widget>[
         Text(term, style: text.bodySmall),
         const SizedBox(height: 2),
-        Text(
-          value,
-          style: emphasise
-              ? text.titleMedium
-              : text.bodyLarge,
-        ),
+        Text(value, style: emphasise ? text.titleMedium : text.bodyLarge),
       ],
     );
   }

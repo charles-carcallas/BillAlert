@@ -8,6 +8,7 @@ import '../../core/result/result.dart';
 import '../../domain/entities/consumer.dart';
 import '../auth/auth_controller.dart';
 import '../common/failure_banner.dart';
+import '../common/staff_app_bar.dart';
 import '../providers.dart';
 import '../router.dart';
 
@@ -55,7 +56,7 @@ class AdminAccountsScreen extends ConsumerWidget {
     final TextTheme text = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Accounts')),
+      appBar: const StaffAppBar(title: 'Accounts'),
       floatingActionButton: FloatingActionButton.extended(
         // `push`, so the back arrow returns here. The refresh afterwards goes
         // to the server on purpose: creating a household writes to Supabase
@@ -111,17 +112,69 @@ class AdminAccountsScreen extends ConsumerWidget {
                     ),
                   )
                 else ...<Widget>[
-                  Text(
-                    '${list.length} household${list.length == 1 ? '' : 's'} in '
-                    'this service area',
-                    style: text.titleSmall,
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerLowest,
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.outlineVariant,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      children: <Widget>[
+                        Icon(
+                          Icons.groups_outlined,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            '${list.length} household${list.length == 1 ? '' : 's'} '
+                            'in this service area',
+                            style: text.titleSmall,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  for (final Consumer household in list)
-                    _HouseholdTile(household: household),
+                  const SizedBox(height: 12),
+                  Container(
+                    clipBehavior: Clip.antiAlias,
+                    decoration: BoxDecoration(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerLowest,
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.outlineVariant,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      children: <Widget>[
+                        for (
+                          var index = 0;
+                          index < list.length;
+                          index++
+                        ) ...<Widget>[
+                          _HouseholdTile(household: list[index]),
+                          if (index < list.length - 1)
+                            const Divider(indent: 16, endIndent: 16),
+                        ],
+                      ],
+                    ),
+                  ),
                 ],
                 const SizedBox(height: 24),
-                Card(
+                Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.07),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                   child: Padding(
                     padding: const EdgeInsets.all(14),
                     child: Column(
@@ -172,16 +225,41 @@ class _HouseholdTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final TextTheme text = Theme.of(context).textTheme;
 
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Text(household.fullName, style: text.titleMedium),
-      subtitle: Text(
-        <String>[
-          household.consumerNo.value,
-          if (household.purok != null) household.purok!,
-          if (!household.isActive) 'not an active account',
-        ].join(' · '),
-        style: text.bodySmall,
+    final colours = Theme.of(context).colorScheme;
+    final String initials = <String>[
+      if (household.firstName.isNotEmpty) household.firstName[0],
+      if (household.lastName.isNotEmpty) household.lastName[0],
+    ].join().toUpperCase();
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: <Widget>[
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: colours.primary.withValues(alpha: 0.11),
+            foregroundColor: colours.primary,
+            child: Text(initials.isEmpty ? '?' : initials),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(household.fullName, style: text.titleMedium),
+                Text(
+                  <String>[
+                    household.consumerNo.value,
+                    if (household.purok != null) household.purok!,
+                    if (!household.isActive) 'inactive',
+                  ].join(' · '),
+                  style: text.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          if (!household.isActive)
+            Icon(Icons.block, size: 18, color: colours.error),
+        ],
       ),
     );
   }

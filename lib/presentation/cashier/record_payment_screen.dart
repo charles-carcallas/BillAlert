@@ -6,7 +6,10 @@ import '../../domain/entities/bill.dart';
 import '../../domain/repositories/bill_repository.dart';
 import '../../domain/repositories/payment_repository.dart';
 import '../../domain/value_objects/money.dart';
+import '../../domain/value_objects/ph_date.dart';
 import '../common/failure_banner.dart';
+import '../common/staff_app_bar.dart';
+import '../providers.dart';
 import 'record_payment_controller.dart';
 
 /// FR-30 — Cashier › Payment.
@@ -38,21 +41,26 @@ class RecordPaymentScreen extends ConsumerWidget {
       );
     }
 
+    final bool choosingHousehold = state.selected == null;
     return Scaffold(
-      appBar: AppBar(
-        title: Text(state.selected == null ? 'Payment' : 'Take payment'),
-        leading: state.selected == null
-            ? null
-            : IconButton(
+      appBar: choosingHousehold
+          ? const StaffAppBar(title: 'Consumers')
+          : AppBar(
+              title: const Text('Take payment'),
+              leading: IconButton(
                 icon: const Icon(Icons.arrow_back),
                 tooltip: 'Choose another household',
                 onPressed: controller.startNewPayment,
               ),
-      ),
+            ),
       body: SafeArea(
-        child: state.selected == null
+        child: choosingHousehold
             ? _HouseholdPicker(state: state, controller: controller)
-            : _PaymentForm(state: state, controller: controller),
+            : _PaymentForm(
+                state: state,
+                controller: controller,
+                today: ref.watch(phClockProvider).today(),
+              ),
       ),
     );
   }
@@ -69,6 +77,13 @@ class _HouseholdPicker extends StatelessWidget {
   Widget build(BuildContext context) {
     final TextTheme text = Theme.of(context).textTheme;
     final List<ConsumerOutstanding> visible = state.visibleHouseholds;
+    final Money total = state.households.fold(
+      Money.zero,
+      (Money sum, ConsumerOutstanding item) => sum + item.totalOutstanding,
+    );
+    final int payable = state.households
+        .where((ConsumerOutstanding item) => item.hasPayableBills)
+        .length;
 
     return Column(
       children: <Widget>[
@@ -77,11 +92,23 @@ class _HouseholdPicker extends StatelessWidget {
           child: TextField(
             onChanged: controller.search,
             decoration: const InputDecoration(
-              hintText: 'Search by name or consumer number',
+              hintText: 'Search name or account number',
               prefixIcon: Icon(Icons.search),
             ),
           ),
         ),
+        if (state.households.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '$payable consumer${payable == 1 ? '' : 's'} with payable '
+                'bills · ${total.format()} outstanding',
+                style: text.bodySmall,
+              ),
+            ),
+          ),
         if (state.failure != null)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -94,47 +121,35 @@ class _HouseholdPicker extends StatelessWidget {
           child: state.isLoadingHouseholds && state.households.isEmpty
               ? const Center(child: CircularProgressIndicator())
               : visible.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Text(
-                          state.households.isEmpty
-                              ? 'Nobody in this area has an unpaid bill.'
-                              : 'No household matches that search.',
-                          style: text.bodyMedium,
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: controller.loadHouseholds,
-                      child: ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                        itemCount: visible.length,
-                        separatorBuilder: (_, _) => const Divider(height: 1),
-                        itemBuilder: (BuildContext context, int index) {
-                          final ConsumerOutstanding c = visible[index];
-                          return ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(c.consumerName, style: text.titleMedium),
-                            subtitle: Text(
-                              '${c.consumerNo.value} · '
-                              '${_billsPhrase(c)}'
-                              '${c.overdueCount > 0 ? ' · ${c.overdueCount} overdue' : ''}',
-                              style: text.bodySmall,
-                            ),
-                            trailing: Text(
-                              c.totalOutstanding.format(),
-                              style: text.titleMedium,
-                            ),
-                            // A household whose only readings are unpriced has
-                            // nothing collectable, so it cannot be opened.
-                            enabled: c.hasPayableBills,
-                            onTap: () => controller.selectHousehold(c),
-                          );
-                        },
-                      ),
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Text(
+                      state.households.isEmpty
+                          ? 'Nobody in this area has an unpaid bill.'
+                          : 'No household matches that search.',
+                      style: text.bodyMedium,
+                      textAlign: TextAlign.center,
                     ),
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: controller.loadHouseholds,
+                  child: ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                    itemCount: visible.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 10),
+                    itemBuilder: (BuildContext context, int index) {
+                      final ConsumerOutstanding c = visible[index];
+                      return _HouseholdTile(
+                        household: c,
+                        onTap: c.hasPayableBills
+                            ? () => controller.selectHousehold(c)
+                            : null,
+                      );
+                    },
+                  ),
+                ),
         ),
       ],
     );
@@ -154,16 +169,132 @@ class _HouseholdPicker extends StatelessWidget {
   }
 }
 
+class _HouseholdTile extends StatelessWidget {
+  final ConsumerOutstanding household;
+  final VoidCallback? onTap;
+
+  const _HouseholdTile({required this.household, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme colours = Theme.of(context).colorScheme;
+    final TextTheme text = Theme.of(context).textTheme;
+    final bool overdue = household.overdueCount > 0;
+    final Color accent = overdue ? const Color(0xFFB85C00) : colours.primary;
+
+    return Material(
+      color: overdue ? const Color(0xFFFFF8EE) : colours.surfaceContainerLowest,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(
+          color: overdue ? const Color(0xFFF0C58E) : colours.outlineVariant,
+        ),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: IntrinsicHeight(
+          child: Row(
+            children: <Widget>[
+              Container(width: 4, color: accent),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(13, 13, 8, 13),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Expanded(
+                            child: Text(
+                              household.consumerName,
+                              style: text.titleMedium,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            household.totalOutstanding.format(),
+                            style: text.titleMedium?.copyWith(
+                              color: overdue ? accent : null,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        <String>[
+                          household.consumerNo.value,
+                          if (household.purok?.trim().isNotEmpty ?? false)
+                            household.purok!.trim(),
+                        ].join(' · '),
+                        style: text.bodySmall,
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: <Widget>[
+                          Expanded(
+                            child: Text(
+                              _HouseholdPicker._billsPhrase(household),
+                              style: text.bodySmall,
+                            ),
+                          ),
+                          if (overdue)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFE6C6),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                '${household.overdueCount} overdue',
+                                style: text.labelSmall?.copyWith(
+                                  color: accent,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.chevron_right,
+                            size: 20,
+                            color: onTap == null
+                                ? colours.outline
+                                : colours.onSurfaceVariant,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Choose the months, take the cash.
 class _PaymentForm extends StatelessWidget {
   final RecordPaymentState state;
   final RecordPaymentController controller;
+  final PhDate today;
 
-  const _PaymentForm({required this.state, required this.controller});
+  const _PaymentForm({
+    required this.state,
+    required this.controller,
+    required this.today,
+  });
 
   @override
   Widget build(BuildContext context) {
     final TextTheme text = Theme.of(context).textTheme;
+    final ColorScheme colours = Theme.of(context).colorScheme;
     final ConsumerOutstanding household = state.selected!;
 
     return Column(
@@ -172,23 +303,60 @@ class _PaymentForm extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
             children: <Widget>[
-              Text(household.consumerName, style: text.titleLarge),
-              Text(household.consumerNo.value, style: text.bodySmall),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: colours.surfaceContainerLowest,
+                  border: Border.all(color: colours.outlineVariant),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'PAYING',
+                      style: text.labelSmall?.copyWith(
+                        color: colours.primary,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.7,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(household.consumerName, style: text.titleLarge),
+                    Text(
+                      <String>[
+                        household.consumerNo.value,
+                        if (household.purok?.trim().isNotEmpty ?? false)
+                          household.purok!.trim(),
+                      ].join(' · '),
+                      style: text.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
 
               if (state.failure != null) ...<Widget>[
                 const SizedBox(height: 12),
                 FailureBanner(failure: state.failure!),
               ],
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               Row(
                 children: <Widget>[
                   Expanded(
-                    child: Text('Unpaid months', style: text.titleSmall),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text('OUTSTANDING BILLS', style: text.labelMedium),
+                        Text('Tap a bill to select it', style: text.bodySmall),
+                      ],
+                    ),
                   ),
                   if (state.payableBills.length > 1)
                     TextButton(
-                      onPressed: controller.selectAll,
+                      onPressed: state.isSubmitting
+                          ? null
+                          : controller.selectAll,
                       child: const Text('Select all'),
                     ),
                 ],
@@ -210,37 +378,35 @@ class _PaymentForm extends StatelessWidget {
                   ),
                 )
               else
-                for (final Bill bill in state.payableBills)
-                  CheckboxListTile(
-                    contentPadding: EdgeInsets.zero,
-                    value: state.selectedBillIds.contains(bill.id.value),
-                    onChanged: state.isSubmitting
+                for (final Bill bill in state.payableBills) ...<Widget>[
+                  _BillSelectionTile(
+                    bill: bill,
+                    today: today,
+                    selected: state.selectedBillIds.contains(bill.id.value),
+                    onTap: state.isSubmitting
                         ? null
-                        : (bool? on) => controller.toggleBill(bill, on ?? false),
-                    title: Text(bill.cycle.displayName),
-                    subtitle: Text(
-                      '${bill.billNo.value} · due '
-                      '${bill.dueDate?.toIso() ?? 'not set'}',
-                      style: text.bodySmall,
-                    ),
-                    secondary: Text(
-                      bill.balance.format(),
-                      style: text.titleMedium,
-                    ),
+                        : () => controller.toggleBill(
+                            bill,
+                            !state.selectedBillIds.contains(bill.id.value),
+                          ),
                   ),
+                  const SizedBox(height: 8),
+                ],
 
-              const SizedBox(height: 20),
-              Text('Cash received', style: text.titleSmall),
+              const SizedBox(height: 14),
+              Text('CASH RECEIVED', style: text.labelMedium),
               const SizedBox(height: 6),
               TextField(
                 enabled: !state.isSubmitting,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 inputFormatters: <TextInputFormatter>[
                   FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
                 ],
                 decoration: const InputDecoration(
                   prefixText: '₱ ',
-                  hintText: 'Leave empty if not recording cash',
+                  hintText: 'Enter cash received',
                 ),
                 onChanged: controller.setCashTendered,
               ),
@@ -249,6 +415,85 @@ class _PaymentForm extends StatelessWidget {
         ),
         _Totals(state: state, controller: controller),
       ],
+    );
+  }
+}
+
+class _BillSelectionTile extends StatelessWidget {
+  final Bill bill;
+  final PhDate today;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  const _BillSelectionTile({
+    required this.bill,
+    required this.today,
+    required this.selected,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme colours = Theme.of(context).colorScheme;
+    final TextTheme text = Theme.of(context).textTheme;
+    final bool overdue = bill.isOverdueOn(today);
+    return Material(
+      color: selected
+          ? colours.primary.withValues(alpha: 0.08)
+          : colours.surfaceContainerLowest,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(
+          color: selected ? colours.primary : colours.outlineVariant,
+          width: selected ? 1.5 : 1,
+        ),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(13),
+          child: Row(
+            children: <Widget>[
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 140),
+                height: 24,
+                width: 24,
+                decoration: BoxDecoration(
+                  color: selected ? colours.primary : Colors.transparent,
+                  border: Border.all(
+                    color: selected ? colours.primary : colours.outline,
+                  ),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: selected
+                    ? Icon(Icons.check, size: 17, color: colours.onPrimary)
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(bill.cycle.displayName, style: text.titleSmall),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${overdue ? 'Overdue' : 'Due'} · '
+                      '${bill.dueDate?.toIso() ?? 'date not set'} · '
+                      '${bill.billNo.value}',
+                      style: text.bodySmall?.copyWith(
+                        color: overdue ? colours.error : null,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(bill.balance.format(), style: text.titleMedium),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -268,59 +513,64 @@ class _Totals extends StatelessWidget {
     final int count = state.selectedBills.length;
 
     return Material(
-      elevation: 0,
-      color: colours.surfaceContainerHighest,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              _Line(
-                label: count == 0
-                    ? 'Total'
-                    : 'Total · $count month${count == 1 ? '' : 's'}',
-                value: state.total.format(),
-                emphasise: true,
-              ),
-              if (state.cashTendered != null) ...<Widget>[
-                const SizedBox(height: 4),
+      color: colours.surface,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: colours.outlineVariant)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
                 _Line(
-                  label: 'Cash received',
-                  value: state.cashTendered!.format(),
+                  label: count == 0
+                      ? 'Total'
+                      : 'Total · $count month${count == 1 ? '' : 's'}',
+                  value: state.total.format(),
+                  emphasise: true,
                 ),
-                const SizedBox(height: 4),
-                _Line(
-                  label: 'Change',
-                  value: change == null ? 'short' : change.format(),
+                if (state.cashTendered != null) ...<Widget>[
+                  const SizedBox(height: 4),
+                  _Line(
+                    label: 'Cash received',
+                    value: state.cashTendered!.format(),
+                  ),
+                  const SizedBox(height: 4),
+                  _Line(
+                    label: 'Change',
+                    value: change == null ? 'short' : change.format(),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: state.canConfirm ? controller.confirm : null,
+                  icon: state.isSubmitting
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.payments_outlined),
+                  label: Text(
+                    count == 0
+                        ? 'Select a bill to continue'
+                        : 'Confirm cash payment · ${state.total.format()}',
+                  ),
                 ),
+                if (state.queuedOffline) ...<Widget>[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Saved on this phone. The receipt number is issued when it '
+                    'reaches the server.',
+                    style: text.bodySmall,
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ],
-              const SizedBox(height: 12),
-              FilledButton(
-                onPressed: state.canConfirm ? controller.confirm : null,
-                child: state.isSubmitting
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(
-                        count == 0
-                            ? 'Record payment'
-                            : 'Record ${state.total.format()}',
-                      ),
-              ),
-              if (state.queuedOffline) ...<Widget>[
-                const SizedBox(height: 8),
-                Text(
-                  'Saved on this phone. The receipt number is issued when it '
-                  'reaches the server.',
-                  style: text.bodySmall,
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ],
+            ),
           ),
         ),
       ),
@@ -371,79 +621,161 @@ class _ReceiptIssued extends StatelessWidget {
     final ColorScheme colours = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Receipt issued')),
+      appBar: AppBar(
+        title: const Text('Receipt issued'),
+        actions: <Widget>[
+          IconButton(
+            tooltip: 'Copy receipt details',
+            icon: const Icon(Icons.copy_outlined),
+            onPressed: () => _copyReceipt(context),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
           children: <Widget>[
-            Icon(Icons.check_circle, size: 44, color: colours.primary),
-            const SizedBox(height: 12),
-            Center(
-              child: Text(receipt.receiptNo, style: text.headlineMedium),
-            ),
-            Center(
-              child: Text(
-                'Verification ${receipt.verificationCode}',
-                style: text.bodySmall,
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: colours.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(14),
               ),
-            ),
-            const SizedBox(height: 20),
-
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    Text(
-                      'Settled ${receipt.billCount} '
-                      'month${receipt.billCount == 1 ? '' : 's'}',
-                      style: text.titleSmall,
-                    ),
-                    const SizedBox(height: 8),
-                    for (final SettledBill bill in receipt.bills)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: _Line(
-                          label: bill.cycleLabel.isEmpty
-                              ? bill.billNo.value
-                              : bill.cycleLabel,
-                          value: bill.amountPaid.format(),
+              child: Row(
+                children: <Widget>[
+                  Icon(Icons.check_circle, color: colours.primary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text('Payment recorded', style: text.titleSmall),
+                        Text(
+                          'The official receipt is ready.',
+                          style: text.bodySmall,
                         ),
-                      ),
-                    const Divider(),
-                    _Line(
-                      label: 'Total paid',
-                      value: receipt.totalCollected.format(),
-                      emphasise: true,
+                      ],
                     ),
-                    if (receipt.cashTendered != null) ...<Widget>[
-                      const SizedBox(height: 4),
-                      _Line(
-                        label: 'Cash received',
-                        value: receipt.cashTendered!.format(),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: colours.surfaceContainerLowest,
+                border: Border.all(color: colours.outlineVariant),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Text(
+                    'BILLALERT',
+                    style: text.labelMedium?.copyWith(
+                      color: colours.primary,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  Text(
+                    'OFFICIAL DIGITAL RECEIPT',
+                    style: text.labelSmall,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    receipt.receiptNo,
+                    style: text.headlineSmall,
+                    textAlign: TextAlign.center,
+                  ),
+                  Text(
+                    'Verification ${receipt.verificationCode}',
+                    style: text.bodySmall,
+                    textAlign: TextAlign.center,
+                  ),
+                  const Divider(height: 28),
+                  _Line(label: 'Consumer', value: receipt.consumerName),
+                  const SizedBox(height: 14),
+                  Text(
+                    'Settled ${receipt.billCount} '
+                    'month${receipt.billCount == 1 ? '' : 's'}',
+                    style: text.titleSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  for (final SettledBill bill in receipt.bills)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: _Line(
+                        label: bill.cycleLabel.isEmpty
+                            ? bill.billNo.value
+                            : bill.cycleLabel,
+                        value: bill.amountPaid.format(),
                       ),
-                    ],
-                    if (receipt.changeDue != null) ...<Widget>[
-                      const SizedBox(height: 4),
-                      _Line(
-                        label: 'Change',
-                        value: receipt.changeDue!.format(),
-                      ),
-                    ],
+                    ),
+                  const Divider(),
+                  _Line(
+                    label: 'Total paid',
+                    value: receipt.totalCollected.format(),
+                    emphasise: true,
+                  ),
+                  if (receipt.cashTendered != null) ...<Widget>[
+                    const SizedBox(height: 4),
+                    _Line(
+                      label: 'Cash received',
+                      value: receipt.cashTendered!.format(),
+                    ),
                   ],
-                ),
+                  if (receipt.changeDue != null) ...<Widget>[
+                    const SizedBox(height: 4),
+                    _Line(label: 'Change', value: receipt.changeDue!.format()),
+                  ],
+                ],
               ),
             ),
 
             const SizedBox(height: 20),
-            FilledButton(
-              onPressed: onNewPayment,
-              child: const Text('Take another payment'),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _copyReceipt(context),
+                    icon: const Icon(Icons.copy_outlined),
+                    label: const Text('Copy details'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: onNewPayment,
+                    child: const Text('Next customer'),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _copyReceipt(BuildContext context) async {
+    await Clipboard.setData(
+      ClipboardData(
+        text: <String>[
+          'BillAlert receipt ${receipt.receiptNo}',
+          receipt.consumerName,
+          'Paid: ${receipt.totalCollected.format()}',
+          'Verification: ${receipt.verificationCode}',
+        ].join('\n'),
+      ),
+    );
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Receipt details copied.')));
   }
 }

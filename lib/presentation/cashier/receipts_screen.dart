@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/repositories/payment_repository.dart';
 import '../../domain/value_objects/ph_date.dart';
 import '../common/failure_banner.dart';
+import '../common/staff_app_bar.dart';
 import 'receipts_controller.dart';
 
 /// CSH-03 — Cashier › Receipts.
@@ -24,7 +25,7 @@ class ReceiptsScreen extends ConsumerWidget {
     final TextTheme text = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Receipts')),
+      appBar: const StaffAppBar(title: 'Receipts'),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: controller.load,
@@ -35,7 +36,10 @@ class ReceiptsScreen extends ConsumerWidget {
 
               if (state.failure != null) ...<Widget>[
                 const SizedBox(height: 12),
-                FailureBanner(failure: state.failure!, onRetry: controller.load),
+                FailureBanner(
+                  failure: state.failure!,
+                  onRetry: controller.load,
+                ),
               ],
 
               const SizedBox(height: 20),
@@ -87,23 +91,28 @@ class ReceiptsScreen extends ConsumerWidget {
     final TextTheme text = Theme.of(context).textTheme;
     final PhDate today = PhDate.at(DateTime.now());
 
-    final widgets = <Widget>[];
-    PhDate? currentDay;
-
-    // The list already arrives newest first, so a heading is emitted whenever
-    // the day changes rather than by sorting into buckets first.
+    final groups = <PhDate, List<PaymentSummary>>{};
     for (final PaymentSummary receipt in receipts) {
       final PhDate day = PhDate.at(receipt.paidAt);
-      if (currentDay == null || day != currentDay) {
-        if (currentDay != null) widgets.add(const SizedBox(height: 20));
-        widgets.add(Text(_dayLabel(day, today), style: text.titleSmall));
-        widgets.add(const SizedBox(height: 8));
-        currentDay = day;
-      }
-      widgets.add(_ReceiptTile(receipt: receipt));
+      groups.putIfAbsent(day, () => <PaymentSummary>[]).add(receipt);
     }
-
-    return widgets;
+    return <Widget>[
+      for (final entry in groups.entries) ...<Widget>[
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
+            _dayLabel(entry.key, today).toUpperCase(),
+            style: text.labelMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              letterSpacing: 0.4,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        _ReceiptGroup(receipts: entry.value),
+        const SizedBox(height: 18),
+      ],
+    ];
   }
 
   static String _dayLabel(PhDate day, PhDate today) {
@@ -114,15 +123,30 @@ class ReceiptsScreen extends ConsumerWidget {
   }
 
   static const List<String> _months = <String>[
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
 
   static String _month(int month) => _months[month - 1];
 
   static const List<String> _weekdays = <String>[
-    'Monday', 'Tuesday', 'Wednesday', 'Thursday',
-    'Friday', 'Saturday', 'Sunday',
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
   ];
 
   /// DateTime.weekday is 1..7 starting at Monday, which is the same order as
@@ -140,29 +164,69 @@ class _TodayCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final TextTheme text = Theme.of(context).textTheme;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: <Widget>[
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text("Today's collections", style: text.bodySmall),
-                  const SizedBox(height: 2),
-                  Text(today.totalCollected.format(), style: text.headlineMedium),
-                ],
-              ),
+    final colours = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colours.primary.withValues(alpha: 0.13),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: <Widget>[
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  "Today's collections",
+                  style: text.bodySmall?.copyWith(color: colours.primary),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  today.totalCollected.format(),
+                  style: text.headlineMedium?.copyWith(color: colours.primary),
+                ),
+              ],
             ),
-            Text(
-              '${today.receiptCount} receipt'
-              '${today.receiptCount == 1 ? '' : 's'}',
-              style: text.bodyMedium,
+          ),
+          Text(
+            '${today.receiptCount} receipt'
+            '${today.receiptCount == 1 ? '' : 's'}',
+            style: text.bodyMedium?.copyWith(
+              color: colours.primary,
+              fontWeight: FontWeight.w600,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReceiptGroup extends StatelessWidget {
+  final List<PaymentSummary> receipts;
+
+  const _ReceiptGroup({required this.receipts});
+
+  @override
+  Widget build(BuildContext context) {
+    final colours = Theme.of(context).colorScheme;
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: colours.surfaceContainerLowest,
+        border: Border.all(color: colours.outlineVariant),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: <Widget>[
+          for (var index = 0; index < receipts.length; index++) ...<Widget>[
+            _ReceiptTile(receipt: receipts[index]),
+            if (index < receipts.length - 1)
+              const Divider(indent: 16, endIndent: 16),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -176,52 +240,56 @@ class _ReceiptTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final TextTheme text = Theme.of(context).textTheme;
+    final colours = Theme.of(context).colorScheme;
+    final initials = receipt.consumerName
+        .split(' ')
+        .where((part) => part.isNotEmpty)
+        .take(2)
+        .map((part) => part[0])
+        .join()
+        .toUpperCase();
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  if (receipt.consumerName.isNotEmpty) ...<Widget>[
-                    Text(receipt.consumerName, style: text.titleSmall),
-                    const SizedBox(height: 2),
-                  ],
-                  Text(receipt.receiptNo, style: text.titleSmall),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${_time(receipt.paidAt)} · ${receipt.billCount} '
-                    'month${receipt.billCount == 1 ? '' : 's'}',
-                    style: text.bodySmall,
-                  ),
-                  const SizedBox(height: 6),
-                  // Which months this one handover settled. The same receipt
-                  // number against several months is the correct result.
-                  Text(
-                    receipt.bills
-                        .map((SettledBill b) => b.cycleLabel)
-                        .where((String label) => label.isNotEmpty)
-                        .join(' · '),
-                    style: text.bodySmall,
-                  ),
-                ],
-              ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: <Widget>[
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: colours.primary.withValues(alpha: 0.11),
+            foregroundColor: colours.primary,
+            child: Text(
+              initials.isEmpty ? '?' : initials,
+              style: text.labelMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
-            const SizedBox(width: 8),
-            Text(receipt.totalCollected.format(), style: text.titleMedium),
-          ],
-        ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(receipt.consumerName, style: text.titleSmall),
+                const SizedBox(height: 2),
+                Text(
+                  '${receipt.receiptNo} · ${_time(receipt.paidAt)}',
+                  style: text.bodySmall,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${receipt.billCount} '
+                  'month${receipt.billCount == 1 ? '' : 's'} settled',
+                  style: text.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(receipt.totalCollected.format(), style: text.titleMedium),
+        ],
       ),
     );
   }
 
-  /// "2:18 PM" in Philippine time. Written out rather than taken from `intl`,
-  /// which this project deliberately does not depend on.
   static String _time(DateTime instant) {
     final DateTime manila = instant.toUtc().add(PhDate.utcOffset);
     final int hour24 = manila.hour;

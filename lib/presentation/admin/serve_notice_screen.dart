@@ -64,11 +64,37 @@ class _ServeNoticeScreenState extends ConsumerState<ServeNoticeScreen> {
             : ListView(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
                 children: <Widget>[
-                  Text(chosen.fullName, style: text.titleLarge),
-                  Text(
-                    '${chosen.consumerNo.value}'
-                    '${chosen.purok == null ? '' : ' · ${chosen.purok}'}',
-                    style: text.bodySmall,
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerLowest,
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.outlineVariant,
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          'SERVING NOTICE TO',
+                          style: text.labelSmall?.copyWith(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(chosen.fullName, style: text.titleLarge),
+                        Text(
+                          '${chosen.consumerNo.value}'
+                          '${chosen.purok == null ? '' : ' · ${chosen.purok}'}',
+                          style: text.bodySmall,
+                        ),
+                      ],
+                    ),
                   ),
 
                   if (state.failure != null) ...<Widget>[
@@ -89,7 +115,18 @@ class _ServeNoticeScreenState extends ConsumerState<ServeNoticeScreen> {
                   ),
 
                   const SizedBox(height: 20),
-                  Card(
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.errorContainer.withValues(alpha: 0.35),
+                      border: Border.all(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.error.withValues(alpha: 0.35),
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                     child: Padding(
                       padding: const EdgeInsets.all(14),
                       child: Text(
@@ -104,8 +141,9 @@ class _ServeNoticeScreenState extends ConsumerState<ServeNoticeScreen> {
 
                   const SizedBox(height: 20),
                   FilledButton(
-                    onPressed:
-                        state.isSubmitting ? null : () => _confirm(controller),
+                    onPressed: state.isSubmitting
+                        ? null
+                        : () => _confirm(controller),
                     child: state.isSubmitting
                         ? const SizedBox(
                             height: 20,
@@ -169,7 +207,7 @@ class _Picker extends StatelessWidget {
           child: TextField(
             onChanged: controller.search,
             decoration: const InputDecoration(
-              hintText: 'Search by name or consumer number',
+              hintText: 'Search name or account number',
               prefixIcon: Icon(Icons.search),
             ),
           ),
@@ -183,11 +221,33 @@ class _Picker extends StatelessWidget {
             ),
           ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-          child: Text(
-            'A notice can only be served on a household with an overdue '
-            'bill. Those are listed first.',
-            style: text.bodySmall,
+          padding: const EdgeInsets.fromLTRB(16, 2, 16, 10),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.07),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Icon(
+                  Icons.info_outline,
+                  size: 18,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    'Only households with an overdue bill can be served. '
+                    'Eligible households are listed first.',
+                    style: text.bodySmall,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
         Expanded(
@@ -199,12 +259,16 @@ class _Picker extends StatelessWidget {
                       ? ListView(
                           children: <Widget>[
                             Padding(
-                              padding:
-                                  const EdgeInsets.fromLTRB(32, 64, 32, 32),
+                              padding: const EdgeInsets.fromLTRB(
+                                32,
+                                64,
+                                32,
+                                32,
+                              ),
                               child: Text(
                                 state.households.isEmpty
                                     ? 'No households on this device yet. Pull '
-                                        'down to fetch them.'
+                                          'down to fetch them.'
                                     : 'No household matches that search.',
                                 style: text.bodyMedium,
                                 textAlign: TextAlign.center,
@@ -215,7 +279,7 @@ class _Picker extends StatelessWidget {
                       : ListView.separated(
                           padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                           itemCount: visible.length,
-                          separatorBuilder: (_, _) => const Divider(height: 1),
+                          separatorBuilder: (_, _) => const SizedBox(height: 8),
                           itemBuilder: (BuildContext context, int index) {
                             final Consumer c = visible[index];
                             final int overdue = state.overdueCountFor(c);
@@ -225,29 +289,48 @@ class _Picker extends StatelessWidget {
                             // told no after choosing a name.
                             final bool allowed = state.canServe(c);
 
-                            return ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              title:
-                                  Text(c.fullName, style: text.titleMedium),
-                              subtitle: Text(
-                                <String>[
-                                  c.consumerNo.value,
-                                  if (c.purok != null) c.purok!,
-                                  if (!c.isActive)
-                                    'not an active account'
-                                  else if (overdue == 0)
-                                    'nothing overdue'
-                                  else
-                                    '$overdue overdue bill'
-                                        '${overdue == 1 ? '' : 's'}',
-                                ].join(' · '),
-                                style: text.bodySmall,
+                            return Container(
+                              decoration: BoxDecoration(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.surfaceContainerLowest,
+                                border: Border.all(
+                                  color: allowed
+                                      ? Theme.of(
+                                          context,
+                                        ).colorScheme.outlineVariant
+                                      : Theme.of(context)
+                                            .colorScheme
+                                            .outlineVariant
+                                            .withValues(alpha: 0.55),
+                                ),
+                                borderRadius: BorderRadius.circular(14),
                               ),
-                              trailing: allowed
-                                  ? const Icon(Icons.chevron_right)
-                                  : null,
-                              enabled: allowed,
-                              onTap: () => controller.select(c),
+                              child: ListTile(
+                                title: Text(
+                                  c.fullName,
+                                  style: text.titleMedium,
+                                ),
+                                subtitle: Text(
+                                  <String>[
+                                    c.consumerNo.value,
+                                    if (c.purok != null) c.purok!,
+                                    if (!c.isActive)
+                                      'not an active account'
+                                    else if (overdue == 0)
+                                      'nothing overdue'
+                                    else
+                                      '$overdue overdue bill'
+                                          '${overdue == 1 ? '' : 's'}',
+                                  ].join(' · '),
+                                  style: text.bodySmall,
+                                ),
+                                trailing: allowed
+                                    ? const Icon(Icons.chevron_right)
+                                    : null,
+                                enabled: allowed,
+                                onTap: () => controller.select(c),
+                              ),
                             );
                           },
                         ),

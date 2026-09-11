@@ -8,11 +8,14 @@ import '../../domain/repositories/notice_repository.dart';
 import '../../domain/value_objects/ph_date.dart';
 import '../auth/auth_controller.dart';
 import '../common/failure_banner.dart';
+import '../common/staff_app_bar.dart';
 import '../providers.dart';
 import '../router.dart';
 
 /// Active disconnection notices for this Admin's area.
-final activeNoticesProvider = FutureProvider<List<ActiveNotice>>((Ref ref) async {
+final activeNoticesProvider = FutureProvider<List<ActiveNotice>>((
+  Ref ref,
+) async {
   final user = await ref.watch(authControllerProvider.future);
   final areaId = user?.areaId;
   if (areaId == null) {
@@ -39,16 +42,26 @@ final activeNoticesProvider = FutureProvider<List<ActiveNotice>>((Ref ref) async
 /// then advanced past Sundays and holidays — and this screen only counts down
 /// to the answer it was given. A second opinion about a legal deadline is the
 /// last thing this app should hold.
-class DisconnectionsScreen extends ConsumerWidget {
+class DisconnectionsScreen extends ConsumerStatefulWidget {
   const DisconnectionsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DisconnectionsScreen> createState() =>
+      _DisconnectionsScreenState();
+}
+
+enum _NoticeFilter { all, elapsed }
+
+class _DisconnectionsScreenState extends ConsumerState<DisconnectionsScreen> {
+  _NoticeFilter _filter = _NoticeFilter.all;
+
+  @override
+  Widget build(BuildContext context) {
     final notices = ref.watch(activeNoticesProvider);
     final TextTheme text = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Notices')),
+      appBar: const StaffAppBar(title: 'Disconnections'),
       floatingActionButton: FloatingActionButton.extended(
         // `push`, so the back arrow returns to this list, and the list
         // refreshes when the notice lands.
@@ -71,60 +84,117 @@ class DisconnectionsScreen extends ConsumerWidget {
               onRetry: () => ref.invalidate(activeNoticesProvider),
             ),
           ),
-          data: (List<ActiveNotice> list) => RefreshIndicator(
-            onRefresh: () async => ref.invalidate(activeNoticesProvider),
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-              children: <Widget>[
-                if (list.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 64),
-                    child: Column(
+          data: (List<ActiveNotice> list) {
+            final int elapsedCount = list
+                .where((ActiveNotice notice) => notice.periodElapsed)
+                .length;
+            final visible = _filter == _NoticeFilter.elapsed
+                ? list
+                      .where((ActiveNotice notice) => notice.periodElapsed)
+                      .toList()
+                : list;
+            return RefreshIndicator(
+              onRefresh: () async => ref.invalidate(activeNoticesProvider),
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+                children: <Widget>[
+                  if (list.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 64),
+                      child: Column(
+                        children: <Widget>[
+                          Icon(
+                            Icons.verified_outlined,
+                            size: 40,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'No active notices.',
+                            style: text.titleMedium,
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Nobody in this area is under a disconnection '
+                            'notice.',
+                            style: text.bodyMedium,
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    )
+                  else ...<Widget>[
+                    Text.rich(
+                      TextSpan(
+                        children: <InlineSpan>[
+                          TextSpan(
+                            text: '${list.length}',
+                            style: text.headlineMedium,
+                          ),
+                          TextSpan(
+                            text: ' awaiting review',
+                            style: text.bodyMedium,
+                          ),
+                          if (elapsedCount > 0)
+                            TextSpan(
+                              text: '  ·  $elapsedCount past 48h',
+                              style: text.bodyMedium?.copyWith(
+                                color: Theme.of(context).colorScheme.error,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
                       children: <Widget>[
-                        Icon(
-                          Icons.verified_outlined,
-                          size: 40,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ChoiceChip(
+                          label: const Text('All'),
+                          selected: _filter == _NoticeFilter.all,
+                          onSelected: (_) =>
+                              setState(() => _filter = _NoticeFilter.all),
                         ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'No active notices.',
-                          style: text.titleMedium,
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Nobody in this area is under a disconnection '
-                          'notice.',
-                          style: text.bodyMedium,
-                          textAlign: TextAlign.center,
+                        ChoiceChip(
+                          label: const Text('Past 48h'),
+                          selected: _filter == _NoticeFilter.elapsed,
+                          onSelected: (_) =>
+                              setState(() => _filter = _NoticeFilter.elapsed),
                         ),
                       ],
                     ),
-                  )
-                else ...<Widget>[
-                  Text(
-                    '${list.length} active notice'
-                    '${list.length == 1 ? '' : 's'}',
-                    style: text.titleSmall,
-                  ),
-                  const SizedBox(height: 8),
-                  for (final ActiveNotice notice in list)
-                    _NoticeTile(
-                      notice: notice,
-                      // Returning from the document refreshes the list: a
-                      // notice closed in there is no longer active, and it
-                      // must not linger here looking as though it were.
-                      onOpen: () async {
-                        await context
-                            .push(Routes.noticeDocumentFor(notice.id.value));
-                        ref.invalidate(activeNoticesProvider);
-                      },
-                    ),
+                    const SizedBox(height: 12),
+                    if (visible.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 36),
+                        child: Text(
+                          'No notices match this filter.',
+                          style: text.bodyMedium,
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    for (final ActiveNotice notice in visible)
+                      _NoticeTile(
+                        notice: notice,
+                        // Returning from the document refreshes the list: a
+                        // notice closed in there is no longer active, and it
+                        // must not linger here looking as though it were.
+                        onOpen: () async {
+                          await context.push(
+                            Routes.noticeDocumentFor(notice.id.value),
+                          );
+                          ref.invalidate(activeNoticesProvider);
+                        },
+                      ),
+                  ],
                 ],
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -141,11 +211,18 @@ class _NoticeTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final TextTheme text = Theme.of(context).textTheme;
     final ColorScheme colours = Theme.of(context).colorScheme;
-    final bool elapsed = notice.hoursRemaining == 0;
+    final bool elapsed = notice.periodElapsed;
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 8),
       clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: colours.surfaceContainerLowest,
+        border: Border.all(
+          color: elapsed ? colours.error : colours.outlineVariant,
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: InkWell(
         onTap: onOpen,
         child: Padding(
@@ -155,49 +232,59 @@ class _NoticeTile extends StatelessWidget {
             children: <Widget>[
               Row(
                 children: <Widget>[
+                  Container(
+                    width: 9,
+                    height: 9,
+                    decoration: BoxDecoration(
+                      color: elapsed ? colours.error : colours.primary,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(notice.consumerLabel, style: text.titleMedium),
                   ),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: colours.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
                       elapsed
-                          ? 'period elapsed'
+                          ? '48h elapsed'
                           : '${notice.hoursRemaining}h left',
-                      style: text.bodySmall
-                          ?.copyWith(color: colours.onSurfaceVariant),
+                      style: text.bodySmall?.copyWith(
+                        color: colours.onSurfaceVariant,
+                      ),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 6),
               Text(
-                'Served ${_servedOn(notice.servedAt)}',
+                '${notice.noticeNo} · Served ${_servedOn(notice.servedAt)}',
                 style: text.bodySmall,
               ),
               const SizedBox(height: 4),
               Text(
                 elapsed
                     ? 'The notice period has passed. Disconnection may now be '
-                        'referred to the cooperative.'
+                          'referred to the cooperative.'
                     : 'Disconnection is not lawful until the period is over.',
                 style: text.bodySmall,
               ),
-              const SizedBox(height: 8),
-              Row(
-                children: <Widget>[
-                  Text(
-                    'Open notice ${notice.noticeNo}',
-                    style: text.labelLarge?.copyWith(color: colours.primary),
-                  ),
-                  const SizedBox(width: 2),
-                  Icon(Icons.chevron_right, size: 18, color: colours.primary),
-                ],
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Icon(
+                  Icons.chevron_right,
+                  size: 20,
+                  color: colours.onSurfaceVariant,
+                ),
               ),
             ],
           ),
@@ -212,8 +299,18 @@ class _NoticeTile extends StatelessWidget {
   static String _servedOn(DateTime instant) {
     final PhDate day = PhDate.at(instant);
     const List<String> months = <String>[
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${day.day} ${months[day.month - 1]} ${day.year}';
   }

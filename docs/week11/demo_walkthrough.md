@@ -1,203 +1,260 @@
-# Demo walkthrough — all four roles on the phone
+# Week 11 demo walkthrough — controlled demo data
 
-Every screen is built and routed. What has *not* happened is a person holding
-a phone and walking the whole thing end to end. The three worst bugs of this
-project — the missing INTERNET permission, the views that bypassed RLS, and
-the billing cycle the app and database disagreed about — were all found by
-*using* the app or its data, not by testing it.
+Use this walkthrough for the Week 11 MVP presentation. It runs BillAlert with
+deterministic data held in memory and never connects to Supabase. You can repeat
+the walkthrough without changing the live database.
 
-Work down this list in order. Anything that misbehaves, write down what you
-did and what it said, not just "broken".
+Week 11 demonstrates the primary screens, navigation, validation, and core user
+journeys. Live API/database integration belongs to Week 12. The production
+SQLite force-stop and reconnect test remains a separate integration check; demo
+mode cannot provide evidence for persistence across an app restart.
 
 ---
 
-## 0. Before you build
+## 0. Start the correct build
 
-- [ ] `supabase/migrations/03_views.sql` re-run — the `amount_overdue` fix.
-      Without it the notice document overstates what a household owes.
+### From VS Code
+
+1. Open **Run and Debug**.
+2. Select **BillAlert (demo data)**.
+3. Press **Start Debugging**.
+
+Do not select **BillAlert (dev)** for this walkthrough. The dev configuration
+uses Supabase; the demo-data configuration supplies `DEMO_MODE=true`.
+
+### From a terminal
 
 ```bash
-flutter build apk --release --dart-define-from-file=env.json
+flutter run --dart-define=DEMO_MODE=true
 ```
 
-`env.json` holds `SUPABASE_URL` and `SUPABASE_ANON_KEY`, generated from
-`.vscode/launch.json` and gitignored. Use it rather than two `--dart-define`
-flags: an APK built without them installs and runs perfectly, then fails
-**every** sign-in with "Something went wrong on the server" — which looks like
-a backend problem and is not. That has already cost one build.
+### Build a dedicated demo APK
 
-- [ ] Built and installed
+```bash
+flutter build apk --release --dart-define=DEMO_MODE=true
+```
+
+No Supabase URL or key is needed for a demo build. `DEMO_MODE` is a compile-time
+setting, so a running demo APK cannot accidentally be switched to the live
+database.
+
+- [ ] Start the app with one of the demo commands above.
+- [ ] Confirm that the diagonal **DEMO DATA** banner is visible and the login
+      screen lists the controlled demo accounts.
 
 ---
 
-## The data you are walking into
+## Demo accounts
 
-| Household | State | Used for |
+Every account uses the password **`demo`**.
+
+| Role | Username | Full-name alias also accepted |
 |---|---|---|
-| **Virgilio Busalanan** | paid in full, **the only household that can sign in** | the whole live chain |
-| Elena Bongcaras | overdue ₱541.20, **active notice DN-2026-0910-0033** | the notice document |
-| Rodel Amistad | overdue ₱612.35, no notice | serving a notice live |
-| B. Sarigumba | overdue ₱533.45, Aug bill ₱658.30 unpaid | cashier collection |
-| Teresita Lumayag | paid in full | the eligibility guard |
+| Meter Reader | `reader` | `ledesman.dormal` |
+| Admin | `admin` | `mario.ombajin` |
+| Cashier | `cashier` | `maria.canete` |
+| Consumer | `consumer` | `elena.bongcaras` |
 
-The **September cycle is empty** — no household has been read. That is what
-steps 1 and 5 need.
-
-### Read BUSALANAN's meter in step 1
-
-`virgilio.busalanan` is the only consumer login that exists. Every other
-household has `profile_id` null and cannot sign in, so a receipt handed to
-any of them can never be opened by a consumer.
-
-Read his meter, post his amount, collect his payment — and step 4 signs in
-as him and watches the receipt appear. That is the entire system in one
-unbroken pass, and it needs no new account.
-
-He already has one receipt from earlier — `BIEC-2026-09-004471`, settling
-two months on one number. After step 3 he will have two, which also shows
-History with more than a single row in it.
+The short usernames are easier to type during the presentation.
 
 ---
 
-## 1. Meter Reader — `ledesman.dormal`
+## Controlled starting data
 
-- [ ] Sign in. Lands on **Readings**.
-- [ ] The round says **September 2026** and lists all five households unread.
-- [ ] Tap **Virgilio Busalanan** (2019-0917-TUB) → the form opens with his
-      previous reading, 3475.
-- [ ] Type a reading **above** it — 3538 gives 63 kWh — → Save → confirmation.
+The demo clock is fixed at **10 September 2026**, so the reading round is always
+**September 2026**. The seeded households are Elena Bongcaras, Bienvenido
+Sarigumba, Virgilio Bacus, Teresita Daguplo, and Odelon Paredes.
 
-**Read ONE household only, and make it Busalanan.** He is the only consumer
-who can sign in, so he is the only one who can open the receipt in step 4.
-Step 5 needs unread households left, and once a household is read this cycle
-FR-23 will not let you read it again.
+The main records used in the walkthrough are:
 
-- [ ] Go back into that same household → refused. *(FR-23.)*
-- [ ] On a different household, try a reading **below** the previous → refused.
-      *(MTR-08, a meter does not run backwards.)*
-- [ ] **Consumers** tab lists the area; **Profile** says "Meter Reader".
+| Record | Demo state | Used to show |
+|---|---|---|
+| Elena Bongcaras | July bill overdue by **₱541.20** | Consumer bill, overdue history, inbox, and notice |
+| Elena's June and May bills | Paid under receipt **OR-2026-0802-0018** | Payment history and receipt document |
+| Notice **DN-2026-0910-0033** | Active; earliest lawful moment is 14 Sep 2026, 08:00 PH | Notice list and document |
+| Teresita Daguplo | One bill awaiting an amount | Admin Amounts queue |
+| Virgilio Bacus | Existing recent receipt **OR-2026-0909-0041** | Cashier Receipts list |
 
-Write down which household you read and the number you typed.
-
----
-
-## 2. Admin (Area President) — `mario.ombajin`
-
-**Amounts:**
-
-- [ ] The reading from step 1 is in the queue with how long it has waited.
-- [ ] Type the peso amount and a due date → Post. **The amount comes from the
-      cooperative's bill.** BillAlert computes no amount — there is no tariff
-      anywhere in this codebase, by design.
-- [ ] It leaves the queue.
-
-**Accounts:**
-
-- [ ] Opens on the households of Area 3, with a count.
-- [ ] Pull down to refresh.
-- [ ] **New consumer** → consumer number, first and last name → Create.
-- [ ] Confirmation shows the name and number back.
-- [ ] **Done** → back on the list, and *the new household is in it.* If it is
-      missing, the server refresh on return is broken.
-- [ ] Try a consumer number that already exists → it should say the number is
-      in use, not "something went wrong".
-- [ ] The foot of the tab says staff sign-ins cannot be created here. That is
-      the honest answer, not a missing screen — it needs the service-role key,
-      which must never be inside an app anyone can install.
-
-**Notices:**
-
-- [ ] Elena's notice is listed with hours remaining.
-- [ ] **Tap it** → the notice document opens: notice number, her address and
-      meter serial, the reason, when it was served, the earliest lawful
-      moment, and what she owes.
-- [ ] Check the amount reads **₱541.20** — her overdue balance, not her total
-      unpaid. If it shows more, `03_views.sql` was not re-run.
-- [ ] Read the line saying BillAlert never authorises, schedules, or executes
-      a disconnection. "Referred" records a handover to the cooperative.
-- [ ] **Do not close Elena's notice yet** — closing it removes it from the
-      list, and you want it there if you demo this twice.
-- [ ] Back → **Serve a notice** → Rodel and Sarigumba are listed first;
-      Busalanan and Lumayag are greyed out with "nothing overdue".
-- [ ] Serve one on **Rodel** → confirm → it appears in the list.
-- [ ] Open Rodel's document → record the outcome as **settled** → it leaves
-      the list. That is `fn_close_disconnection_notice`, the last RPC.
-
-The countdown is worked out server-side: 48 hours from service, then past any
-Sunday or holiday, then into the 08:00 window. Elena's was served 10 Sep
-04:55 and is lawful from **14 Sep 08:00** — Saturday skipped, Sunday skipped.
-The app never computes that.
+All changes stay inside the running app. Closing Elena's notice, adding a
+consumer, or recording a reading does not touch Supabase.
 
 ---
 
-## 3. Cashier — `mercedita.gales`
+## 1. Meter Reader
 
-- [ ] Sign in. Lands on the payment screen.
-- [ ] Search for **Busalanan** — the household whose amount you posted in step 2.
-- [ ] Its unpaid bills are listed with real amounts.
-- [ ] Select the bills, enter cash tendered → Record payment.
-- [ ] A receipt number, a verification code, and the change due come back.
-- [ ] **Receipts** tab shows it in today's collection.
+Sign in with **`reader` / `demo`**.
 
-**Write down the receipt number.**
+- [ ] The app lands on **Readings**.
+- [ ] The round says **September 2026** and shows five households.
+- [ ] Open a household and confirm that the previous reading and last-reading
+      date are visible.
+- [ ] Enter a value below the previous reading and confirm that the app rejects
+      it because a meter cannot run backwards.
+- [ ] Enter a valid value above the previous reading and save it.
+- [ ] Confirm that the reading is shown as queued and that the roster updates.
+- [ ] Try the same household again and confirm that a second reading for the
+      same cycle is refused.
+- [ ] Open **Consumers** and review the household list, last-reading dates, and
+      search/filter controls.
+- [ ] Open **Profile** and confirm the Meter Reader identity and sign-out action.
 
----
-
-## 4. Consumer — `virgilio.busalanan`
-
-The only consumer login that exists, which is why steps 1 to 3 were all done
-against his household.
-
-- [ ] Sign in. If it demands a new password, there is nowhere else to go —
-      that is deliberate (GEN-04).
-- [ ] **Bill** shows the current bill, or an honest "waiting for the amount".
-- [ ] **History** lists **three** months now: July and August settled on
-      receipt `BIEC-2026-09-004471`, and September on the receipt you just
-      created.
-- [ ] Tap the September row → **the receipt opens**, and its number matches
-      what the cashier read out. Reader → Admin → Cashier → Consumer, in one
-      glance.
-- [ ] Tap the July row → the OLDER receipt opens, and July and August share
-      one number. That is correct: the money changed hands once, so there is
-      one receipt covering both months.
-- [ ] The verification code is text, not a QR, and the screen says why.
-- [ ] **Inbox** shows notifications, or says there are none.
-- [ ] **Profile** → change password → sign out → sign back in → change it back.
-- [ ] Try changing it to the password it already is. It must say the new one
-      has to be different — **not** "you have been signed out".
+This demonstrates the offline-first interaction at the UI/domain level. In demo
+mode, the queued reading exists only in memory.
 
 ---
 
-## 5. The offline test — this is the graded one
+## 2. Admin (Area President)
 
-NFR-05 and MTR-11/12. The only requirement with no evidence at all, and the
-reason the outbox exists. Do it last, and carefully.
+Sign out, then sign in with **`admin` / `demo`**.
 
-- [ ] Sign in as `ledesman.dormal` **with signal**, so the roster caches.
-- [ ] Turn on **airplane mode**.
-- [ ] Open **Consumers** — the households are still there. From the encrypted
-      cache. This is the point.
-- [ ] Record a reading on a household you did **not** read in step 1.
-- [ ] It **saves** and says it is queued. No network error, no lost reading.
-- [ ] **Force-stop the app** from Android settings. Not just background it.
-- [ ] Reopen, still in airplane mode → the reading is still queued.
-      *(This replaces "survives restart — not verified" in the evidence log.)*
-- [ ] Turn airplane mode **off**.
-- [ ] The queue drains and the reading syncs.
-- [ ] Sign in as `mario.ombajin` → that household is in the Amounts queue.
+### Amounts
 
-The reading's time should be **when you typed it in airplane mode**, not when
-it synced. That is `capturedAt`, and it is why a reading lands in the right
-billing cycle when a reader walks a whole barangay with no signal.
+- [ ] Open **Amounts** and find Teresita Daguplo's bill waiting for an amount.
+- [ ] Submit with no amount and confirm that validation explains what is needed.
+- [ ] Enter an amount and due date, then post it.
+- [ ] Confirm the success message.
+
+The demo repository keeps the seeded queue visible so this screen can be
+rehearsed repeatedly. The app still exercises the form, use case, validation,
+outbox handoff, and success state.
+
+### Notices
+
+- [ ] Open **Notices** and select **DN-2026-0910-0033**.
+- [ ] Confirm the document shows Elena Bongcaras, consumer number
+      `2018-0442-TUB`, Purok 1, meter `BIEC-08319`, the reason, service time,
+      earliest lawful moment, and **₱541.20** overdue.
+- [ ] Confirm the earliest lawful moment is **14 September 2026 at 08:00 PH**.
+- [ ] Read the statement that BillAlert never authorises, schedules, or executes
+      a disconnection. **Referred** records a handover to cooperative personnel.
+- [ ] Choose one outcome, add optional notes, review the confirmation dialog,
+      and close the notice.
+- [ ] Confirm the success state and the honest empty state when the closed notice
+      can no longer be found.
+
+It is safe to close this demo notice. Relaunching the demo restores it.
+
+### Serve a notice
+
+- [ ] Open **Serve a notice**.
+- [ ] Search or select a household with an outstanding bill.
+- [ ] Enter a reason, review the confirmation, and submit.
+- [ ] Confirm the served-success state.
+
+The demo confirms the presentation and handoff flow. It does not start a legal
+clock or create a live notice because those results are assigned by the server.
+
+### Accounts
+
+- [ ] Open **Accounts** and search the five seeded households.
+- [ ] Open **New consumer**, enter a unique consumer number and name, and create
+      the household.
+- [ ] Confirm the created-consumer result, then return to the list.
+- [ ] Review the explanation that staff accounts require a trusted server and
+      cannot be created from the mobile client.
 
 ---
 
-## What to record
+## 3. Cashier
 
-For `evidence_log.md`, per step: what you did, what the app showed, and the
-identifier it produced — bill number, receipt number, notice number, consumer
-number. An identifier is what makes it evidence rather than a claim, because
-it can be looked up in the database afterwards.
+Sign out, then sign in with **`cashier` / `demo`**.
 
-Two lines in that log still read **not verified — needs a device**. Step 5 is
-what replaces them.
+- [ ] The payment screen opens with searchable households and outstanding bills.
+- [ ] Search for **Bienvenido Sarigumba** and review his unpaid August bill.
+- [ ] Try to submit without selecting a bill and confirm the validation message.
+- [ ] Select the bill and enter cash tendered below the amount due; confirm that
+      the app refuses insufficient cash.
+- [ ] Enter enough cash and record the payment.
+- [ ] Confirm the honest queued message explaining that the official receipt
+      number is issued after server synchronization.
+- [ ] Open **Receipts** and inspect the seeded collection history, including
+      receipt **OR-2026-0909-0041**.
+- [ ] Open **Profile** and confirm the Cashier identity and sign-out action.
+
+The seeded bills and receipts return after a relaunch. No official receipt is
+minted for this action because demo mode does not call the server RPC. The
+Consumer section below uses a separate seeded receipt to demonstrate the full
+receipt document.
+
+---
+
+## 4. Consumer
+
+Sign out, then sign in with **`consumer` / `demo`**. This account represents
+**Elena Bongcaras**.
+
+### Bill
+
+- [ ] **Bill** shows the July 2026 balance of **₱541.20**, its due date, and its
+      overdue state.
+- [ ] Review the amount, consumption, and bill details.
+
+### History
+
+- [ ] Open **History** and switch between the **Bills** and **Payments** tabs.
+- [ ] Search by month or OR number.
+- [ ] Change the date sort and confirm the order changes.
+- [ ] Confirm that July is presented as overdue without covering the main bill
+      information.
+- [ ] In Payments, open **OR-2026-0802-0018**.
+- [ ] Confirm that the receipt covers the paid May and June bills, shows the
+      cash/change breakdown, and includes its verification code.
+
+### Inbox and profile
+
+- [ ] Open **Inbox** and review the overdue and bill-ready notifications.
+- [ ] Use the notification filters and mark an unread item as read.
+- [ ] Open **Profile** and review the household, account, meter, and address
+      sections.
+- [ ] Open Change password and verify the form validation.
+- [ ] Sign out.
+
+---
+
+## Repeat or reset the walkthrough
+
+Demo data is recreated each time `main()` starts.
+
+1. Stop the running app completely.
+2. Start **BillAlert (demo data)** again.
+3. Sign in with any demo account and repeat the walkthrough.
+
+A VS Code **Hot Restart** also recreates the provider scope in normal debugging,
+but stopping and starting the app is the clearest reset before a presentation.
+You do not need to clear app storage, edit Supabase rows, recreate bills, or
+protect a live notice.
+
+---
+
+## What demo mode does and does not prove
+
+| Demonstrated in Week 11 demo mode | Requires later integration/device evidence |
+|---|---|
+| All role-based screens and navigation | Supabase connectivity and RLS |
+| Seeded bills, receipts, notices, and notifications | Live RPC-generated identifiers |
+| Form validation and success/empty states | Real notification delivery |
+| Reading queued within the running app | Encrypted SQLite surviving force-stop |
+| Safe, repeatable role walkthroughs | Reconnect, queue drain, and Admin seeing the synced reading |
+
+Do not perform the airplane-mode force-stop test with this demo build. Its fake
+outbox is intentionally in memory, so closing the process resets it. Perform the
+production outbox test later with **BillAlert (dev)** or a configured integration
+APK, a dedicated test household, and live Supabase.
+
+---
+
+## Week 11 evidence to capture
+
+Capture screenshots or a short recording showing:
+
+- [ ] The **BillAlert (demo data)** launch configuration or demo login state.
+- [ ] Each role reaching its primary screen.
+- [ ] Navigation among every major tab.
+- [ ] A valid reading being accepted and a duplicate/invalid reading refused.
+- [ ] The notice document and its close confirmation/success state.
+- [ ] The Cashier payment flow and Receipts screen.
+- [ ] The Consumer Bill, Bills/Payments History, receipt, Inbox, and Profile.
+
+Describe the action, expected result, and observed result. Demo identifiers are
+useful for matching screenshots, but they are controlled fixtures and should not
+be presented as rows verified in the live database.

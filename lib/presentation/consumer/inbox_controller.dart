@@ -19,8 +19,7 @@ final class InboxState {
     this.failure,
   });
 
-  int get unreadCount =>
-      alerts.where((AppNotification a) => !a.isRead).length;
+  int get unreadCount => alerts.where((AppNotification a) => !a.isRead).length;
 }
 
 class InboxController extends Notifier<InboxState> {
@@ -43,8 +42,9 @@ class InboxController extends Notifier<InboxState> {
   }
 
   Future<void> _doLoad() async {
-    final consumerResult =
-        await ref.read(consumerRepositoryProvider).signedInConsumer();
+    final consumerResult = await ref
+        .read(consumerRepositoryProvider)
+        .signedInConsumer();
 
     final Consumer? me = switch (consumerResult) {
       Ok(:final value) => value,
@@ -87,7 +87,28 @@ class InboxController extends Notifier<InboxState> {
         state = InboxState(alerts: state.alerts, failure: failure);
     }
   }
+
+  /// Marks every currently visible unread alert, then reloads once so the
+  /// count and list reflect what the repository accepted.
+  Future<void> markAllRead() async {
+    if (_consumerId == null) return;
+
+    final unread = state.alerts.where((AppNotification alert) => !alert.isRead);
+    for (final AppNotification alert in unread) {
+      switch (await ref
+          .read(notificationRepositoryProvider)
+          .markRead(alert.id)) {
+        case Ok():
+          break;
+        case Err(:final failure):
+          state = InboxState(alerts: state.alerts, failure: failure);
+          return;
+      }
+    }
+    await load();
+  }
 }
 
-final inboxControllerProvider =
-    NotifierProvider<InboxController, InboxState>(InboxController.new);
+final inboxControllerProvider = NotifierProvider<InboxController, InboxState>(
+  InboxController.new,
+);
