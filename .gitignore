@@ -77,3 +77,8 @@ env.json
 # Editor backups. .vscode/launch.json is ignored but launch.json.bak was
 # not, so a copy of the Supabase key could sit untracked beside it.
 *.bak
+
+# Local AI-agent workspace. These files contain machine-specific task context
+# and are not part of the BillAlert application or its project documentation.
+/.agents/
+/AGENTS.md
