@@ -9,8 +9,10 @@ import 'package:billalert/domain/value_objects/kwh.dart';
 import 'package:billalert/domain/value_objects/money.dart';
 import 'package:billalert/domain/value_objects/ph_date.dart';
 import 'package:billalert/presentation/admin/post_bill_amount_controller.dart';
+import 'package:billalert/presentation/admin/post_bill_amount_screen.dart';
 import 'package:billalert/presentation/auth/auth_controller.dart';
 import 'package:billalert/presentation/providers.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -39,22 +41,41 @@ void main() {
   final clock = FixedPhClock.onPhDate(const PhDate(2026, 9, 9));
 
   AwaitingAmountEntry sarigumba() => const AwaitingAmountEntry(
-        bill: Bill(
-          id: BillId('117cdc15-a13a-4c25-ba20-f46d89667272'),
-          billNo: BillNumber('BA-202608-000005'),
-          consumerId: ConsumerId('e9d5aba2'),
-          cycle: CycleLabel(2026, 8),
-          consumption: Kwh.fromHundredths(5800),
-          totalAmount: null,
-          dueDate: null,
-        ),
-        consumerName: 'Bienvenido Sarigumba',
-        consumerNo: ConsumerNumber('2020-0791-TUB'),
-        previousReading: Kwh.fromHundredths(461000),
-        currentReading: Kwh.fromHundredths(466800),
-        readingDate: PhDate(2026, 8, 10),
-        daysWaiting: 6,
-      );
+    bill: Bill(
+      id: BillId('117cdc15-a13a-4c25-ba20-f46d89667272'),
+      billNo: BillNumber('BA-202608-000005'),
+      consumerId: ConsumerId('e9d5aba2'),
+      cycle: CycleLabel(2026, 8),
+      consumption: Kwh.fromHundredths(5800),
+      totalAmount: null,
+      dueDate: null,
+    ),
+    consumerName: 'Bienvenido Sarigumba',
+    consumerNo: ConsumerNumber('2020-0791-TUB'),
+    previousReading: Kwh.fromHundredths(461000),
+    currentReading: Kwh.fromHundredths(466800),
+    readingDate: PhDate(2026, 8, 10),
+    daysWaiting: 6,
+  );
+
+  AwaitingAmountEntry amistad() => const AwaitingAmountEntry(
+    bill: Bill(
+      id: BillId('bill-amistad'),
+      billNo: BillNumber('BA-202608-000006'),
+      consumerId: ConsumerId('consumer-amistad'),
+      cycle: CycleLabel(2026, 8),
+      consumption: Kwh.fromHundredths(6700),
+      totalAmount: null,
+      dueDate: null,
+    ),
+    consumerName: 'Rosalinda Amistad',
+    consumerNo: ConsumerNumber('2020-0812-TUB'),
+    purok: 'Purok 5',
+    previousReading: Kwh.fromHundredths(510000),
+    currentReading: Kwh.fromHundredths(516700),
+    readingDate: PhDate(2026, 8, 10),
+    daysWaiting: 6,
+  );
 
   late FakeBillRepository bills;
   late FakeOutboxRepository outbox;
@@ -67,14 +88,14 @@ void main() {
 
     final container = ProviderContainer(
       overrides: [
-        authControllerProvider
-            .overrideWith(() => FakeAuthController(signedInUser: admin)),
+        authControllerProvider.overrideWith(
+          () => FakeAuthController(signedInUser: admin),
+        ),
         billRepositoryProvider.overrideWithValue(bills),
         outboxRepositoryProvider.overrideWithValue(outbox),
         syncServiceProvider.overrideWithValue(sync),
         phClockProvider.overrideWithValue(clock),
-        clientUuidFactoryProvider
-            .overrideWithValue(CountingUuidFactory().call),
+        clientUuidFactoryProvider.overrideWithValue(CountingUuidFactory().call),
       ],
     );
     addTearDown(container.dispose);
@@ -82,8 +103,9 @@ void main() {
   }
 
   Future<PostBillAmountController> loaded(ProviderContainer container) async {
-    final controller =
-        container.read(postBillAmountControllerProvider.notifier);
+    final controller = container.read(
+      postBillAmountControllerProvider.notifier,
+    );
     await controller.refresh();
     return controller;
   }
@@ -96,8 +118,47 @@ void main() {
     await loaded(container);
 
     expect(bills.awaitingCalls, greaterThanOrEqualTo(1));
-    expect(stateOf(container).queue.single.consumerName, 'Bienvenido Sarigumba');
+    expect(
+      stateOf(container).queue.single.consumerName,
+      'Bienvenido Sarigumba',
+    );
     expect(stateOf(container).failure, isNull);
+  });
+
+  testWidgets('search filters the real queue by its identifying fields', (
+    WidgetTester tester,
+  ) async {
+    final container = harness();
+    bills.queue = <AwaitingAmountEntry>[sarigumba(), amistad()];
+    await loaded(container);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: PostBillAmountScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bienvenido Sarigumba'), findsOneWidget);
+    expect(find.text('Rosalinda Amistad'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey<String>('amounts-search')),
+      '2020-0812',
+    );
+    await tester.pump();
+
+    expect(find.text('Bienvenido Sarigumba'), findsNothing);
+    expect(find.text('Rosalinda Amistad'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey<String>('amounts-search')),
+      'nobody',
+    );
+    await tester.pump();
+
+    expect(find.text('No matching readings.'), findsOneWidget);
   });
 
   test('a typed amount reaches the outbox as exact centavos', () async {
@@ -116,44 +177,51 @@ void main() {
     // The whole point of Money: 658.30 is 65,830 centavos and never a double.
     expect(operation.amount, const Money.fromCentavos(65830));
     expect(operation.amount.toDatabaseString(), '658.30');
-    expect(operation.billId, const BillId('117cdc15-a13a-4c25-ba20-f46d89667272'));
+    expect(
+      operation.billId,
+      const BillId('117cdc15-a13a-4c25-ba20-f46d89667272'),
+    );
     expect(operation.dueDate.toIso(), '2026-09-25');
     expect(stateOf(container).failure, isNull);
   });
 
-  test('a comma and a peso sign are accepted, because people type them',
-      () async {
-    final container = harness();
-    final controller = await loaded(container);
+  test(
+    'a comma and a peso sign are accepted, because people type them',
+    () async {
+      final container = harness();
+      final controller = await loaded(container);
 
-    await controller.post(
-      entry: sarigumba(),
-      amountText: '₱1,975.35',
-      dueDate: const PhDate(2026, 9, 25),
-    );
+      await controller.post(
+        entry: sarigumba(),
+        amountText: '₱1,975.35',
+        dueDate: const PhDate(2026, 9, 25),
+      );
 
-    expect(
-      (outbox.enqueued.single as PostAmountOperation).amount,
-      const Money.fromCentavos(197535),
-    );
-  });
+      expect(
+        (outbox.enqueued.single as PostAmountOperation).amount,
+        const Money.fromCentavos(197535),
+      );
+    },
+  );
 
-  test('text that is not an amount is refused, and nothing is queued',
-      () async {
-    final container = harness();
-    final controller = await loaded(container);
+  test(
+    'text that is not an amount is refused, and nothing is queued',
+    () async {
+      final container = harness();
+      final controller = await loaded(container);
 
-    await controller.post(
-      entry: sarigumba(),
-      amountText: 'six hundred',
-      dueDate: const PhDate(2026, 9, 25),
-    );
+      await controller.post(
+        entry: sarigumba(),
+        amountText: 'six hundred',
+        dueDate: const PhDate(2026, 9, 25),
+      );
 
-    expect(outbox.enqueued, isEmpty);
-    expect(stateOf(container).failure, isA<ValidationFailure>());
-    // The queue is still on screen: a typo must not empty the list.
-    expect(stateOf(container).queue, hasLength(1));
-  });
+      expect(outbox.enqueued, isEmpty);
+      expect(stateOf(container).failure, isA<ValidationFailure>());
+      // The queue is still on screen: a typo must not empty the list.
+      expect(stateOf(container).queue, hasLength(1));
+    },
+  );
 
   test('a missing due date is refused before anything is queued', () async {
     final container = harness();

@@ -28,15 +28,27 @@ class PostBillAmountScreen extends ConsumerStatefulWidget {
 }
 
 class _PostBillAmountScreenState extends ConsumerState<PostBillAmountScreen> {
+  final TextEditingController _search = TextEditingController();
+
   /// Which queue row is open. One at a time: the form is long, and the Admin
   /// is working one statement at a time anyway.
   String? _expandedBillId;
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(postBillAmountControllerProvider);
     final controller = ref.read(postBillAmountControllerProvider.notifier);
     final TextTheme text = Theme.of(context).textTheme;
+    final List<AwaitingAmountEntry> visibleQueue = _matchingEntries(
+      state.queue,
+      _search.text,
+    );
 
     return Scaffold(
       appBar: const StaffAppBar(title: 'Post bill amount'),
@@ -65,6 +77,32 @@ class _PostBillAmountScreenState extends ConsumerState<PostBillAmountScreen> {
               ],
 
               const SizedBox(height: 16),
+
+              if (state.queue.isNotEmpty) ...<Widget>[
+                TextField(
+                  key: const ValueKey<String>('amounts-search'),
+                  controller: _search,
+                  textInputAction: TextInputAction.search,
+                  autocorrect: false,
+                  decoration: InputDecoration(
+                    labelText: 'Search readings',
+                    hintText: 'Name, consumer number, purok or bill number',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _search.text.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: 'Clear search',
+                            onPressed: () {
+                              _search.clear();
+                              setState(() {});
+                            },
+                            icon: const Icon(Icons.close),
+                          ),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+                const SizedBox(height: 16),
+              ],
 
               if (state.isLoading && state.queue.isEmpty)
                 const Padding(
@@ -96,8 +134,34 @@ class _PostBillAmountScreenState extends ConsumerState<PostBillAmountScreen> {
                     ],
                   ),
                 )
+              else if (visibleQueue.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 40),
+                  child: Column(
+                    children: <Widget>[
+                      Icon(
+                        Icons.search_off,
+                        size: 40,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No matching readings.',
+                        style: text.titleMedium,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Try another name, consumer number, purok or bill '
+                        'number.',
+                        style: text.bodyMedium,
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                )
               else
-                for (final AwaitingAmountEntry entry in state.queue)
+                for (final AwaitingAmountEntry entry in visibleQueue)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: _QueueCard(
@@ -128,6 +192,28 @@ class _PostBillAmountScreenState extends ConsumerState<PostBillAmountScreen> {
   /// than from the clock, so it says what is actually on screen.
   static String? _cycleLabel(PostBillAmountState state) =>
       state.queue.isEmpty ? null : state.queue.first.bill.cycle.displayName;
+
+  /// Searches only the real queue already returned for this Admin's area.
+  /// It never fabricates rows and does not issue a second server query.
+  static List<AwaitingAmountEntry> _matchingEntries(
+    List<AwaitingAmountEntry> queue,
+    String rawQuery,
+  ) {
+    final String query = rawQuery.trim().toLowerCase();
+    if (query.isEmpty) return queue;
+
+    return queue
+        .where((AwaitingAmountEntry entry) {
+          final String searchable = <String>[
+            entry.consumerName,
+            entry.consumerNo.value,
+            entry.purok ?? '',
+            entry.bill.billNo.value,
+          ].join(' ').toLowerCase();
+          return searchable.contains(query);
+        })
+        .toList(growable: false);
+  }
 }
 
 class _Header extends StatelessWidget {
