@@ -1,5 +1,6 @@
 import '../../core/result/result.dart';
 import '../entities/app_user.dart';
+import '../entities/staff_account.dart';
 
 /// Signing in, signing out, and knowing who is signed in.
 ///
@@ -28,4 +29,16 @@ abstract class AuthRepository {
 
   /// GEN-04: replaces a temporary password and clears must_change_password.
   Future<Result<void>> changePassword({required String newPassword});
+
+  /// FR-31: provisions a Meter Reader or Cashier in the signed-in Admin's
+  /// area. The implementation delegates the privileged auth-user write to
+  /// the server; it must never use a service-role key in this client.
+  Future<Result<CreatedStaffAccount>> createStaffAccount({
+    required String username,
+    required String firstName,
+    required String lastName,
+    required String? contactNumber,
+    required StaffRole role,
+    required String temporaryPassword,
+  });
 }

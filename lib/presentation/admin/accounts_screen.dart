@@ -11,6 +11,7 @@ import '../common/failure_banner.dart';
 import '../common/staff_app_bar.dart';
 import '../providers.dart';
 import '../router.dart';
+import 'new_staff_screen.dart';
 
 /// The households of this Admin's own service area, read from the cache.
 ///
@@ -41,12 +42,8 @@ final adminHouseholdsProvider = FutureProvider<List<Consumer>>((Ref ref) async {
 /// chasing a bill the Area President wants to see the record exists, and
 /// after creating one they want to see it appear.
 ///
-/// STAFF accounts (Figma 70:1436) are NOT created here, and the screen says
-/// so rather than offering a button that fails. Creating a sign-in account
-/// means creating an auth user, which needs the service-role key — a
-/// credential that must never be shipped inside a client app, where anyone
-/// with the APK can read it out. That is an architectural limit, not an
-/// unfinished screen.
+/// Staff provisioning is reached from this screen but performed by a
+/// server-owned function. The app never receives the service-role key.
 class AdminAccountsScreen extends ConsumerWidget {
   const AdminAccountsScreen({super.key});
 
@@ -169,29 +166,35 @@ class AdminAccountsScreen extends ConsumerWidget {
                 ],
                 const SizedBox(height: 24),
                 Container(
+                  padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: Theme.of(
                       context,
                     ).colorScheme.primary.withValues(alpha: 0.07),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text('Staff accounts', style: text.titleSmall),
-                        const SizedBox(height: 6),
-                        Text(
-                          'A meter reader or cashier sign-in cannot be created '
-                          'from this app. Doing so needs a service-role key, '
-                          'and that key must never be inside an app anyone can '
-                          'install. Ask the cooperative to provision the '
-                          'account, then it signs in here like any other.',
-                          style: text.bodySmall,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      Text('Staff accounts', style: text.titleSmall),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Provision a Meter Reader or Cashier for your own '
+                        'service area. The privileged account creation stays '
+                        'on the server and never ships in this app.',
+                        style: text.bodySmall,
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const AdminNewStaffScreen(),
+                          ),
                         ),
-                      ],
-                    ),
+                        icon: const Icon(Icons.badge_outlined),
+                        label: const Text('Create staff account'),
+                      ),
+                    ],
                   ),
                 ),
               ],

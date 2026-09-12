@@ -38,14 +38,16 @@ Receipt `BIEC-2026-09-004472` settled July and August in one
 both bills `paid`. Posting an amount and recording a payment were both driven
 **from the running app**, not just the API.
 
-Slices 0–4 are done. Every tab is a real screen except **Admin → Accounts**.
+Slices 0–4 are done. Admin → Accounts now includes consumer creation and a
+server-backed staff-account flow. The latter still needs migration 09 and the
+Edge Function deployed, then verification as a signed-in Area President,
+before it may be called complete.
 
 ## What is left
 
 **Slice 5, and the brief says cut it without hesitation if time is short:**
 
-- Admin New Account (staff) — Figma `70:1436`
-- Admin New Consumer — Figma `70:6009`
+- Admin New Account (staff) — implemented locally; deployment verification pending
 - Disconnection Notice screen — Figma `132:2`
 
 These are real features but are not in the Week 11 core flow, and there is no
@@ -91,8 +93,10 @@ meaning.
 
 **Supabase.** Only five RPCs are app-callable: `fn_record_meter_reading`,
 `fn_post_bill_amount`, `fn_record_payment`, `fn_issue_disconnection_notice`,
-`fn_close_disconnection_notice`. Everything else in `02_functions.sql` is a
-trigger or helper. Read through the `v_` views, not raw joins.
+`fn_close_disconnection_notice`. Staff creation uses the authenticated
+`create-staff-account` Edge Function; its `fn_create_staff_profile` database
+helper is server-only. Everything else in `02_functions.sql` is a trigger or
+helper. Read through the `v_` views, not raw joins.
 `test/architecture/vocabulary_test.dart` enforces this.
 
 **Domain.** The Admin is an **Area President**, not a superuser — RLS confines
@@ -180,7 +184,7 @@ Graded.
   `build/app/outputs/` is whatever was last built and carries no version
   marker.
 - `flutter analyze` should show only 7 issues, all in the gitignored
-  `scratch/`. `flutter test` should be **124 passing**.
+  `scratch/`. `flutter test` should be **147 passing**.
 - SQL lives in `supabase/migrations/` (01–05, 07) and `supabase/tests/`. That
   folder is the source of truth; the old copy under `Week10_DataModel/sql/`
   has been replaced with a pointer. Applying SQL needs the Supabase SQL editor

@@ -8,6 +8,7 @@ import '../data/sync/sync_service.dart';
 import '../domain/entities/app_user.dart';
 import '../domain/entities/bill.dart';
 import '../domain/entities/consumer.dart';
+import '../domain/entities/staff_account.dart';
 import '../domain/outbox/outbox_entry.dart';
 import '../domain/outbox/outbox_operation.dart';
 import '../domain/repositories/auth_repository.dart';
@@ -375,6 +376,21 @@ final class _DemoAuthRepository implements AuthRepository {
   @override
   Future<Result<void>> changePassword({required String newPassword}) async =>
       const Ok<void>(null);
+
+  @override
+  Future<Result<CreatedStaffAccount>> createStaffAccount({
+    required String username,
+    required String firstName,
+    required String lastName,
+    required String? contactNumber,
+    required StaffRole role,
+    required String temporaryPassword,
+  }) async => Err<CreatedStaffAccount>(
+    ConflictFailure(
+      'This service area already has an active ${role.label}. Deactivate or '
+      'reassign that account before creating another.',
+    ),
+  );
   @override
   Future<Result<void>> signOut() async {
     current = null;

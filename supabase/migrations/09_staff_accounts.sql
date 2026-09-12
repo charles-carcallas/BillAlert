@@ -1,81 +1,59 @@
 -- =====================================================================
 -- BillAlert — 09_staff_accounts.sql
--- FR-31 / ADM (Figma 70:1436): the Area President creates a meter reader
--- or cashier account for their OWN service area.
+-- FR-31: server-only profile creation for a newly provisioned staff user.
 --
--- WHY THIS IS A DATABASE FUNCTION AND NOT APP CODE
+-- `auth.users` is owned by Supabase Auth and is never written directly.
+-- The create-staff-account Edge Function uses the Auth Admin API, then calls
+-- this helper with its server-side service role. The Flutter client cannot
+-- execute this function.
 --
--- Creating a sign-in account means writing to `auth.users`, and the
--- Supabase client can only do that with the SERVICE-ROLE key — a
--- credential that bypasses every RLS policy in the project. Putting it in
--- the APK would hand full read/write over every household, bill and
--- payment to anyone willing to unzip the file. That is not a risk to
--- manage; it is a key that must never leave a server.
---
--- So the privilege stays here. This function is SECURITY DEFINER, which
--- means it runs as its owner (postgres) no matter who calls it. The app
--- calls it over PostgREST with the ordinary anon key and the Admin's own
--- JWT, exactly like the other five RPCs. Nothing privileged ships in the
--- app.
---
--- SECURITY DEFINER is only safe when the function decides for itself what
--- the caller may do, so it does:
---
---   * app.is_admin() — a meter reader calling this gets refused.
---   * The area is taken from app.current_area(), never from a parameter.
---     An Area President cannot create staff in somebody else's area even
---     by editing the request.
---   * The role is restricted to meter_reader or cashier. This cannot mint
---     another admin, and it cannot mint a consumer — MTR-04 provisions
---     those from the household record.
---   * search_path is pinned, so nothing can be hijacked by a shadowing
---     object in a caller-controlled schema.
---
--- NOTE: this is the SIXTH app-callable RPC. The other five were the whole
--- list on purpose. Adding one is a deliberate change, made because the
--- alternative was a screen that could not exist.
---
--- Run after 01-07. Safe to run more than once.
+-- Run after 01-08. Safe to run more than once.
 -- =====================================================================
 
-create or replace function fn_create_staff_account(
-  p_username       text,
-  p_first_name     text,
-  p_last_name      text,
-  p_role           user_role,
-  p_temp_password  text,
-  p_position_title text default null,
+-- Remove the earlier client-callable prototype if it was ever deployed. It
+-- inserted directly into auth.users, which Supabase does not support.
+drop function if exists fn_create_staff_account(
+  text, text, text, user_role, text, text, text
+);
+
+create or replace function fn_create_staff_profile(
+  p_admin_id      uuid,
+  p_user_id       uuid,
+  p_username      text,
+  p_first_name    text,
+  p_last_name     text,
+  p_role          user_role,
   p_contact_number text default null
-) returns uuid
+) returns text
 language plpgsql
 security definer
-set search_path = public, extensions, pg_temp
+set search_path = public, pg_temp
 as $$
 declare
-  v_uid      uuid := gen_random_uuid();
-  v_username text := lower(trim(p_username));
-  v_email    text;
-  v_area     uuid;
-  v_prefix   text;
-  v_seq      integer;
-  v_code     text;
+  v_area          uuid;
+  v_username      text := lower(trim(p_username));
+  v_prefix        text;
+  v_seq           integer;
+  v_code          text;
+  v_role_label    text;
+  v_existing_name text;
 begin
-  -- ---- who may call this -------------------------------------------
-  if not app.is_admin() then
-    raise exception 'Only an Area President can create a staff account';
-  end if;
+  -- The Edge Function gets this id from the verified user JWT. Looking the
+  -- profile up again here makes the database enforce the same boundary.
+  select area_id
+    into v_area
+    from profiles
+   where id = p_admin_id
+     and role = 'admin'
+     and account_status = 'active';
 
-  v_area := app.current_area();
   if v_area is null then
-    raise exception 'No service area is attached to your account';
+    raise exception 'Only an active Area President can create a staff account';
   end if;
 
-  -- ---- what may be created -----------------------------------------
-  if p_role not in ('meter_reader'::user_role, 'cashier'::user_role) then
-    raise exception
-      'A staff account is a meter reader or a cashier. Consumers are '
-      'provisioned from the household record, and an Area President is '
-      'appointed by the cooperative.';
+  if p_role is null
+     or p_role not in ('meter_reader'::user_role, 'cashier'::user_role) then
+    raise exception 'A staff account must be a Meter Reader or Cashier';
   end if;
 
   if v_username !~ '^[a-z][a-z0-9._-]{2,49}$' then
@@ -84,103 +62,80 @@ begin
       'only letters, numbers, dot, underscore or hyphen';
   end if;
 
-  if length(coalesce(p_temp_password, '')) < 8 then
-    raise exception 'The temporary password must be at least 8 characters';
+  if nullif(trim(coalesce(p_first_name, '')), '') is null then
+    raise exception 'Enter the staff member''s first name';
+  end if;
+
+  if nullif(trim(coalesce(p_last_name, '')), '') is null then
+    raise exception 'Enter the staff member''s last name';
   end if;
 
   if exists (select 1 from profiles where username = v_username) then
     raise exception 'Username % is already taken', v_username;
   end if;
 
-  -- Must match AppConfig.loginEmailDomain. The app never builds this
-  -- address itself except in AuthRepositoryImpl.emailForUsername.
-  v_email := v_username || '@billalert.local';
+  v_role_label := case p_role
+                    when 'meter_reader'::user_role then 'Meter Reader'
+                    else 'Cashier'
+                  end;
 
-  if exists (select 1 from auth.users u where u.email = v_email) then
-    raise exception 'Username % is already taken', v_username;
+  select first_name || ' ' || last_name
+    into v_existing_name
+    from profiles
+   where area_id = v_area
+     and role = p_role
+     and account_status = 'active'
+   limit 1;
+
+  if v_existing_name is not null then
+    raise exception
+      'Assignment blocked — % is already the active % for this service area',
+      v_existing_name, v_role_label;
   end if;
 
-  -- ---- MTR-0007 / CSH-0003 -----------------------------------------
   v_prefix := case p_role
                 when 'meter_reader'::user_role then 'MTR'
                 else 'CSH'
               end;
 
-  select coalesce(max((regexp_replace(user_code, '^[A-Z]+-', ''))::integer), 0) + 1
+  -- Serialises code allocation so two Area Presidents cannot receive the
+  -- same MTR/CSH number when requests arrive together.
+  perform pg_advisory_xact_lock(hashtext('billalert.staff.' || v_prefix));
+
+  select coalesce(
+           max((regexp_replace(user_code, '^[A-Z]+-', ''))::integer),
+           0
+         ) + 1
     into v_seq
     from profiles
    where user_code ~ ('^' || v_prefix || '-[0-9]+$');
 
   v_code := v_prefix || '-' || lpad(v_seq::text, 4, '0');
 
-  -- ---- the sign-in account -----------------------------------------
-  -- email_confirmed_at is set now: this account is vouched for by the
-  -- Area President in person, and there is no mailbox behind
-  -- @billalert.local to confirm from.
-  --
-  -- The token columns are '' and not null. GoTrue reads them as text and
-  -- a null makes sign-in fail with an error that names none of this.
-  insert into auth.users (
-    instance_id, id, aud, role, email, encrypted_password,
-    email_confirmed_at, created_at, updated_at,
-    raw_app_meta_data, raw_user_meta_data,
-    confirmation_token, recovery_token, email_change, email_change_token_new
-  ) values (
-    '00000000-0000-0000-0000-000000000000', v_uid,
-    'authenticated', 'authenticated', v_email,
-    crypt(p_temp_password, gen_salt('bf')),
-    now(), now(), now(),
-    '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb,
-    '', '', '', ''
-  );
-
-  -- The identity row is what the dashboard lists under the account, and
-  -- what newer GoTrue versions expect to find. Password sign-in works
-  -- without it, so a schema that has no auth.identities — or a different
-  -- shape of one — must not lose the whole account.
-  begin
-    insert into auth.identities (
-      id, user_id, provider_id, identity_data, provider,
-      last_sign_in_at, created_at, updated_at
-    ) values (
-      gen_random_uuid(), v_uid, v_uid::text,
-      jsonb_build_object('sub', v_uid::text, 'email', v_email),
-      'email', now(), now(), now()
-    );
-  exception when others then
-    raise notice
-      'auth.identities row not written (%). The account can still sign in.',
-      sqlerrm;
-  end;
-
-  -- ---- the profile the app actually reads ---------------------------
-  -- GEN-04: must_change_password locks the new member of staff to the
-  -- change-password screen until they pick their own.
   insert into profiles (
     id, user_code, username, first_name, last_name, role,
-    position_title, contact_number, area_id, account_status,
-    must_change_password
+    contact_number, area_id, account_status, must_change_password
   ) values (
-    v_uid, v_code, v_username, trim(p_first_name), trim(p_last_name), p_role,
-    nullif(trim(coalesce(p_position_title, '')), ''),
-    nullif(trim(coalesce(p_contact_number, '')), ''),
-    v_area, 'active', true
+    p_user_id, v_code, v_username, trim(p_first_name), trim(p_last_name),
+    p_role, nullif(trim(coalesce(p_contact_number, '')), ''), v_area,
+    'active', true
   );
 
-  return v_uid;
+  return v_code;
+exception
+  when unique_violation then
+    raise exception
+      'That username or staff assignment is already in use. Refresh and try again.';
 end $$;
 
-comment on function fn_create_staff_account is
-  'FR-31: an Area President creates a meter reader or cashier for their own '
-  'area. SECURITY DEFINER so the service-role key never ships in the client; '
-  'the function checks app.is_admin() and takes the area from the caller.';
+comment on function fn_create_staff_profile is
+  'FR-31 server helper: creates an area-scoped Meter Reader or Cashier '
+  'profile after the Edge Function provisions the auth user.';
 
--- Callable by a signed-in user only. An anon caller would fail is_admin()
--- anyway, but there is no reason to let it reach the body.
-revoke all on function fn_create_staff_account(
-  text, text, text, user_role, text, text, text
-) from public, anon;
+revoke all on function fn_create_staff_profile(
+  uuid, uuid, text, text, text, user_role, text
+) from public, anon, authenticated;
 
-grant execute on function fn_create_staff_account(
-  text, text, text, user_role, text, text, text
-) to authenticated;
+grant execute on function fn_create_staff_profile(
+  uuid, uuid, text, text, text, user_role, text
+) to service_role;

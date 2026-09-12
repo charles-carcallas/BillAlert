@@ -14,16 +14,30 @@ Apply to a fresh database in this order:
 | File | What it does |
 |---|---|
 | `migrations/01_schema.sql` | tables, enums, triggers, sequences |
-| `migrations/02_functions.sql` | the `app.*` session helpers and the five app-callable functions |
+| `migrations/02_functions.sql` | the `app.*` session helpers and the five transactional app functions |
 | `migrations/03_views.sql` | the twelve `v_` views, **and `security_invoker` on every one** |
 | `migrations/04_rls.sql` | row-level security policies |
 | `migrations/05_seed.sql` | reference data, then a fixture section |
 | `migrations/07_api_grants.sql` | lets `anon` and `authenticated` enter the `app` schema |
+| `migrations/08_calendar_cycles.sql` | creates billing cycles from calendar months without pricing bills |
+| `migrations/09_staff_accounts.sql` | server-only profile helper for Meter Reader and Cashier account creation |
 
 `07` is not optional. Every policy calls a helper in the `app` schema, and
 without the grant every request fails with
 `401 permission denied for schema app` — which surfaces in the app as a silent
 bounce back to the login screen.
+
+Staff creation enters through the authenticated `create-staff-account` Edge
+Function. It uses Supabase's Auth Admin API, then calls the `SECURITY DEFINER`
+helper in `09` to create a Meter Reader or Cashier profile in the caller's own
+area. The helper is executable only by `service_role`; neither it nor the
+service-role key is exposed to the Flutter client.
+
+Deploy the function after applying migration `09`:
+
+```sh
+supabase functions deploy create-staff-account
+```
 
 There is no `06` migration: `06_tests.sql` is a test suite, and lives in
 `tests/`.

@@ -5,7 +5,9 @@ import '../../core/config/app_config.dart';
 import '../../core/errors/app_failure.dart';
 import '../../core/result/result.dart';
 import '../../domain/entities/app_user.dart';
+import '../../domain/entities/staff_account.dart';
 import '../../domain/repositories/auth_repository.dart';
+import '../../domain/value_objects/ids.dart';
 import '../dto/profile_dto.dart';
 import '../local/app_database.dart';
 import '../supabase/failure_mapper.dart';
@@ -59,9 +61,11 @@ class AuthRepositoryImpl implements AuthRepository {
         // Same wording as the wrong-password case in FailureMapper. The user
         // never sees the synthetic email, so an error that mentioned one would
         // be describing something they have never been shown.
-        return const Err<AppUser>(AuthFailure(
-          'That username or password is not correct. Please try again.',
-        ));
+        return const Err<AppUser>(
+          AuthFailure(
+            'That username or password is not correct. Please try again.',
+          ),
+        );
       }
 
       final profileResult = await _loadProfile(user.id);
@@ -74,10 +78,12 @@ class AuthRepositoryImpl implements AuthRepository {
             // half created. Signing out again avoids a session that can
             // reach nothing.
             await _client.auth.signOut();
-            return const Err<AppUser>(AuthFailure(
-              'This account is not set up yet. Ask your Area President to '
-              'finish creating it.',
-            ));
+            return const Err<AppUser>(
+              AuthFailure(
+                'This account is not set up yet. Ask your Area President to '
+                'finish creating it.',
+              ),
+            );
           }
           await _claimCacheFor(value);
           return Ok<AppUser>(value);
@@ -143,6 +149,78 @@ class AuthRepositoryImpl implements AuthRepository {
     }
   }
 
+  @override
+  Future<Result<CreatedStaffAccount>> createStaffAccount({
+    required String username,
+    required String firstName,
+    required String lastName,
+    required String? contactNumber,
+    required StaffRole role,
+    required String temporaryPassword,
+  }) async {
+    try {
+      // The signed-in Admin's JWT accompanies this request. The server checks
+      // that it belongs to an Area President and derives the area from that
+      // session. No privileged key or area id is sent by the app.
+      final response = await _client.functions.invoke(
+        'create-staff-account',
+        body: <String, dynamic>{
+          'username': username,
+          'first_name': firstName,
+          'last_name': lastName,
+          'role': role.code,
+          'temporary_password': temporaryPassword,
+          'contact_number': contactNumber,
+        },
+      );
+
+      final value = response.data;
+      if (value is! Map) {
+        return const Err<CreatedStaffAccount>(
+          ServerFailure(
+            'The server did not confirm that the staff account was created. '
+            'Please check the account list before trying again.',
+          ),
+        );
+      }
+
+      if (value['ok'] != true) {
+        final message = value['message'] is String
+            ? value['message'] as String
+            : 'The staff account could not be created. Please try again.';
+        return Err<CreatedStaffAccount>(switch (value['kind']) {
+          'validation' => ValidationFailure(message),
+          'permission' => PermissionFailure(message),
+          'conflict' => ConflictFailure(message),
+          _ => ServerFailure(message),
+        });
+      }
+
+      final id = value['id'];
+      if (id is! String || id.isEmpty) {
+        return const Err<CreatedStaffAccount>(
+          ServerFailure(
+            'The server did not confirm that the staff account was created. '
+            'Please check the account list before trying again.',
+          ),
+        );
+      }
+
+      return Ok<CreatedStaffAccount>(
+        CreatedStaffAccount(
+          id: ProfileId(id),
+          username: username,
+          firstName: firstName,
+          lastName: lastName,
+          role: role,
+          contactNumber: contactNumber,
+        ),
+      );
+    } catch (error, stackTrace) {
+      return Err<CreatedStaffAccount>(FailureMapper.from(error, stackTrace));
+    }
+  }
+
   Future<Result<AppUser?>> _loadProfile(String userId) async {
     try {
       final row = await _client
@@ -155,10 +233,12 @@ class AuthRepositoryImpl implements AuthRepository {
         return const Ok<AppUser?>(null);
       }
       if (row['account_status'] != 'active') {
-        return const Err<AppUser?>(AuthFailure(
-          'This account is not active. Ask your Area President to activate '
-          'it.',
-        ));
+        return const Err<AppUser?>(
+          AuthFailure(
+            'This account is not active. Ask your Area President to activate '
+            'it.',
+          ),
+        );
       }
       return Ok<AppUser?>(ProfileDto.fromJson(row));
     } catch (error, stackTrace) {
@@ -174,7 +254,9 @@ class AuthRepositoryImpl implements AuthRepository {
     if (existing != null && existing.profileId != user.id.value) {
       await _db.clearCachedData();
     }
-    await _db.into(_db.cacheOwner).insertOnConflictUpdate(
+    await _db
+        .into(_db.cacheOwner)
+        .insertOnConflictUpdate(
           CacheOwnerCompanion.insert(
             id: const Value<int>(1),
             profileId: user.id.value,

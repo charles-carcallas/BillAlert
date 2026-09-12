@@ -6,6 +6,7 @@ import 'package:billalert/data/sync/sync_service.dart';
 import 'package:billalert/domain/entities/app_user.dart';
 import 'package:billalert/domain/entities/bill.dart';
 import 'package:billalert/domain/entities/consumer.dart';
+import 'package:billalert/domain/entities/staff_account.dart';
 import 'package:billalert/domain/outbox/outbox_entry.dart';
 import 'package:billalert/domain/outbox/outbox_operation.dart';
 import 'package:billalert/domain/repositories/auth_repository.dart';
@@ -39,9 +40,8 @@ final class FixedPhClock implements PhClock {
 
   /// Noon in Manila on the given date, which is safely inside the day
   /// whichever way the offset is applied.
-  factory FixedPhClock.onPhDate(PhDate date) => FixedPhClock(
-        DateTime.utc(date.year, date.month, date.day, 4),
-      );
+  factory FixedPhClock.onPhDate(PhDate date) =>
+      FixedPhClock(DateTime.utc(date.year, date.month, date.day, 4));
 
   @override
   DateTime nowUtc() => _instant.toUtc();
@@ -70,15 +70,17 @@ final class FakeOutboxRepository implements OutboxRepository {
 
   @override
   Future<Result<List<OutboxEntry>>> pending() async => Ok<List<OutboxEntry>>(
-        enqueued
-            .map((OutboxOperation op) => OutboxEntry(
-                  operation: op,
-                  status: OutboxStatus.pending,
-                  attempts: 0,
-                  createdAt: op.capturedAt,
-                ))
-            .toList(),
-      );
+    enqueued
+        .map(
+          (OutboxOperation op) => OutboxEntry(
+            operation: op,
+            status: OutboxStatus.pending,
+            attempts: 0,
+            createdAt: op.capturedAt,
+          ),
+        )
+        .toList(),
+  );
 
   @override
   Future<Result<List<OutboxEntry>>> all() => pending();
@@ -88,15 +90,18 @@ final class FakeOutboxRepository implements OutboxRepository {
       const Ok<void>(null);
 
   @override
-  Future<Result<void>> markSynced(ClientUuid clientUuid, String serverId) async =>
-      const Ok<void>(null);
+  Future<Result<void>> markSynced(
+    ClientUuid clientUuid,
+    String serverId,
+  ) async => const Ok<void>(null);
 
   @override
   Future<Result<void>> markFailed(ClientUuid clientUuid, String reason) async =>
       const Ok<void>(null);
 
   @override
-  Stream<List<OutboxEntry>> watchAll() => const Stream<List<OutboxEntry>>.empty();
+  Stream<List<OutboxEntry>> watchAll() =>
+      const Stream<List<OutboxEntry>>.empty();
 }
 
 /// Knows which households already have a queued reading.
@@ -108,12 +113,13 @@ final class FakeReadingRepository implements ReadingRepository {
   }
 
   @override
-  Future<Result<Set<ConsumerId>>> queuedConsumerIdsFor(CycleLabel cycle) async =>
-      Ok<Set<ConsumerId>>(
-        (queued[cycle.value] ?? <String>{})
-            .map((String id) => ConsumerId(id))
-            .toSet(),
-      );
+  Future<Result<Set<ConsumerId>>> queuedConsumerIdsFor(
+    CycleLabel cycle,
+  ) async => Ok<Set<ConsumerId>>(
+    (queued[cycle.value] ?? <String>{})
+        .map((String id) => ConsumerId(id))
+        .toSet(),
+  );
 
   @override
   Future<Result<bool>> isReadingQueuedFor({
@@ -176,9 +182,7 @@ final class FakeConsumerRepository implements ConsumerRepository {
   @override
   Future<Result<List<Consumer>>> areaRoster(AreaId areaId) async =>
       Ok<List<Consumer>>(
-        households
-            .where((Consumer c) => c.areaId == areaId)
-            .toList(),
+        households.where((Consumer c) => c.areaId == areaId).toList(),
       );
 
   @override
@@ -224,18 +228,17 @@ Consumer household({
   Kwh? previousReading,
   CycleLabel? lastReadCycle,
   AccountStatus status = AccountStatus.active,
-}) =>
-    Consumer(
-      id: ConsumerId(id),
-      consumerNo: const ConsumerNumber('2019-0917-TUB'),
-      firstName: 'Elena',
-      lastName: 'Ravelo',
-      areaId: AreaId(areaId),
-      accountStatus: status,
-      previousReading: previousReading ?? Kwh.of(1250),
-      purok: 'Purok 3',
-      lastReadCycle: lastReadCycle,
-    );
+}) => Consumer(
+  id: ConsumerId(id),
+  consumerNo: const ConsumerNumber('2019-0917-TUB'),
+  firstName: 'Elena',
+  lastName: 'Ravelo',
+  areaId: AreaId(areaId),
+  accountStatus: status,
+  previousReading: previousReading ?? Kwh.of(1250),
+  purok: 'Purok 3',
+  lastReadCycle: lastReadCycle,
+);
 
 /// Stand-in for AuthRepository to test auth flows without Supabase.
 final class FakeAuthRepository implements AuthRepository {
@@ -245,6 +248,11 @@ final class FakeAuthRepository implements AuthRepository {
   AppUser? user;
   AppFailure? nextSignInFailure;
   int signInCalls = 0;
+  int createStaffCalls = 0;
+  String? createdStaffUsername;
+  String? createdStaffContactNumber;
+  StaffRole? createdStaffRole;
+  AppFailure? nextCreateStaffFailure;
   Duration? delay;
 
   FakeAuthRepository({this.user});
@@ -262,7 +270,8 @@ final class FakeAuthRepository implements AuthRepository {
     if (failure != null) {
       return Err<AppUser>(failure);
     }
-    final loggedIn = user ??
+    final loggedIn =
+        user ??
         MeterReaderUser(
           id: const ProfileId('profile-1'),
           username: username,
@@ -290,6 +299,33 @@ final class FakeAuthRepository implements AuthRepository {
   @override
   Future<Result<void>> changePassword({required String newPassword}) async =>
       const Ok<void>(null);
+
+  @override
+  Future<Result<CreatedStaffAccount>> createStaffAccount({
+    required String username,
+    required String firstName,
+    required String lastName,
+    required String? contactNumber,
+    required StaffRole role,
+    required String temporaryPassword,
+  }) async {
+    createStaffCalls++;
+    createdStaffUsername = username;
+    createdStaffContactNumber = contactNumber;
+    createdStaffRole = role;
+    final failure = nextCreateStaffFailure;
+    if (failure != null) return Err<CreatedStaffAccount>(failure);
+    return Ok<CreatedStaffAccount>(
+      CreatedStaffAccount(
+        id: const ProfileId('staff-created'),
+        username: username,
+        firstName: firstName,
+        lastName: lastName,
+        role: role,
+        contactNumber: contactNumber,
+      ),
+    );
+  }
 
   void dispose() {
     _controller.close();
@@ -336,7 +372,9 @@ final class FakeBillRepository implements BillRepository {
   int awaitingCalls = 0;
 
   @override
-  Future<Result<List<AwaitingAmountEntry>>> awaitingAmount(AreaId areaId) async {
+  Future<Result<List<AwaitingAmountEntry>>> awaitingAmount(
+    AreaId areaId,
+  ) async {
     awaitingCalls++;
     final failure = awaitingFailure;
     if (failure != null) return Err<List<AwaitingAmountEntry>>(failure);
@@ -348,8 +386,10 @@ final class FakeBillRepository implements BillRepository {
       const Ok<Bill?>(null);
 
   @override
-  Future<Result<List<Bill>>> historyFor(ConsumerId consumerId, {int limit = 12}) async =>
-      const Ok<List<Bill>>(<Bill>[]);
+  Future<Result<List<Bill>>> historyFor(
+    ConsumerId consumerId, {
+    int limit = 12,
+  }) async => const Ok<List<Bill>>(<Bill>[]);
 
   @override
   Future<Result<Bill?>> byId(BillId id) async => const Ok<Bill?>(null);
@@ -359,14 +399,18 @@ final class FakeBillRepository implements BillRepository {
       const Ok<List<Bill>>(<Bill>[]);
 
   @override
-  Future<Result<void>> refreshFor(ConsumerId consumerId, CycleLabel cycle) async =>
-      const Ok<void>(null);
+  Future<Result<void>> refreshFor(
+    ConsumerId consumerId,
+    CycleLabel cycle,
+  ) async => const Ok<void>(null);
 
   List<ConsumerOutstanding> outstanding = <ConsumerOutstanding>[];
   AppFailure? outstandingFailure;
 
   @override
-  Future<Result<List<ConsumerOutstanding>>> outstandingInArea(AreaId areaId) async {
+  Future<Result<List<ConsumerOutstanding>>> outstandingInArea(
+    AreaId areaId,
+  ) async {
     final failure = outstandingFailure;
     if (failure != null) return Err<List<ConsumerOutstanding>>(failure);
     return Ok<List<ConsumerOutstanding>>(outstanding);
@@ -379,8 +423,7 @@ final class FakeBillRepository implements BillRepository {
 /// methods that would reach outside the test. The real one checks
 /// connectivity, which a widget test cannot answer.
 final class FakeSyncService extends SyncService {
-  FakeSyncService()
-      : super(FakeOutboxRepository(), const _NoopOutboxGateway());
+  FakeSyncService() : super(FakeOutboxRepository(), const _NoopOutboxGateway());
 
   int syncCalls = 0;
 

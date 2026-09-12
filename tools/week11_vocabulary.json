@@ -41,6 +41,7 @@
     "current_role",
     "current_user_id",
     "fn_bills_sync_derived",
+    "fn_create_staff_profile",
     "fn_earliest_lawful_disconnection",
     "fn_ensure_billing_cycle",
     "fn_normalize_contact",
