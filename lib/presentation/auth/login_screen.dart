@@ -7,6 +7,7 @@ import '../../domain/entities/app_user.dart';
 import '../common/failure_banner.dart';
 import 'app_lock_controller.dart';
 import 'auth_controller.dart';
+import 'forgot_password_sheet.dart';
 
 /// GEN-01. The username here is what staff are given ("ledesman.dormal").
 /// Turning it into the credential Supabase Auth wants happens in the data
@@ -204,8 +205,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: <Widget>[
             Text('Password', style: textTheme.titleSmall),
-            GestureDetector(
-              onTap: () {},
+            // Was a GestureDetector with an empty handler: it did nothing, and
+            // its hit area was the height of the text. A TextButton with the
+            // padded tap target gives a thumb the 48px the Material and WCAG
+            // guidance ask for.
+            TextButton(
+              onPressed: () => showForgotPasswordHelp(context),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                minimumSize: const Size(0, 40),
+                tapTargetSize: MaterialTapTargetSize.padded,
+              ),
               child: Text('Forgot password?', style: textTheme.labelMedium),
             ),
           ],
