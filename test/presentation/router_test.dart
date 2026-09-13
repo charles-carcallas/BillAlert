@@ -1,12 +1,17 @@
 import 'package:billalert/domain/entities/app_user.dart';
 import 'package:billalert/domain/value_objects/ids.dart';
+import 'package:billalert/presentation/auth/app_lock_controller.dart';
 import 'package:billalert/presentation/auth/auth_controller.dart';
+import 'package:billalert/presentation/auth/login_screen.dart';
+import 'package:billalert/presentation/providers.dart';
 import 'package:billalert/presentation/router.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
 import '../support/fakes.dart';
+import '../support/fingerprint_fakes.dart';
 
 /// Every tab must lead somewhere, and every constant in [Routes] must name a
 /// route that exists.
@@ -143,5 +148,37 @@ void main() {
     // exactly the kind of tidying that looks harmless.
     expect(Routes.noticeDocument.startsWith('/admin/disconnections/'), isFalse);
     expect(Routes.serveNotice, '/admin/disconnections/serve');
+  });
+
+  testWidgets('a locked session is held on the sign-in screen, not its home', (
+    WidgetTester tester,
+  ) async {
+    // The meter reader's session is restored, and fingerprint sign-in is on.
+    // Without this redirect the router would open their round — a household
+    // list — for whoever happens to be holding the phone.
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authControllerProvider.overrideWith(
+            () => FakeAuthController(signedInUser: users[1]),
+          ),
+          appLockControllerProvider.overrideWith(LockedAppLockController.new),
+          deviceUnlockProvider.overrideWithValue(FakeDeviceUnlock()),
+        ],
+        child: Consumer(
+          builder: (BuildContext context, WidgetRef ref, Widget? _) =>
+              MaterialApp.router(routerConfig: ref.watch(routerProvider)),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(find.text('Unlock with fingerprint'), findsOneWidget);
+
+    final GoRouter router = ProviderScope.containerOf(
+      tester.element(find.byType(LoginScreen)),
+    ).read(routerProvider);
+    expect(router.routerDelegate.currentConfiguration.uri.path, Routes.login);
   });
 }

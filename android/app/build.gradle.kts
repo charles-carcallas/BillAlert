@@ -57,3 +57,12 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // Declared rather than trusted to arrive through local_auth. styles.xml
+    // makes both window themes descend from Theme.AppCompat, which the
+    // fingerprint prompt needs on Android 8.1 and below. If AppCompat were
+    // not on the classpath, those themes would not exist and the APK would
+    // not build.
+    implementation("androidx.appcompat:appcompat:1.7.1")
+}

@@ -9,6 +9,7 @@ import 'admin/new_consumer_screen.dart';
 import 'admin/notice_document_screen.dart';
 import 'admin/post_bill_amount_screen.dart';
 import 'admin/serve_notice_screen.dart';
+import 'auth/app_lock_controller.dart';
 import 'auth/auth_controller.dart';
 import 'auth/change_password_screen.dart';
 import 'auth/login_screen.dart';
@@ -98,6 +99,9 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
   // screen without any screen having to push a route itself.
   final refresh = ValueNotifier<int>(0);
   ref.listen(authControllerProvider, (_, _) => refresh.value++);
+  // Unlocking with a fingerprint changes where a signed-in user may go
+  // without changing who is signed in, so it has to move the router too.
+  ref.listen(appLockControllerProvider, (_, _) => refresh.value++);
   ref.onDispose(refresh.dispose);
 
   return GoRouter(
@@ -241,6 +245,15 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
       final user = auth.value;
 
       if (user == null) {
+        return location == Routes.login ? null : Routes.login;
+      }
+
+      // Fingerprint sign-in: a session restored on a phone where it is turned
+      // on stays on the sign-in screen — which draws the lock — until the
+      // phone's own screen lock confirms who is holding it. Checked before
+      // everything else a signed-in user can reach, the forced password
+      // change included, because every one of those is behind the lock.
+      if (ref.read(appLockControllerProvider).locked) {
         return location == Routes.login ? null : Routes.login;
       }
 

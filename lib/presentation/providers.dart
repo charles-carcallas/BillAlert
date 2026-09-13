@@ -11,6 +11,8 @@ import '../data/repositories/notification_repository_impl.dart';
 import '../data/repositories/outbox_repository_impl.dart';
 import '../data/repositories/payment_repository_impl.dart';
 import '../data/repositories/reading_repository_impl.dart';
+import '../data/security/local_auth_device_unlock.dart';
+import '../data/security/secure_fingerprint_setting.dart';
 import '../data/sync/supabase_outbox_gateway.dart';
 import '../data/sync/sync_service.dart';
 import '../domain/outbox/outbox_operation.dart';
@@ -22,6 +24,8 @@ import '../domain/repositories/notification_repository.dart';
 import '../domain/repositories/outbox_repository.dart';
 import '../domain/repositories/payment_repository.dart';
 import '../domain/repositories/reading_repository.dart';
+import '../domain/security/device_unlock.dart';
+import '../domain/security/fingerprint_setting.dart';
 import '../domain/time/ph_clock.dart';
 import '../domain/usecases/admin/issue_disconnection_notice.dart';
 import '../domain/usecases/admin/post_bill_amount.dart';
@@ -58,6 +62,17 @@ final supabaseClientProvider = Provider<SupabaseClient>(
 
 /// SYS-07: the app's idea of "now", always in Philippine time.
 final phClockProvider = Provider<PhClock>((Ref ref) => const SystemPhClock());
+
+/// The phone's screen lock — fingerprint, face or PIN. Injected so the rules
+/// about when the app locks can be tested without a sensor to press.
+final deviceUnlockProvider = Provider<DeviceUnlock>(
+  (Ref ref) => LocalAuthDeviceUnlock(),
+);
+
+/// Whether fingerprint sign-in is on for this phone, and for whom.
+final fingerprintSettingProvider = Provider<FingerprintSetting>(
+  (Ref ref) => const SecureFingerprintSetting(),
+);
 
 /// Mints the idempotency key for a queued operation. Injected rather than
 /// called directly so a test can hand out predictable ids, and so `domain/`

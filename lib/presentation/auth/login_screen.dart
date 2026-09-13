@@ -3,12 +3,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/errors/app_failure.dart';
+import '../../domain/entities/app_user.dart';
 import '../common/failure_banner.dart';
+import 'app_lock_controller.dart';
 import 'auth_controller.dart';
 
 /// GEN-01. The username here is what staff are given ("ledesman.dormal").
 /// Turning it into the credential Supabase Auth wants happens in the data
 /// layer, which is why this screen never mentions an email address.
+///
+/// The screen has two faces. Signed out, it is the username and password
+/// form. When a session was restored on a phone where fingerprint sign-in is
+/// on, it is the lock: the same screen, greeting the person by name, with the
+/// phone's own screen lock as the way through. The router decides which, by
+/// holding a locked session here; this screen only draws it.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -54,11 +62,51 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     // not push a route, because where each role lands is the user's business.
   }
 
+  /// The fingerprint button. The operating system shows the prompt and only
+  /// answers yes or no; on yes the lock lifts and the router moves on.
+  Future<void> _unlock() async {
+    if (_isSubmitting) return;
+    setState(() {
+      _isSubmitting = true;
+      _failure = null;
+    });
+
+    final failure = await ref.read(appLockControllerProvider.notifier).unlock();
+
+    if (!mounted) return;
+    setState(() {
+      _isSubmitting = false;
+      _failure = failure;
+    });
+  }
+
+  /// Somebody else's phone, or a person who would rather type a password:
+  /// sign the locked session out and show the ordinary form. Readings still
+  /// waiting to sync survive this — signing out keeps the outbox.
+  Future<void> _useDifferentAccount() async {
+    if (_isSubmitting) return;
+    setState(() {
+      _isSubmitting = true;
+      _failure = null;
+    });
+
+    final failure = await ref.read(authControllerProvider.notifier).signOut();
+
+    if (!mounted) return;
+    setState(() {
+      _isSubmitting = false;
+      _failure = failure;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
     final colorScheme = theme.colorScheme;
+
+    final bool locked = ref.watch(appLockControllerProvider).locked;
+    final AppUser? signedIn = ref.watch(authControllerProvider).value;
 
     return Scaffold(
       body: SafeArea(
@@ -115,94 +163,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ],
                   const SizedBox(height: 24),
-                  Text('Username', style: textTheme.titleSmall),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: _username,
-                    autocorrect: false,
-                    enableSuggestions: false,
-                    textInputAction: TextInputAction.next,
-                    decoration: const InputDecoration(
-                      // The mockup shows a real staff username here. A hint is
-                      // only an example, but printing a valid account on the
-                      // sign-in screen hands anyone holding the phone half of
-                      // a login. The shape is what the hint is for.
-                      hintText: 'firstname.lastname',
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: <Widget>[
-                      Text('Password', style: textTheme.titleSmall),
-                      GestureDetector(
-                        onTap: () {},
-                        child: Text(
-                          'Forgot password?',
-                          style: textTheme.labelMedium,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: _password,
-                    obscureText: _obscure,
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => _isSubmitting ? null : _submit(),
-                    decoration: InputDecoration(
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscure
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                        onPressed: () => setState(() => _obscure = !_obscure),
-                      ),
-                    ),
-                  ),
-                  if (_failure != null) ...<Widget>[
-                    const SizedBox(height: 16),
-                    FailureBanner(failure: _failure!),
-                  ],
-                  const SizedBox(height: 20),
-                  FilledButton(
-                    onPressed: _isSubmitting ? null : _submit,
-                    child: _isSubmitting
-                        ? SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: colorScheme.onPrimary,
-                            ),
-                          )
-                        : const Text('Log in'),
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    children: <Widget>[
-                      const Expanded(child: Divider()),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text('or', style: textTheme.bodySmall),
-                      ),
-                      const Expanded(child: Divider()),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  OutlinedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.fingerprint, size: 22),
-                    label: const Text('Unlock with fingerprint'),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    "For devices you've signed in on before. Your fingerprint never leaves this device.",
-                    textAlign: TextAlign.center,
-                    style: textTheme.bodySmall,
-                  ),
+                  if (locked && signedIn != null)
+                    ..._unlockPanel(signedIn, textTheme, colorScheme)
+                  else
+                    ..._passwordForm(textTheme, colorScheme),
                   const SizedBox(height: 32),
                   Text(
                     'v1.0 · Bohol I Electric Cooperative',
@@ -217,4 +181,149 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ),
     );
   }
+
+  List<Widget> _passwordForm(TextTheme textTheme, ColorScheme colorScheme) =>
+      <Widget>[
+        Text('Username', style: textTheme.titleSmall),
+        const SizedBox(height: 6),
+        TextField(
+          controller: _username,
+          autocorrect: false,
+          enableSuggestions: false,
+          textInputAction: TextInputAction.next,
+          decoration: const InputDecoration(
+            // The mockup shows a real staff username here. A hint is only an
+            // example, but printing a valid account on the sign-in screen
+            // hands anyone holding the phone half of a login. The shape is
+            // what the hint is for.
+            hintText: 'firstname.lastname',
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: <Widget>[
+            Text('Password', style: textTheme.titleSmall),
+            GestureDetector(
+              onTap: () {},
+              child: Text('Forgot password?', style: textTheme.labelMedium),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        TextField(
+          controller: _password,
+          obscureText: _obscure,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => _isSubmitting ? null : _submit(),
+          decoration: InputDecoration(
+            suffixIcon: IconButton(
+              icon: Icon(
+                _obscure
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+                color: colorScheme.onSurfaceVariant,
+              ),
+              onPressed: () => setState(() => _obscure = !_obscure),
+            ),
+          ),
+        ),
+        if (_failure != null) ...<Widget>[
+          const SizedBox(height: 16),
+          FailureBanner(failure: _failure!),
+        ],
+        const SizedBox(height: 20),
+        FilledButton(
+          onPressed: _isSubmitting ? null : _submit,
+          child: _isSubmitting
+              ? SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: colorScheme.onPrimary,
+                  ),
+                )
+              : const Text('Log in'),
+        ),
+        // No fingerprint button on this face. Signed out, there is no session
+        // on the phone for a fingerprint to unlock, and the mockup's button
+        // here did nothing at all. It appears on the other face — the lock —
+        // where it works.
+      ];
+
+  List<Widget> _unlockPanel(
+    AppUser user,
+    TextTheme textTheme,
+    ColorScheme colorScheme,
+  ) => <Widget>[
+    Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLowest,
+        border: Border.all(color: colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: <Widget>[
+          Container(
+            width: 56,
+            height: 56,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withValues(alpha: 0.10),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.fingerprint,
+              size: 32,
+              color: colorScheme.primary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Welcome back, ${user.firstName}',
+            textAlign: TextAlign.center,
+            style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'BillAlert is locked on this phone. Confirm it’s you to continue.',
+            textAlign: TextAlign.center,
+            style: textTheme.bodyMedium,
+          ),
+        ],
+      ),
+    ),
+    if (_failure != null) ...<Widget>[
+      const SizedBox(height: 16),
+      FailureBanner(failure: _failure!),
+    ],
+    const SizedBox(height: 20),
+    FilledButton.icon(
+      onPressed: _isSubmitting ? null : _unlock,
+      icon: _isSubmitting
+          ? SizedBox(
+              height: 18,
+              width: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: colorScheme.onPrimary,
+              ),
+            )
+          : const Icon(Icons.fingerprint, size: 22),
+      label: const Text('Unlock with fingerprint'),
+    ),
+    const SizedBox(height: 8),
+    Text(
+      "Your fingerprint never leaves this device. Your phone's PIN works too.",
+      textAlign: TextAlign.center,
+      style: textTheme.bodySmall,
+    ),
+    const SizedBox(height: 12),
+    TextButton(
+      onPressed: _isSubmitting ? null : _useDifferentAccount,
+      child: const Text('Sign in with a different account'),
+    ),
+  ];
 }

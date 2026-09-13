@@ -6,6 +6,7 @@ import '../../core/errors/app_failure.dart';
 import '../../core/result/result.dart';
 import '../../domain/entities/app_user.dart';
 import '../providers.dart';
+import 'app_lock_controller.dart';
 
 /// Who is signed in, for the whole app.
 ///
@@ -26,20 +27,35 @@ class AuthController extends AsyncNotifier<AppUser?> {
     // moves without every screen having to poll.
     final subscription = repository.authChanges().listen((AppUser? user) {
       if (_ready) {
+        // A session that has ended cannot still be waiting to be unlocked.
+        if (user == null) ref.read(appLockControllerProvider.notifier).reset();
         state = AsyncData<AppUser?>(user);
       }
     });
     ref.onDispose(subscription.cancel);
 
     final restored = await repository.currentUser();
-    _ready = true;
 
-    return switch (restored) {
+    final AppUser? user = switch (restored) {
       Ok(:final value) => value,
       // A failure restoring a session is not something to show on a splash
       // screen. Treat it as "not signed in" and let them sign in again.
       Err() => null,
     };
+
+    // Fingerprint sign-in: settle whether this restored session is locked
+    // BEFORE the user is handed to the router, and before the auth stream is
+    // allowed to publish one. Otherwise the router sees a signed-in, unlocked
+    // user for a moment, draws their home screen, and only then snaps back to
+    // the lock — showing the very contents the lock exists to protect.
+    if (user != null) {
+      await ref
+          .read(appLockControllerProvider.notifier)
+          .lockIfTurnedOnFor(user);
+    }
+    _ready = true;
+
+    return user;
   }
 
   /// Returns null on success, or the failure to show under the form.
@@ -66,6 +82,13 @@ class AuthController extends AsyncNotifier<AppUser?> {
     switch (result) {
       case Ok(:final value):
         _ready = true;
+        // A password is proof enough, so nothing stays locked — and this is
+        // where the phone decides whether to offer fingerprint sign-in. It is
+        // settled before the user is published, so the home screen the
+        // router opens already knows whether to ask.
+        await ref
+            .read(appLockControllerProvider.notifier)
+            .afterPasswordSignIn(value);
         state = AsyncData<AppUser?>(value);
         // MTR-11/12: start draining anything left in the outbox from the last
         // session as soon as somebody is signed in again.
@@ -82,6 +105,7 @@ class AuthController extends AsyncNotifier<AppUser?> {
   Future<AppFailure?> signOut() async {
     final result = await ref.read(signOutProvider)();
     await ref.read(syncServiceProvider).stop();
+    ref.read(appLockControllerProvider.notifier).reset();
     state = const AsyncData<AppUser?>(null);
 
     return switch (result) {
