@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/repositories/payment_repository.dart';
 import '../../domain/value_objects/ph_date.dart';
 import '../common/failure_banner.dart';
+import '../common/local_search_field.dart';
+import '../common/payment_search.dart';
 import '../common/staff_app_bar.dart';
 import 'receipts_controller.dart';
 
@@ -15,14 +17,30 @@ import 'receipts_controller.dart';
 /// Grouped by Philippine calendar day. `paid_at` is a UTC instant, and a
 /// payment taken at 7am in Tubod is the previous day in UTC — so the day is
 /// worked out through [PhDate], the same way every other date in this app is.
-class ReceiptsScreen extends ConsumerWidget {
+class ReceiptsScreen extends ConsumerStatefulWidget {
   const ReceiptsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ReceiptsScreen> createState() => _ReceiptsScreenState();
+}
+
+class _ReceiptsScreenState extends ConsumerState<ReceiptsScreen> {
+  final TextEditingController _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(receiptsControllerProvider);
     final controller = ref.read(receiptsControllerProvider.notifier);
     final TextTheme text = Theme.of(context).textTheme;
+    final List<PaymentSummary> visible = state.receipts
+        .where((receipt) => paymentMatchesSearch(receipt, _search.text))
+        .toList();
 
     return Scaffold(
       appBar: const StaffAppBar(title: 'Receipts'),
@@ -43,6 +61,16 @@ class ReceiptsScreen extends ConsumerWidget {
               ],
 
               const SizedBox(height: 20),
+
+              if (state.receipts.isNotEmpty) ...<Widget>[
+                LocalSearchField(
+                  fieldKey: const ValueKey<String>('cashier-receipts-search'),
+                  controller: _search,
+                  onChanged: (_) => setState(() {}),
+                  hintText: 'Search consumer or receipt number',
+                ),
+                const SizedBox(height: 16),
+              ],
 
               if (state.isLoading && state.receipts.isEmpty)
                 const Padding(
@@ -74,8 +102,27 @@ class ReceiptsScreen extends ConsumerWidget {
                     ],
                   ),
                 )
+              else if (visible.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 40),
+                  child: Column(
+                    children: <Widget>[
+                      Icon(
+                        Icons.search_off,
+                        size: 40,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No receipt matches that search.',
+                        style: text.titleMedium,
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                )
               else
-                ..._grouped(context, state.receipts),
+                ..._grouped(context, visible),
             ],
           ),
         ),

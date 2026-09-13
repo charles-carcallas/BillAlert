@@ -6,7 +6,9 @@ import '../../core/errors/app_failure.dart';
 import '../../core/result/result.dart';
 import '../../domain/entities/area_roster.dart';
 import '../auth/auth_controller.dart';
+import '../common/consumer_search.dart';
 import '../common/failure_banner.dart';
+import '../common/local_search_field.dart';
 import 'roster_controller.dart';
 
 /// MTR-11 — the meter reader's round for this billing cycle.
@@ -24,9 +26,7 @@ class RosterScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          user == null ? 'My round' : 'My round · ${user.firstName}',
-        ),
+        title: Text(user == null ? 'My round' : 'My round · ${user.firstName}'),
         actions: <Widget>[
           IconButton(
             tooltip: 'Sign out',
@@ -54,9 +54,8 @@ class RosterScreen extends ConsumerWidget {
   }
 
   Future<void> _confirmSignOut(BuildContext context, WidgetRef ref) async {
-    final waiting = ref.read(rosterControllerProvider).value?.roster
-            .waitingToSync ??
-        0;
+    final waiting =
+        ref.read(rosterControllerProvider).value?.roster.waitingToSync ?? 0;
 
     // Signing out empties the cache. If there are readings still queued, the
     // reader has to be told before that happens, not afterwards.
@@ -68,8 +67,8 @@ class RosterScreen extends ConsumerWidget {
           waiting == 0
               ? 'Everything you recorded has been sent.'
               : 'You still have $waiting reading${waiting == 1 ? '' : 's'} '
-                  'waiting to sync. They stay saved on this phone and will be '
-                  'sent when you sign in again.',
+                    'waiting to sync. They stay saved on this phone and will be '
+                    'sent when you sign in again.',
         ),
         actions: <Widget>[
           TextButton(
@@ -90,19 +89,40 @@ class RosterScreen extends ConsumerWidget {
   }
 }
 
-class _RosterBody extends ConsumerWidget {
+class _RosterBody extends ConsumerStatefulWidget {
   final RosterView view;
 
   const _RosterBody({required this.view});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final roster = view.roster;
+  ConsumerState<_RosterBody> createState() => _RosterBodyState();
+}
 
-    final List<RosterEntry> pending =
-        roster.entries.where((RosterEntry e) => !e.isDone).toList();
-    final List<RosterEntry> done =
-        roster.entries.where((RosterEntry e) => e.isDone).toList();
+class _RosterBodyState extends ConsumerState<_RosterBody> {
+  final TextEditingController _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final roster = widget.view.roster;
+    final List<RosterEntry> matching = roster.entries
+        .where(
+          (RosterEntry entry) =>
+              consumerMatchesSearch(entry.consumer, _search.text),
+        )
+        .toList();
+
+    final List<RosterEntry> pending = matching
+        .where((RosterEntry e) => !e.isDone)
+        .toList();
+    final List<RosterEntry> done = matching
+        .where((RosterEntry e) => e.isDone)
+        .toList();
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -110,20 +130,32 @@ class _RosterBody extends ConsumerWidget {
             .read(rosterControllerProvider.notifier)
             .refreshFromServer();
         if (failure != null && context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(failure.message)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(failure.message)));
         }
       },
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: <Widget>[
-          _ProgressCard(roster: roster, lastRefreshedAt: view.lastRefreshedAt),
+          _ProgressCard(
+            roster: roster,
+            lastRefreshedAt: widget.view.lastRefreshedAt,
+          ),
           if (roster.waitingToSync > 0) ...<Widget>[
             const SizedBox(height: 12),
             _WaitingToSyncCard(count: roster.waitingToSync),
           ],
           const SizedBox(height: 16),
+          if (roster.entries.isNotEmpty) ...<Widget>[
+            LocalSearchField(
+              fieldKey: const ValueKey<String>('reader-roster-search'),
+              controller: _search,
+              onChanged: (_) => setState(() {}),
+              hintText: 'Search name, account, purok or meter',
+            ),
+            const SizedBox(height: 16),
+          ],
           if (roster.entries.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 32),
@@ -131,6 +163,26 @@ class _RosterBody extends ConsumerWidget {
                 'No households saved on this phone yet. Pull down to load '
                 'your area while you have a connection.',
                 textAlign: TextAlign.center,
+              ),
+            ),
+
+          if (roster.entries.isNotEmpty && matching.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 32),
+              child: Column(
+                children: <Widget>[
+                  Icon(
+                    Icons.search_off,
+                    size: 40,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No household matches that search.',
+                    style: Theme.of(context).textTheme.titleMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
             ),
 
@@ -254,7 +306,10 @@ class _WaitingToSyncCard extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         child: Row(
           children: <Widget>[
-            Icon(Icons.cloud_upload_outlined, color: scheme.onSecondaryContainer),
+            Icon(
+              Icons.cloud_upload_outlined,
+              color: scheme.onSecondaryContainer,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -285,8 +340,9 @@ class _WaitingToSyncCard extends ConsumerWidget {
       Err(:final failure) => failure.message,
     };
 
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }
 

@@ -8,6 +8,8 @@ import '../../domain/repositories/notice_repository.dart';
 import '../../domain/value_objects/ph_date.dart';
 import '../auth/auth_controller.dart';
 import '../common/failure_banner.dart';
+import '../common/local_search_field.dart';
+import '../common/notice_search.dart';
 import '../common/staff_app_bar.dart';
 import '../providers.dart';
 import '../router.dart';
@@ -54,6 +56,13 @@ enum _NoticeFilter { all, elapsed }
 
 class _DisconnectionsScreenState extends ConsumerState<DisconnectionsScreen> {
   _NoticeFilter _filter = _NoticeFilter.all;
+  final TextEditingController _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -88,11 +97,13 @@ class _DisconnectionsScreenState extends ConsumerState<DisconnectionsScreen> {
             final int elapsedCount = list
                 .where((ActiveNotice notice) => notice.periodElapsed)
                 .length;
-            final visible = _filter == _NoticeFilter.elapsed
-                ? list
-                      .where((ActiveNotice notice) => notice.periodElapsed)
-                      .toList()
-                : list;
+            final String query = _search.text.trim();
+            final visible = list.where((ActiveNotice notice) {
+              final bool matchesFilter =
+                  _filter == _NoticeFilter.all || notice.periodElapsed;
+              if (!matchesFilter) return false;
+              return noticeMatchesSearch(notice, query);
+            }).toList();
             return RefreshIndicator(
               onRefresh: () async => ref.invalidate(activeNoticesProvider),
               child: ListView(
@@ -150,6 +161,13 @@ class _DisconnectionsScreenState extends ConsumerState<DisconnectionsScreen> {
                       ),
                     ),
                     const SizedBox(height: 10),
+                    LocalSearchField(
+                      fieldKey: const ValueKey<String>('admin-notices-search'),
+                      controller: _search,
+                      onChanged: (_) => setState(() {}),
+                      hintText: 'Search consumer, account or notice number',
+                    ),
+                    const SizedBox(height: 10),
                     Wrap(
                       spacing: 8,
                       children: <Widget>[
@@ -172,7 +190,9 @@ class _DisconnectionsScreenState extends ConsumerState<DisconnectionsScreen> {
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 36),
                         child: Text(
-                          'No notices match this filter.',
+                          query.isEmpty
+                              ? 'No notices match this filter.'
+                              : 'No notice matches that search and filter.',
                           style: text.bodyMedium,
                           textAlign: TextAlign.center,
                         ),
