@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/entities/staff_account.dart';
 import '../common/failure_banner.dart';
+import '../common/final_confirmation_dialog.dart';
 import 'new_staff_controller.dart';
 
 /// FR-31 — Admin › New Staff Account, adapted from Figma 70:1436.
@@ -245,17 +246,56 @@ class _AdminNewStaffScreenState extends ConsumerState<AdminNewStaffScreen> {
     child: Text(value, style: text.titleSmall),
   );
 
-  Future<void> _submit() => ref
-      .read(adminNewStaffControllerProvider.notifier)
-      .create(
-        username: _username.text,
-        firstName: _firstName.text,
-        lastName: _lastName.text,
-        contactNumber: _contactNumber.text,
-        role: _role,
-        temporaryPassword: _temporaryPassword.text,
-        confirmPassword: _confirmPassword.text,
-      );
+  Future<void> _submit() async {
+    final AdminNewStaffController controller = ref.read(
+      adminNewStaffControllerProvider.notifier,
+    );
+    final String username = _username.text.trim().toLowerCase();
+
+    // Obvious invalid input goes directly to the existing validation path.
+    if (!RegExp(r'^[a-z][a-z0-9._-]{2,49}$').hasMatch(username) ||
+        _firstName.text.trim().isEmpty ||
+        _lastName.text.trim().isEmpty ||
+        _temporaryPassword.text.length < 8 ||
+        _temporaryPassword.text != _confirmPassword.text) {
+      await _create(controller);
+      return;
+    }
+
+    final bool confirmed = await showFinalConfirmation(
+      context,
+      title: 'Confirm new staff account',
+      subject: '${_firstName.text.trim()} ${_lastName.text.trim()}',
+      details: <ConfirmationDetail>[
+        ConfirmationDetail('Username', username),
+        ConfirmationDetail('Role', _role.label),
+        ConfirmationDetail(
+          'Mobile number',
+          _contactNumber.text.trim().isEmpty
+              ? 'Not provided'
+              : _contactNumber.text.trim(),
+        ),
+        const ConfirmationDetail('Service area', 'Your assigned area'),
+      ],
+      warning:
+          'This creates a permanent sign-in and staff profile. The temporary '
+          'password is deliberately not displayed here; hand it over securely.',
+      confirmLabel: 'Create staff account',
+    );
+
+    if (!mounted || !confirmed) return;
+    await _create(controller);
+  }
+
+  Future<void> _create(AdminNewStaffController controller) => controller.create(
+    username: _username.text,
+    firstName: _firstName.text,
+    lastName: _lastName.text,
+    contactNumber: _contactNumber.text,
+    role: _role,
+    temporaryPassword: _temporaryPassword.text,
+    confirmPassword: _confirmPassword.text,
+  );
 
   void _clearFields() {
     _username.clear();

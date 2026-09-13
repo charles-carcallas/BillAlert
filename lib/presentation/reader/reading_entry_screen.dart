@@ -11,6 +11,7 @@ import '../../domain/entities/consumer.dart';
 import '../../domain/usecases/reader/record_meter_reading.dart';
 import '../../domain/value_objects/kwh.dart';
 import '../common/failure_banner.dart';
+import '../common/final_confirmation_dialog.dart';
 import 'reading_entry_controller.dart';
 
 /// FR-21a — recording one household's reading.
@@ -78,14 +79,50 @@ class _ReadingEntryScreenState extends ConsumerState<ReadingEntryScreen> {
               consumer: consumer,
               controller: _reading,
               state: entry,
-              onSave: () => ref
-                  .read(readingEntryControllerProvider.notifier)
-                  .save(consumer: consumer, enteredReading: _reading.text),
+              onSave: () => _confirmReading(consumer),
             );
           },
         ),
       ),
     );
+  }
+
+  Future<void> _confirmReading(Consumer consumer) async {
+    final ReadingEntryController controller = ref.read(
+      readingEntryControllerProvider.notifier,
+    );
+    final Kwh? present = Kwh.tryParse(_reading.text);
+
+    // Let the existing controller/use-case validation explain invalid input.
+    if (present == null || !consumer.isPlausibleReading(present)) {
+      await controller.save(consumer: consumer, enteredReading: _reading.text);
+      return;
+    }
+
+    final bool confirmed = await showFinalConfirmation(
+      context,
+      title: 'Confirm meter reading',
+      subject: consumer.fullName,
+      details: <ConfirmationDetail>[
+        ConfirmationDetail('Consumer number', consumer.consumerNo.value),
+        ConfirmationDetail(
+          'Previous reading',
+          consumer.previousReading.format(),
+        ),
+        ConfirmationDetail('Present reading', present.format()),
+        ConfirmationDetail(
+          'Consumption',
+          consumer.consumptionFor(present).format(),
+        ),
+      ],
+      warning:
+          'Saving creates this month\'s unpriced bill and cannot be repeated '
+          'for the same billing cycle. It is stored on this phone first.',
+      confirmLabel: 'Save reading',
+    );
+
+    if (!mounted || !confirmed) return;
+    await controller.save(consumer: consumer, enteredReading: _reading.text);
   }
 }
 
@@ -168,8 +205,8 @@ class _Form extends StatelessWidget {
                   typed == null
                       ? '—'
                       : isPlausible
-                          ? consumer.consumptionFor(typed).format()
-                          : 'lower than the last reading',
+                      ? consumer.consumptionFor(typed).format()
+                      : 'lower than the last reading',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     color: typed != null && !isPlausible

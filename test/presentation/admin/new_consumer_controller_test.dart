@@ -108,4 +108,49 @@ void main() {
       expect(find.textContaining('temporary password'), findsNothing);
     },
   );
+
+  testWidgets('creation requires confirmation of the permanent record', (
+    WidgetTester tester,
+  ) async {
+    final consumers = FakeConsumerRepository(<Consumer>[]);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authControllerProvider.overrideWith(
+            () => FakeAuthController(signedInUser: admin),
+          ),
+          consumerRepositoryProvider.overrideWithValue(consumers),
+        ],
+        child: const MaterialApp(home: AdminNewConsumerScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final Finder fields = find.byType(TextField);
+    await tester.enterText(fields.at(0), '2026-1234-TUB');
+    await tester.enterText(fields.at(1), 'Lorna');
+    await tester.enterText(fields.at(2), 'Caberte');
+
+    final Finder purok = find.byWidgetPredicate(
+      (Widget widget) =>
+          widget is TextField && widget.decoration?.hintText == 'e.g. Purok 3',
+    );
+    await tester.drag(find.byType(ListView), const Offset(0, -400));
+    await tester.pumpAndSettle();
+    await tester.enterText(purok.first, 'Purok 4');
+
+    final Finder create = find.text('Create consumer account');
+    await tester.ensureVisible(create);
+    await tester.tap(create);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Confirm new consumer'), findsOneWidget);
+    expect(find.text('Lorna Caberte'), findsOneWidget);
+    expect(find.text('2026-1234-TUB'), findsWidgets);
+    expect(consumers.createCount, 0);
+
+    await tester.tap(find.text('Create consumer'));
+    await tester.pumpAndSettle();
+    expect(consumers.createCount, 1);
+  });
 }

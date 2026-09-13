@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart' hide Consumer;
 
 import '../../domain/entities/consumer.dart';
 import '../common/failure_banner.dart';
+import '../common/final_confirmation_dialog.dart';
 import 'new_consumer_controller.dart';
 
 /// ADM-03 — Admin › New Consumer, based on Figma 70:6009.
@@ -175,15 +176,52 @@ class _AdminNewConsumerScreenState
     );
   }
 
-  Future<void> _submit() => ref
-      .read(adminNewConsumerControllerProvider.notifier)
-      .create(
+  Future<void> _submit() async {
+    final AdminNewConsumerController controller = ref.read(
+      adminNewConsumerControllerProvider.notifier,
+    );
+
+    if (_consumerNo.text.trim().isEmpty ||
+        _firstName.text.trim().isEmpty ||
+        _lastName.text.trim().isEmpty) {
+      await _create(controller);
+      return;
+    }
+
+    final bool confirmed = await showFinalConfirmation(
+      context,
+      title: 'Confirm new consumer',
+      subject: '${_firstName.text.trim()} ${_lastName.text.trim()}',
+      details: <ConfirmationDetail>[
+        ConfirmationDetail('Consumer number', _consumerNo.text.trim()),
+        ConfirmationDetail(
+          'Mobile number',
+          _optionalValue(_contactNumber.text),
+        ),
+        ConfirmationDetail('Purok', _optionalValue(_purok.text)),
+        const ConfirmationDetail('Service area', 'Your assigned area'),
+      ],
+      warning:
+          'This creates a permanent household record. BillAlert has no '
+          'consumer deletion action, so review the number and name carefully.',
+      confirmLabel: 'Create consumer',
+    );
+
+    if (!mounted || !confirmed) return;
+    await _create(controller);
+  }
+
+  Future<void> _create(AdminNewConsumerController controller) =>
+      controller.create(
         consumerNo: _consumerNo.text,
         firstName: _firstName.text,
         lastName: _lastName.text,
         contactNumber: _contactNumber.text,
         purok: _purok.text,
       );
+
+  static String _optionalValue(String value) =>
+      value.trim().isEmpty ? 'Not provided' : value.trim();
 
   void _clearFields() {
     _consumerNo.clear();

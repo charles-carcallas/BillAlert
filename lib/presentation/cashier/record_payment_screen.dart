@@ -8,6 +8,7 @@ import '../../domain/repositories/payment_repository.dart';
 import '../../domain/value_objects/money.dart';
 import '../../domain/value_objects/ph_date.dart';
 import '../common/failure_banner.dart';
+import '../common/final_confirmation_dialog.dart';
 import '../common/staff_app_bar.dart';
 import '../providers.dart';
 import 'record_payment_controller.dart';
@@ -546,7 +547,9 @@ class _Totals extends StatelessWidget {
                 ],
                 const SizedBox(height: 12),
                 FilledButton.icon(
-                  onPressed: state.canConfirm ? controller.confirm : null,
+                  onPressed: state.canConfirm
+                      ? () => _confirmPayment(context)
+                      : null,
                   icon: state.isSubmitting
                       ? const SizedBox(
                           height: 18,
@@ -575,6 +578,40 @@ class _Totals extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _confirmPayment(BuildContext context) async {
+    final String cashText = state.cashTenderedText.trim();
+    final Money? cash = state.cashTendered;
+
+    // Preserve the controller/use-case's friendly validation for malformed or
+    // insufficient cash instead of confirming an impossible handover.
+    if (cashText.isNotEmpty && (cash == null || cash < state.total)) {
+      await controller.confirm();
+      return;
+    }
+
+    final String months = state.selectedBills
+        .map((Bill bill) => bill.cycle.displayName)
+        .join(', ');
+    final bool confirmed = await showFinalConfirmation(
+      context,
+      title: 'Confirm cash payment',
+      subject: state.selected!.consumerName,
+      details: <ConfirmationDetail>[
+        ConfirmationDetail('Consumer number', state.selected!.consumerNo.value),
+        ConfirmationDetail('Bills to settle', months),
+        ConfirmationDetail('Total payment', state.total.format()),
+        ConfirmationDetail('Cash received', cash?.format() ?? 'Not recorded'),
+        ConfirmationDetail('Change', state.change?.format() ?? 'Not recorded'),
+      ],
+      warning:
+          'Recording this handover settles the selected bills and creates one '
+          'official receipt. It cannot be undone from the app.',
+      confirmLabel: 'Record payment',
+    );
+
+    if (confirmed) await controller.confirm();
   }
 }
 

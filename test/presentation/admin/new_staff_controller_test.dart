@@ -113,4 +113,67 @@ void main() {
     expect(find.text('Temporary password'), findsOneWidget);
     expect(find.textContaining('sent to this mobile number'), findsNothing);
   });
+
+  testWidgets('staff confirmation never displays the temporary password', (
+    WidgetTester tester,
+  ) async {
+    final auth = FakeAuthRepository();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authControllerProvider.overrideWith(
+            () => FakeAuthController(signedInUser: admin),
+          ),
+          authRepositoryProvider.overrideWithValue(auth),
+        ],
+        child: const MaterialApp(home: AdminNewStaffScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    Finder fieldWithHint(String hint) => find.byWidgetPredicate(
+      (Widget widget) =>
+          widget is TextField && widget.decoration?.hintText == hint,
+    );
+
+    await tester.enterText(fieldWithHint('Given name'), 'Rodrigo');
+    await tester.enterText(fieldWithHint('Surname'), 'Balistoy');
+
+    await tester.drag(find.byType(ListView), const Offset(0, -500));
+    await tester.pumpAndSettle();
+
+    final Finder username = fieldWithHint('e.g. rodrigo.balistoy');
+    await tester.enterText(username.first, 'rodrigo.balistoy');
+
+    final Finder password = fieldWithHint('At least 8 characters');
+    await tester.enterText(password.first, 'Temporary#42');
+
+    final Finder passwordConfirmation = fieldWithHint(
+      'Type the temporary password again',
+    );
+    await tester.drag(find.byType(ListView), const Offset(0, -300));
+    await tester.pumpAndSettle();
+    await tester.enterText(passwordConfirmation.first, 'Temporary#42');
+
+    final Finder create = find.text('Create staff account');
+    await tester.ensureVisible(create);
+    await tester.tap(create);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Confirm new staff account'), findsOneWidget);
+    expect(find.text('Rodrigo Balistoy'), findsOneWidget);
+    expect(find.text('rodrigo.balistoy'), findsWidgets);
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Temporary#42'),
+      ),
+      findsNothing,
+    );
+    expect(auth.createStaffCalls, 0);
+
+    await tester.tap(find.text('Review'));
+    await tester.pumpAndSettle();
+    expect(auth.createStaffCalls, 0);
+  });
 }

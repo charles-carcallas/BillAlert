@@ -368,6 +368,7 @@ class FakeAuthController extends AuthController {
 /// are given behaviour; the rest answer honestly that they were not set up.
 final class FakeBillRepository implements BillRepository {
   List<AwaitingAmountEntry> queue = <AwaitingAmountEntry>[];
+  List<Bill> payableBills = <Bill>[];
   AppFailure? awaitingFailure;
   int awaitingCalls = 0;
 
@@ -396,7 +397,7 @@ final class FakeBillRepository implements BillRepository {
 
   @override
   Future<Result<List<Bill>>> payableFor(ConsumerId consumerId) async =>
-      const Ok<List<Bill>>(<Bill>[]);
+      Ok<List<Bill>>(payableBills);
 
   @override
   Future<Result<void>> refreshFor(
