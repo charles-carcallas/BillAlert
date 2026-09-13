@@ -520,7 +520,34 @@ class _QueueCardState extends State<_QueueCard> {
     }
   }
 
-  void _submit() => widget.onPost(_amount.text, _dueDate);
+  Future<void> _submit() async {
+    final Money? enteredAmount = Money.tryParse(_amount.text);
+    final PhDate? dueDate = _dueDate;
+
+    // Keep validation in the controller/use case. Sending invalid input there
+    // produces the existing FailureBanner instead of opening a confirmation
+    // dialog that cannot show trustworthy values.
+    if (enteredAmount == null || dueDate == null) {
+      widget.onPost(_amount.text, dueDate);
+      return;
+    }
+
+    final Money roundedAmount = enteredAmount.roundUpToWholePeso();
+    final bool confirmed =
+        await showDialog<bool>(
+          context: context,
+          builder: (BuildContext context) => _ConfirmPostingDialog(
+            consumerName: widget.entry.consumerName,
+            enteredAmount: enteredAmount,
+            roundedAmount: roundedAmount,
+            dueDate: dueDate,
+          ),
+        ) ??
+        false;
+
+    if (!mounted || !confirmed) return;
+    widget.onPost(_amount.text, dueDate);
+  }
 
   static const List<String> _months = <String>[
     'Jan',
@@ -542,6 +569,87 @@ class _QueueCardState extends State<_QueueCard> {
 
   static String _longDate(PhDate date) =>
       '${date.day} ${_months[date.month - 1]} ${date.year}';
+}
+
+class _ConfirmPostingDialog extends StatelessWidget {
+  final String consumerName;
+  final Money enteredAmount;
+  final Money roundedAmount;
+  final PhDate dueDate;
+
+  const _ConfirmPostingDialog({
+    required this.consumerName,
+    required this.enteredAmount,
+    required this.roundedAmount,
+    required this.dueDate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme text = Theme.of(context).textTheme;
+    final bool wasRounded = enteredAmount != roundedAmount;
+
+    return AlertDialog(
+      title: const Text('Confirm bill amount'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(consumerName, style: text.titleMedium),
+          const SizedBox(height: 16),
+          if (wasRounded) ...<Widget>[
+            _ConfirmationRow(
+              label: 'Amount entered',
+              value: enteredAmount.format(),
+            ),
+            const SizedBox(height: 8),
+          ],
+          _ConfirmationRow(
+            label: wasRounded ? 'Rounded amount to post' : 'Amount to post',
+            value: roundedAmount.format(),
+          ),
+          const SizedBox(height: 8),
+          _ConfirmationRow(
+            label: 'Due date',
+            value: _QueueCardState._longDate(dueDate),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Posting makes this bill payable and sends the consumer alert. '
+            'The amount cannot be changed in the app afterward.',
+            style: text.bodySmall,
+          ),
+        ],
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Review'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('Post amount'),
+        ),
+      ],
+    );
+  }
+}
+
+class _ConfirmationRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _ConfirmationRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: <Widget>[
+      Expanded(child: Text(label)),
+      const SizedBox(width: 12),
+      Text(value, style: Theme.of(context).textTheme.titleSmall),
+    ],
+  );
 }
 
 class _WaitBadge extends StatelessWidget {

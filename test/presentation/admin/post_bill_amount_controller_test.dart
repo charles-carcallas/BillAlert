@@ -162,6 +162,63 @@ void main() {
     expect(find.text('No matching readings.'), findsOneWidget);
   });
 
+  testWidgets('posting asks the Admin to confirm the rounded amount', (
+    WidgetTester tester,
+  ) async {
+    final container = harness();
+    await loaded(container);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: PostBillAmountScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Bienvenido Sarigumba'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, '499.41');
+
+    final Finder chooseDate = find.text('Choose the date on the statement');
+    await tester.ensureVisible(chooseDate);
+    await tester.pumpAndSettle();
+    await tester.tap(chooseDate);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('27').last);
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+
+    final Finder postRounded = find.text('Post · ₱500.00 (rounded up)');
+    await tester.ensureVisible(postRounded);
+    await tester.pumpAndSettle();
+    await tester.tap(postRounded);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Confirm bill amount'), findsOneWidget);
+    expect(find.text('Amount entered'), findsOneWidget);
+    expect(find.text('₱499.41'), findsOneWidget);
+    expect(find.text('Rounded amount to post'), findsOneWidget);
+    expect(find.text('₱500.00'), findsOneWidget);
+    expect(find.textContaining('cannot be changed'), findsOneWidget);
+    expect(outbox.enqueued, isEmpty);
+
+    await tester.tap(find.text('Review'));
+    await tester.pumpAndSettle();
+    expect(outbox.enqueued, isEmpty);
+
+    await tester.tap(postRounded);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Post amount'));
+    await tester.pumpAndSettle();
+
+    expect(outbox.enqueued, hasLength(1));
+    expect(
+      (outbox.enqueued.single as PostAmountOperation).amount,
+      Money.of(500),
+    );
+  });
+
   test('an amount with centavos is always rounded up in the outbox', () async {
     final container = harness();
     final controller = await loaded(container);
