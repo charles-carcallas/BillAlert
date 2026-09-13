@@ -36,25 +36,76 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Bill details'), findsOneWidget);
-    expect(find.text('BA-202609-000001'), findsOneWidget);
     expect(find.text('September 2026'), findsWidgets);
 
+    // The statement leads with what is still owed.
+    expect(find.text('Partially paid'), findsOneWidget);
+    expect(find.text('Remaining balance'), findsOneWidget);
+    expect(find.text('₱605.00'), findsOneWidget);
+
+    // ...broken down directly beneath, so the figure is never on trust.
+    await tester.scrollUntilVisible(
+      find.text('Payment received'),
+      160,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('Payment received'), findsOneWidget);
+    expect(find.text('₱1,005.00'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Due in 10 days'),
+      160,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('Due in 10 days'), findsOneWidget);
+
+    // The reference facts close the sheet.
     await tester.scrollUntilVisible(
       find.text('67.00 kWh'),
       160,
       scrollable: find.byType(Scrollable).last,
     );
     expect(find.text('67.00 kWh'), findsOneWidget);
-    expect(find.text('₱1,005.00'), findsOneWidget);
+    expect(find.text('BA-202609-000001'), findsOneWidget);
+    expect(find.text('OFFICIAL DIGITAL RECEIPT'), findsNothing);
+  });
+
+  testWidgets('an overdue bill counts the days past its due date', (
+    WidgetTester tester,
+  ) async {
+    // July, due 28 August, still unpaid on 10 September: 3 days left in
+    // August plus 10 in September. An off-by-one here tells a household it
+    // has one day more or less than it does.
+    const Bill bill = Bill(
+      id: BillId('bill-3'),
+      billNo: BillNumber('BA-202607-000902'),
+      consumerId: ConsumerId('consumer-1'),
+      cycle: CycleLabel(2026, 7),
+      consumption: Kwh.fromHundredths(5900),
+      totalAmount: Money.fromCentavos(54120),
+      dueDate: PhDate(2026, 8, 28),
+    );
+
+    await tester.pumpWidget(
+      _testApp(
+        onOpen: (BuildContext context) => showConsumerBillDetails(
+          context,
+          bill: bill,
+          today: const PhDate(2026, 9, 10),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Open bill'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Overdue'), findsOneWidget);
 
     await tester.scrollUntilVisible(
-      find.text('Remaining balance'),
+      find.text('Overdue by 13 days'),
       160,
       scrollable: find.byType(Scrollable).last,
     );
-    expect(find.text('Payment received'), findsOneWidget);
-    expect(find.text('₱605.00'), findsOneWidget);
-    expect(find.text('OFFICIAL DIGITAL RECEIPT'), findsNothing);
+    expect(find.text('Overdue by 13 days'), findsOneWidget);
   });
 
   testWidgets('an unpriced bill states that its amount is not posted', (
