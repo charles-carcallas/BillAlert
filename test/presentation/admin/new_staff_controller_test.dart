@@ -145,6 +145,9 @@ void main() {
     final Finder username = fieldWithHint('e.g. rodrigo.balistoy');
     await tester.enterText(username.first, 'rodrigo.balistoy');
 
+    await tester.drag(find.byType(ListView), const Offset(0, -250));
+    await tester.pumpAndSettle();
+
     final Finder password = fieldWithHint('At least 8 characters');
     await tester.enterText(password.first, 'Temporary#42');
 

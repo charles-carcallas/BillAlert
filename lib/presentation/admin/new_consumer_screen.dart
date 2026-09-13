@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart' hide Consumer;
 import '../../domain/entities/consumer.dart';
 import '../common/failure_banner.dart';
 import '../common/final_confirmation_dialog.dart';
+import '../common/staff_app_bar.dart';
+import 'account_form_widgets.dart';
 import 'new_consumer_controller.dart';
 
 /// ADM-03 — Admin › New Consumer, based on Figma 70:6009.
@@ -61,114 +63,109 @@ class _AdminNewConsumerScreenState
       );
     }
 
-    final TextTheme text = Theme.of(context).textTheme;
-
     return Scaffold(
-      appBar: AppBar(title: const Text('New consumer account')),
+      appBar: const StaffAppBar(title: 'New account'),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+        child: AdminAccountFormLayout(
           children: <Widget>[
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).colorScheme.primary.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Icon(
-                    Icons.person_add_alt_1_outlined,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Create a household record in your service area. '
-                      'Sign-in access is provisioned separately.',
-                      style: text.bodySmall,
-                    ),
-                  ),
-                ],
-              ),
+            Text(
+              'Add a household to your service area. Existing accounts '
+              'remain available from the Accounts tab.',
+              style: Theme.of(context).textTheme.bodySmall,
             ),
-
             if (state.failure != null) ...<Widget>[
               const SizedBox(height: 12),
               FailureBanner(failure: state.failure!),
             ],
-
-            const SizedBox(height: 22),
-            Text(
-              'HOUSEHOLD DETAILS',
-              style: text.labelMedium?.copyWith(letterSpacing: 0.6),
+            const SizedBox(height: 20),
+            const AccountFormSectionTitle('Household details'),
+            const SizedBox(height: 14),
+            AccountFormField(
+              label: 'Consumer number',
+              child: TextField(
+                controller: _consumerNo,
+                enabled: !state.isSubmitting,
+                textCapitalization: TextCapitalization.characters,
+                textInputAction: TextInputAction.next,
+                inputFormatters: <TextInputFormatter>[
+                  FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                ],
+                decoration: const InputDecoration(
+                  hintText: 'e.g. 2026-1234-TUB',
+                ),
+              ),
             ),
-            const SizedBox(height: 12),
-            _FieldLabel('Consumer number', style: text.titleSmall),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _consumerNo,
-              enabled: !state.isSubmitting,
-              textCapitalization: TextCapitalization.characters,
-              inputFormatters: <TextInputFormatter>[
-                FilteringTextInputFormatter.deny(RegExp(r'\s')),
-              ],
-              decoration: const InputDecoration(hintText: 'e.g. 2026-1234-TUB'),
-            ),
-
             const SizedBox(height: 16),
-            _FieldLabel('First name', style: text.titleSmall),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _firstName,
-              enabled: !state.isSubmitting,
-              textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(hintText: 'Given name'),
+            AccountFormField(
+              label: 'First name',
+              child: TextField(
+                controller: _firstName,
+                enabled: !state.isSubmitting,
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
+                autofillHints: const <String>[AutofillHints.givenName],
+                decoration: const InputDecoration(hintText: 'Given name'),
+              ),
             ),
-
             const SizedBox(height: 16),
-            _FieldLabel('Last name', style: text.titleSmall),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _lastName,
-              enabled: !state.isSubmitting,
-              textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(hintText: 'Surname'),
+            AccountFormField(
+              label: 'Last name',
+              child: TextField(
+                controller: _lastName,
+                enabled: !state.isSubmitting,
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
+                autofillHints: const <String>[AutofillHints.familyName],
+                decoration: const InputDecoration(hintText: 'Surname'),
+              ),
             ),
-
             const SizedBox(height: 16),
-            _FieldLabel('Mobile number (optional)', style: text.titleSmall),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _contactNumber,
-              enabled: !state.isSubmitting,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(hintText: 'e.g. 0917 555 0142'),
+            AccountFormField(
+              label: 'Mobile number (optional)',
+              child: TextField(
+                controller: _contactNumber,
+                enabled: !state.isSubmitting,
+                keyboardType: TextInputType.phone,
+                textInputAction: TextInputAction.next,
+                autofillHints: const <String>[AutofillHints.telephoneNumber],
+                decoration: const InputDecoration(
+                  hintText: 'e.g. 0917 555 0142',
+                ),
+              ),
             ),
-
             const SizedBox(height: 16),
-            _FieldLabel('Purok (optional)', style: text.titleSmall),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _purok,
-              enabled: !state.isSubmitting,
-              textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(hintText: 'e.g. Purok 3'),
+            AccountFormField(
+              label: 'Purok (optional)',
+              child: TextField(
+                controller: _purok,
+                enabled: !state.isSubmitting,
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.done,
+                decoration: const InputDecoration(hintText: 'e.g. Purok 3'),
+              ),
             ),
-
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: state.isSubmitting ? null : _submit,
-              child: state.isSubmitting
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Create consumer account'),
+            const SizedBox(height: 16),
+            const AccountFormNote(
+              icon: Icons.home_work_outlined,
+              title: 'Assigned automatically',
+              message:
+                  'Barangay Tubod and your service area come from your Admin '
+                  'account. Meter details and sign-in access are added '
+                  'separately.',
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 52,
+              child: FilledButton(
+                onPressed: state.isSubmitting ? null : _submit,
+                child: state.isSubmitting
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Create consumer account'),
+              ),
             ),
           ],
         ),
@@ -230,16 +227,6 @@ class _AdminNewConsumerScreenState
     _contactNumber.clear();
     _purok.clear();
   }
-}
-
-class _FieldLabel extends StatelessWidget {
-  final String label;
-  final TextStyle? style;
-
-  const _FieldLabel(this.label, {this.style});
-
-  @override
-  Widget build(BuildContext context) => Text(label, style: style);
 }
 
 class _CreatedConsumer extends StatelessWidget {

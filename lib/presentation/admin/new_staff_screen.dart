@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/staff_account.dart';
 import '../common/failure_banner.dart';
 import '../common/final_confirmation_dialog.dart';
+import '../common/staff_app_bar.dart';
+import 'account_form_widgets.dart';
 import 'new_staff_controller.dart';
 
 /// FR-31 — Admin › New Staff Account, adapted from Figma 70:1436.
@@ -60,191 +62,214 @@ class _AdminNewStaffScreenState extends ConsumerState<AdminNewStaffScreen> {
       );
     }
 
-    final text = Theme.of(context).textTheme;
-
     return Scaffold(
-      appBar: AppBar(title: const Text('New staff account')),
+      appBar: const StaffAppBar(title: 'New account'),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+        child: AdminAccountFormLayout(
           children: <Widget>[
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).colorScheme.primary.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Icon(
-                    Icons.admin_panel_settings_outlined,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Create a Meter Reader or Cashier account. It is '
-                      'assigned to your service area automatically.',
-                      style: text.bodySmall,
-                    ),
-                  ),
-                ],
-              ),
+            Text(
+              'Create a Meter Reader or Cashier account for your service '
+              'area. Existing accounts remain unchanged.',
+              style: Theme.of(context).textTheme.bodySmall,
             ),
             if (state.failure != null) ...<Widget>[
               const SizedBox(height: 12),
               FailureBanner(failure: state.failure!),
             ],
-            const SizedBox(height: 22),
-            Text(
-              'STAFF DETAILS',
-              style: text.labelMedium?.copyWith(letterSpacing: 0.6),
-            ),
-            const SizedBox(height: 12),
-            _label('First name', text),
-            TextField(
-              controller: _firstName,
-              enabled: !state.isSubmitting,
-              textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(hintText: 'Given name'),
-            ),
-            const SizedBox(height: 16),
-            _label('Last name', text),
-            TextField(
-              controller: _lastName,
-              enabled: !state.isSubmitting,
-              textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(hintText: 'Surname'),
-            ),
-            const SizedBox(height: 16),
-            _label('Mobile number (optional)', text),
-            TextField(
-              controller: _contactNumber,
-              enabled: !state.isSubmitting,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(hintText: 'e.g. 0917 555 0142'),
-            ),
-            const SizedBox(height: 18),
-            _label('Role', text),
-            SegmentedButton<StaffRole>(
-              segments: StaffRole.values
-                  .map(
-                    (role) => ButtonSegment<StaffRole>(
-                      value: role,
-                      label: Text(role.label),
-                      icon: Icon(
-                        role == StaffRole.meterReader
-                            ? Icons.speed_outlined
-                            : Icons.point_of_sale_outlined,
-                      ),
-                    ),
-                  )
-                  .toList(),
-              selected: <StaffRole>{_role},
-              onSelectionChanged: state.isSubmitting
-                  ? null
-                  : (roles) => setState(() => _role = roles.single),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'SIGN-IN DETAILS',
-              style: text.labelMedium?.copyWith(letterSpacing: 0.6),
-            ),
-            const SizedBox(height: 12),
-            _label('Username', text),
-            TextField(
-              controller: _username,
-              enabled: !state.isSubmitting,
-              autocorrect: false,
-              textCapitalization: TextCapitalization.none,
-              inputFormatters: <TextInputFormatter>[
-                FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9._-]')),
-              ],
-              decoration: const InputDecoration(
-                hintText: 'e.g. rodrigo.balistoy',
+            const SizedBox(height: 20),
+            const AccountFormSectionTitle('Staff details'),
+            const SizedBox(height: 14),
+            AccountFormField(
+              label: 'First name',
+              child: TextField(
+                controller: _firstName,
+                enabled: !state.isSubmitting,
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
+                autofillHints: const <String>[AutofillHints.givenName],
+                decoration: const InputDecoration(hintText: 'Given name'),
               ),
             ),
             const SizedBox(height: 16),
-            _label('Temporary password', text),
-            TextField(
-              controller: _temporaryPassword,
-              enabled: !state.isSubmitting,
-              obscureText: _obscurePassword,
-              autocorrect: false,
-              enableSuggestions: false,
-              decoration: InputDecoration(
-                hintText: 'At least 8 characters',
-                suffixIcon: IconButton(
-                  tooltip: _obscurePassword ? 'Show password' : 'Hide password',
-                  onPressed: state.isSubmitting
-                      ? null
-                      : () => setState(
-                          () => _obscurePassword = !_obscurePassword,
+            AccountFormField(
+              label: 'Last name',
+              child: TextField(
+                controller: _lastName,
+                enabled: !state.isSubmitting,
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
+                autofillHints: const <String>[AutofillHints.familyName],
+                decoration: const InputDecoration(hintText: 'Surname'),
+              ),
+            ),
+            const SizedBox(height: 16),
+            AccountFormField(
+              label: 'Mobile number (optional)',
+              child: TextField(
+                controller: _contactNumber,
+                enabled: !state.isSubmitting,
+                keyboardType: TextInputType.phone,
+                textInputAction: TextInputAction.next,
+                autofillHints: const <String>[AutofillHints.telephoneNumber],
+                decoration: const InputDecoration(
+                  hintText: 'e.g. 0917 555 0142',
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            AccountFormField(
+              label: 'Role',
+              child: SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<StaffRole>(
+                  showSelectedIcon: false,
+                  style: ButtonStyle(
+                    minimumSize: const WidgetStatePropertyAll<Size>(
+                      Size.fromHeight(42),
+                    ),
+                    backgroundColor: WidgetStateProperty.resolveWith<Color?>(
+                      (Set<WidgetState> states) =>
+                          states.contains(WidgetState.selected)
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerLowest,
+                    ),
+                    foregroundColor: WidgetStateProperty.resolveWith<Color?>(
+                      (Set<WidgetState> states) =>
+                          states.contains(WidgetState.selected)
+                          ? Theme.of(context).colorScheme.onPrimary
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    side: WidgetStatePropertyAll<BorderSide>(
+                      BorderSide(
+                        color: Theme.of(context).colorScheme.outlineVariant,
+                      ),
+                    ),
+                    shape: WidgetStatePropertyAll<OutlinedBorder>(
+                      RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                  segments: StaffRole.values
+                      .map(
+                        (StaffRole role) => ButtonSegment<StaffRole>(
+                          value: role,
+                          label: Text(role.label),
                         ),
-                  icon: Icon(
-                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                      )
+                      .toList(),
+                  selected: <StaffRole>{_role},
+                  onSelectionChanged: state.isSubmitting
+                      ? null
+                      : (Set<StaffRole> roles) =>
+                            setState(() => _role = roles.single),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const AccountFormNote(
+              icon: Icons.location_on_outlined,
+              title: 'Your service area',
+              message:
+                  'The account is assigned to your Admin area automatically. '
+                  'The server also verifies that the role can be assigned.',
+            ),
+            const SizedBox(height: 24),
+            const AccountFormSectionTitle('Sign-in details'),
+            const SizedBox(height: 14),
+            AccountFormField(
+              label: 'Username',
+              child: TextField(
+                controller: _username,
+                enabled: !state.isSubmitting,
+                autocorrect: false,
+                textCapitalization: TextCapitalization.none,
+                textInputAction: TextInputAction.next,
+                autofillHints: const <String>[AutofillHints.newUsername],
+                inputFormatters: <TextInputFormatter>[
+                  FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9._-]')),
+                ],
+                decoration: const InputDecoration(
+                  hintText: 'e.g. rodrigo.balistoy',
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            AccountFormField(
+              label: 'Temporary password',
+              child: TextField(
+                controller: _temporaryPassword,
+                enabled: !state.isSubmitting,
+                obscureText: _obscurePassword,
+                autocorrect: false,
+                enableSuggestions: false,
+                textInputAction: TextInputAction.next,
+                autofillHints: const <String>[AutofillHints.newPassword],
+                decoration: InputDecoration(
+                  hintText: 'At least 8 characters',
+                  suffixIcon: IconButton(
+                    tooltip: _obscurePassword
+                        ? 'Show password'
+                        : 'Hide password',
+                    onPressed: state.isSubmitting
+                        ? null
+                        : () => setState(
+                            () => _obscurePassword = !_obscurePassword,
+                          ),
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                    ),
                   ),
                 ),
               ),
             ),
             const SizedBox(height: 16),
-            _label('Confirm temporary password', text),
-            TextField(
-              controller: _confirmPassword,
-              enabled: !state.isSubmitting,
-              obscureText: _obscurePassword,
-              autocorrect: false,
-              enableSuggestions: false,
-              decoration: const InputDecoration(
-                hintText: 'Type the temporary password again',
+            AccountFormField(
+              label: 'Confirm temporary password',
+              child: TextField(
+                controller: _confirmPassword,
+                enabled: !state.isSubmitting,
+                obscureText: _obscurePassword,
+                autocorrect: false,
+                enableSuggestions: false,
+                textInputAction: TextInputAction.done,
+                autofillHints: const <String>[AutofillHints.newPassword],
+                decoration: const InputDecoration(
+                  hintText: 'Type the temporary password again',
+                ),
               ),
             ),
             const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  const Icon(Icons.lock_reset_outlined, size: 20),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Give the temporary password to the new staff member '
-                      'securely. They must replace it at first sign-in.',
-                      style: text.bodySmall,
-                    ),
-                  ),
-                ],
-              ),
+            const AccountFormNote(
+              icon: Icons.lock_reset_outlined,
+              title: 'Secure handoff',
+              message:
+                  'Give the temporary password to the staff member privately. '
+                  'BillAlert requires them to replace it at first sign-in.',
             ),
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: state.isSubmitting ? null : _submit,
-              child: state.isSubmitting
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Create staff account'),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 52,
+              child: FilledButton(
+                onPressed: state.isSubmitting ? null : _submit,
+                child: state.isSubmitting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Create staff account'),
+              ),
             ),
           ],
         ),
       ),
     );
   }
-
-  Widget _label(String value, TextTheme text) => Padding(
-    padding: const EdgeInsets.only(bottom: 6),
-    child: Text(value, style: text.titleSmall),
-  );
 
   Future<void> _submit() async {
     final AdminNewStaffController controller = ref.read(
