@@ -7,6 +7,7 @@ import '../common/failure_banner.dart';
 import '../common/local_search_field.dart';
 import '../common/payment_search.dart';
 import '../common/staff_app_bar.dart';
+import 'receipt_details_sheet.dart';
 import 'receipts_controller.dart';
 
 /// CSH-03 — Cashier › Receipts.
@@ -296,43 +297,58 @@ class _ReceiptTile extends StatelessWidget {
         .join()
         .toUpperCase();
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: <Widget>[
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: colours.primary.withValues(alpha: 0.11),
-            foregroundColor: colours.primary,
-            child: Text(
-              initials.isEmpty ? '?' : initials,
-              style: text.labelMedium?.copyWith(fontWeight: FontWeight.w700),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(receipt.consumerName, style: text.titleSmall),
-                const SizedBox(height: 2),
-                Text(
-                  '${receipt.receiptNo} · ${_time(receipt.paidAt)}',
-                  style: text.bodySmall,
+    return Semantics(
+      button: true,
+      label: 'Open receipt ${receipt.receiptNo}',
+      child: InkWell(
+        onTap: () => showCashierReceiptDetails(context, receipt),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: <Widget>[
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: colours.primary.withValues(alpha: 0.11),
+                foregroundColor: colours.primary,
+                child: Text(
+                  initials.isEmpty ? '?' : initials,
+                  style: text.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '${receipt.billCount} '
-                  'month${receipt.billCount == 1 ? '' : 's'} settled',
-                  style: text.bodySmall,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(receipt.consumerName, style: text.titleSmall),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${receipt.receiptNo} · ${_time(receipt.paidAt)}',
+                      style: text.bodySmall,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${receipt.billCount} '
+                      'month${receipt.billCount == 1 ? '' : 's'} settled',
+                      style: text.bodySmall,
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              Text(receipt.totalCollected.format(), style: text.titleMedium),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.chevron_right,
+                color: colours.onSurfaceVariant,
+                size: 20,
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Text(receipt.totalCollected.format(), style: text.titleMedium),
-        ],
+        ),
       ),
     );
   }
