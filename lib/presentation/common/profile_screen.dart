@@ -8,6 +8,7 @@ import '../../domain/entities/consumer.dart' as domain;
 import '../../domain/outbox/outbox_entry.dart';
 import '../auth/auth_controller.dart';
 import '../consumer/consumer_app_bar.dart';
+import '../consumer/edit_contact_number_sheet.dart';
 import '../providers.dart';
 import '../router.dart';
 import 'staff_app_bar.dart';
@@ -106,7 +107,30 @@ class ProfileScreen extends ConsumerWidget {
                   label: 'SMS delivery',
                 ),
                 const SizedBox(height: 6),
-                _SmsPanel(consumer: consumer),
+                _SmsPanel(
+                  consumer: consumer,
+                  onEdit: consumer?.hasValue == true
+                      ? () async {
+                          final String? saved =
+                              await showEditConsumerContactNumber(
+                                context,
+                                currentNumber: consumer?.value?.contactNumber,
+                              );
+                          if (saved != null) {
+                            ref.invalidate(profileConsumerProvider);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'SMS number updated to $saved.',
+                                  ),
+                                ),
+                              );
+                            }
+                          }
+                        }
+                      : null,
+                ),
               ],
               const SizedBox(height: 18),
               const _SectionHeader(icon: Icons.sync, label: 'Sync'),
@@ -208,8 +232,9 @@ class ProfileScreen extends ConsumerWidget {
 
 class _SmsPanel extends StatelessWidget {
   final AsyncValue<domain.Consumer?>? consumer;
+  final VoidCallback? onEdit;
 
-  const _SmsPanel({required this.consumer});
+  const _SmsPanel({required this.consumer, this.onEdit});
 
   @override
   Widget build(BuildContext context) {
@@ -255,6 +280,16 @@ class _SmsPanel extends StatelessWidget {
                       number,
                       style: text.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: onEdit,
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      label: Text(
+                        consumer?.value?.contactNumber == null
+                            ? 'Add SMS number'
+                            : 'Edit SMS number',
                       ),
                     ),
                   ],

@@ -186,8 +186,8 @@ Graded.
   `build/app/outputs/` is whatever was last built and carries no version
   marker.
 - `flutter analyze` should show only 7 issues, all in the gitignored
-  `scratch/`. `flutter test` should be **163 passing**.
-- SQL lives in `supabase/migrations/` (01–05, 07) and `supabase/tests/`. That
+  `scratch/`. `flutter test` should be **169 passing**.
+- SQL lives in `supabase/migrations/` (01–05, 07–10) and `supabase/tests/`. That
   folder is the source of truth; the old copy under `Week10_DataModel/sql/`
   has been replaced with a pointer. Applying SQL needs the Supabase SQL editor
   — there is no CLI or `psql` on this machine.

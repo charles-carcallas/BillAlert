@@ -21,6 +21,7 @@ Apply to a fresh database in this order:
 | `migrations/07_api_grants.sql` | lets `anon` and `authenticated` enter the `app` schema |
 | `migrations/08_calendar_cycles.sql` | creates billing cycles from calendar months without pricing bills |
 | `migrations/09_staff_accounts.sql` | server-only profile helper for Meter Reader and Cashier account creation |
+| `migrations/10_consumer_contact_number.sql` | lets a consumer update only their own household SMS number through a narrow authenticated function |
 
 `07` is not optional. Every policy calls a helper in the `app` schema, and
 without the grant every request fails with
@@ -61,6 +62,7 @@ places.
 |---|---|
 | `tests/06_tests.sql` | local Postgres — the 56-case suite |
 | `tests/fn_record_meter_reading_rls_test.sql` | local Postgres, or Supabase with one line changed |
+| `tests/fn_update_own_contact_number_test.sql` | local Postgres — own-household, validation, and staff-denial checks; rolls back |
 
 Run them against a **local Postgres**, not the Supabase SQL editor. The editor
 connects as the table owner, which bypasses every RLS policy, so a suite run

@@ -83,14 +83,14 @@ class ConsumerRepositoryImpl implements ConsumerRepository {
           ($CachedConsumersTable t) => OrderingTerm.asc(t.firstName),
         ]);
       final rows = await query.get();
-      return Ok<List<Consumer>>(
-        rows.map(ConsumerDto.fromCacheRow).toList(),
-      );
+      return Ok<List<Consumer>>(rows.map(ConsumerDto.fromCacheRow).toList());
     } catch (error) {
-      return Err<List<Consumer>>(ServerFailure(
-        'Could not read the household list saved on this phone.',
-        error.toString(),
-      ));
+      return Err<List<Consumer>>(
+        ServerFailure(
+          'Could not read the household list saved on this phone.',
+          error.toString(),
+        ),
+      );
     }
   }
 
@@ -102,10 +102,12 @@ class ConsumerRepositoryImpl implements ConsumerRepository {
       final row = await query.getSingleOrNull();
       return Ok<Consumer?>(row == null ? null : ConsumerDto.fromCacheRow(row));
     } catch (error) {
-      return Err<Consumer?>(ServerFailure(
-        'Could not read that household from this phone.',
-        error.toString(),
-      ));
+      return Err<Consumer?>(
+        ServerFailure(
+          'Could not read that household from this phone.',
+          error.toString(),
+        ),
+      );
     }
   }
 
@@ -132,21 +134,52 @@ class ConsumerRepositoryImpl implements ConsumerRepository {
     }
   }
 
+  @override
+  Future<Result<String>> updateOwnContactNumber(String contactNumber) async {
+    try {
+      final value = await _client.rpc<dynamic>(
+        'fn_update_own_contact_number',
+        params: <String, dynamic>{'p_contact_number': contactNumber},
+      );
+      if (value is! String || value.isEmpty) {
+        return const Err<String>(
+          ServerFailure(
+            'The server did not confirm the saved SMS number. Please refresh '
+            'your Profile before trying again.',
+          ),
+        );
+      }
+      return Ok<String>(value);
+    } catch (error, stackTrace) {
+      final failure = FailureMapper.from(error, stackTrace);
+      if (failure is NetworkFailure) {
+        return Err<String>(
+          NetworkFailure(
+            'No connection right now. The SMS number was not changed. '
+            'Reconnect and try again.',
+            failure.debugDetail,
+          ),
+        );
+      }
+      return Err<String>(failure);
+    }
+  }
+
   /// A consumers-table row has no reading joined onto it. New households and
   /// the signed-in household therefore start at zero rather than inventing a
   /// reading that the server did not return.
   static Consumer _fromSupabaseRow(Map<String, dynamic> row) => Consumer(
-        id: ConsumerId(row['id'] as String),
-        consumerNo: ConsumerNumber(row['consumer_no'] as String),
-        firstName: row['first_name'] as String,
-        lastName: row['last_name'] as String,
-        contactNumber: row['contact_number'] as String?,
-        meterSerialNo: row['meter_serial_no'] as String?,
-        areaId: AreaId(row['area_id'] as String),
-        purok: row['purok'] as String?,
-        accountStatus: AccountStatus.fromCode(row['account_status'] as String),
-        previousReading: Kwh.zero,
-      );
+    id: ConsumerId(row['id'] as String),
+    consumerNo: ConsumerNumber(row['consumer_no'] as String),
+    firstName: row['first_name'] as String,
+    lastName: row['last_name'] as String,
+    contactNumber: row['contact_number'] as String?,
+    meterSerialNo: row['meter_serial_no'] as String?,
+    areaId: AreaId(row['area_id'] as String),
+    purok: row['purok'] as String?,
+    accountStatus: AccountStatus.fromCode(row['account_status'] as String),
+    previousReading: Kwh.zero,
+  );
 
   @override
   Future<Result<DateTime?>> lastRefreshedAt() async {
@@ -155,12 +188,16 @@ class ConsumerRepositoryImpl implements ConsumerRepository {
         ..where(($SyncMetaTable t) => t.tableName_.equals(_syncKey));
       final row = await query.getSingleOrNull();
       final value = row?.lastRefreshedAt;
-      return Ok<DateTime?>(value == null ? null : DateTime.parse(value).toUtc());
+      return Ok<DateTime?>(
+        value == null ? null : DateTime.parse(value).toUtc(),
+      );
     } catch (error) {
-      return Err<DateTime?>(ServerFailure(
-        'Could not tell when this list was last updated.',
-        error.toString(),
-      ));
+      return Err<DateTime?>(
+        ServerFailure(
+          'Could not tell when this list was last updated.',
+          error.toString(),
+        ),
+      );
     }
   }
 
@@ -216,7 +253,9 @@ class ConsumerRepositoryImpl implements ConsumerRepository {
                   cycle['cycle_month'] as int,
                 ).value;
 
-          await _db.into(_db.cachedConsumers).insertOnConflictUpdate(
+          await _db
+              .into(_db.cachedConsumers)
+              .insertOnConflictUpdate(
                 ConsumerDto.toCacheRow(
                   json: household,
                   previousReading: previousReading,
@@ -228,7 +267,9 @@ class ConsumerRepositoryImpl implements ConsumerRepository {
 
         // GEN-11: remember when, so every screen can say how fresh this is.
         final now = DateTime.now().toUtc().toIso8601String();
-        await _db.into(_db.syncMeta).insertOnConflictUpdate(
+        await _db
+            .into(_db.syncMeta)
+            .insertOnConflictUpdate(
               SyncMetaCompanion.insert(
                 tableName_: _syncKey,
                 lastRefreshedAt: Value<String?>(now),
@@ -251,11 +292,14 @@ class ConsumerRepositoryImpl implements ConsumerRepository {
     try {
       // lastRefreshedAt is deliberately left absent, not set to null: the
       // cache is still as fresh as it was, and the screen must keep saying so.
-      await _db.into(_db.syncMeta).insertOnConflictUpdate(
+      await _db
+          .into(_db.syncMeta)
+          .insertOnConflictUpdate(
             SyncMetaCompanion.insert(
               tableName_: _syncKey,
-              lastAttemptAt:
-                  Value<String?>(DateTime.now().toUtc().toIso8601String()),
+              lastAttemptAt: Value<String?>(
+                DateTime.now().toUtc().toIso8601String(),
+              ),
               lastError: Value<String?>(error.toString()),
             ),
           );

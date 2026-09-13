@@ -33,7 +33,8 @@
     "fn_issue_disconnection_notice",
     "fn_post_bill_amount",
     "fn_record_meter_reading",
-    "fn_record_payment"
+    "fn_record_payment",
+    "fn_update_own_contact_number"
   ],
   "rpc_internal": [
     "current_area",

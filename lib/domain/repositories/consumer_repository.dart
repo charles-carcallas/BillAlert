@@ -51,6 +51,10 @@ abstract class ConsumerRepository {
   /// Null when the signed-in user is staff, who have no household.
   Future<Result<Consumer?>> signedInConsumer();
 
+  /// Changes only the signed-in household's SMS destination and returns the
+  /// normalized number stored by the database. Online only.
+  Future<Result<String>> updateOwnContactNumber(String contactNumber);
+
   /// When the cache was last filled, so a screen can say so. GEN-11 requires
   /// every screen showing cached data to show this, in case someone acts on
   /// a stale figure believing it is live.

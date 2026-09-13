@@ -142,6 +142,10 @@ final class FakeConsumerRepository implements ConsumerRepository {
   AreaId? createdAreaId;
   String? createdPurok;
   ProfileId? createdBy;
+  int updateContactCount = 0;
+  String? updatedContactText;
+  String normalizedContactNumber = '+639175550142';
+  AppFailure? updateContactFailure;
 
   FakeConsumerRepository(this.households);
 
@@ -199,6 +203,16 @@ final class FakeConsumerRepository implements ConsumerRepository {
 
   @override
   Future<Result<Consumer?>> signedInConsumer() async => Ok<Consumer?>(me);
+
+  @override
+  Future<Result<String>> updateOwnContactNumber(String contactNumber) async {
+    updateContactCount++;
+    updatedContactText = contactNumber;
+    final failure = updateContactFailure;
+    return failure == null
+        ? Ok<String>(normalizedContactNumber)
+        : Err<String>(failure);
+  }
 
   @override
   Future<Result<DateTime?>> lastRefreshedAt() async =>

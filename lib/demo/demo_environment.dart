@@ -445,6 +445,31 @@ final class _DemoConsumerRepository implements ConsumerRepository {
       Ok<Consumer?>(_first(store.consumers, (c) => c.id == _DemoStore.elena));
 
   @override
+  Future<Result<String>> updateOwnContactNumber(String contactNumber) async {
+    // Demo mode has no server trigger. Keep the text rather than duplicating
+    // the production normalization rule in Dart.
+    final index = store.consumers.indexWhere((c) => c.id == _DemoStore.elena);
+    if (index >= 0) {
+      final existing = store.consumers[index];
+      store.consumers[index] = Consumer(
+        id: existing.id,
+        consumerNo: existing.consumerNo,
+        firstName: existing.firstName,
+        lastName: existing.lastName,
+        areaId: existing.areaId,
+        accountStatus: existing.accountStatus,
+        previousReading: existing.previousReading,
+        contactNumber: contactNumber,
+        meterSerialNo: existing.meterSerialNo,
+        purok: existing.purok,
+        previousReadingDate: existing.previousReadingDate,
+        lastReadCycle: existing.lastReadCycle,
+      );
+    }
+    return Ok<String>(contactNumber);
+  }
+
+  @override
   Future<Result<Consumer>> create({
     required ConsumerNumber consumerNo,
     required String firstName,
