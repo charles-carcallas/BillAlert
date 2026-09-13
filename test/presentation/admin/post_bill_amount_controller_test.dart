@@ -18,8 +18,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/fakes.dart';
 
-/// FR-21b. The Admin transcribes a figure; the app must carry it to the
-/// outbox exactly, or refuse it in words they can act on.
+/// FR-21b. The Admin transcribes a figure; the app must apply the whole-peso
+/// ceiling before carrying it to the outbox, or refuse it in words they can
+/// act on.
 ///
 /// These run the REAL PostBillAmount use case over fake infrastructure, so
 /// the domain rules — no zero, no date in the past, no re-pricing — are
@@ -161,7 +162,7 @@ void main() {
     expect(find.text('No matching readings.'), findsOneWidget);
   });
 
-  test('a typed amount reaches the outbox as exact centavos', () async {
+  test('an amount with centavos is always rounded up in the outbox', () async {
     final container = harness();
     final controller = await loaded(container);
 
@@ -174,15 +175,31 @@ void main() {
     expect(outbox.enqueued, hasLength(1));
     final operation = outbox.enqueued.single as PostAmountOperation;
 
-    // The whole point of Money: 658.30 is 65,830 centavos and never a double.
-    expect(operation.amount, const Money.fromCentavos(65830));
-    expect(operation.amount.toDatabaseString(), '658.30');
+    // This is a ceiling, not nearest-peso rounding: 658.30 becomes 659.00.
+    expect(operation.amount, const Money.fromCentavos(65900));
+    expect(operation.amount.toDatabaseString(), '659.00');
     expect(
       operation.billId,
       const BillId('117cdc15-a13a-4c25-ba20-f46d89667272'),
     );
     expect(operation.dueDate.toIso(), '2026-09-25');
     expect(stateOf(container).failure, isNull);
+  });
+
+  test('an exact peso amount is not increased', () async {
+    final container = harness();
+    final controller = await loaded(container);
+
+    await controller.post(
+      entry: sarigumba(),
+      amountText: '658.00',
+      dueDate: const PhDate(2026, 9, 25),
+    );
+
+    expect(
+      (outbox.enqueued.single as PostAmountOperation).amount,
+      const Money.fromCentavos(65800),
+    );
   });
 
   test(
@@ -199,7 +216,7 @@ void main() {
 
       expect(
         (outbox.enqueued.single as PostAmountOperation).amount,
-        const Money.fromCentavos(197535),
+        const Money.fromCentavos(197600),
       );
     },
   );

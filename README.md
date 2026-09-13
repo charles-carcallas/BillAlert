@@ -11,16 +11,18 @@ Basio (Consumer)
 
 ## The one rule to read before anything else
 
-**BillAlert never computes a bill amount.**
+**BillAlert never derives a bill amount from consumption.** The Admin enters
+the cooperative's figure, and any centavos are always rounded up to the next
+whole peso before posting.
 
 The meter reader captures a reading, which creates a bill in an **unpriced**
 state — consumption recorded, no amount, no due date. About seven days later
 the cooperative returns a peso figure and the Area President posts it, which
 makes the bill payable and sends the consumer's bill-ready notification.
 
-There is no tariff, no rate table and no arithmetic on money anywhere in this
-app. If you find yourself writing a multiplication that produces pesos, stop
-and ask — you have misunderstood the domain.
+There is no tariff or rate table. Apart from the whole-peso ceiling, the app
+does not calculate money. If you find yourself writing a multiplication from
+kWh that produces pesos, stop and ask — you have misunderstood the domain.
 
 ---
 

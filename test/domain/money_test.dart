@@ -20,8 +20,11 @@ void main() {
       for (var i = 0; i < 10; i++) {
         wrong += 0.10;
       }
-      expect(wrong == 1.0, isFalse,
-          reason: 'double addition of 0.10 ten times is not exactly 1.00');
+      expect(
+        wrong == 1.0,
+        isFalse,
+        reason: 'double addition of 0.10 ten times is not exactly 1.00',
+      );
     });
 
     test('a cashier settling three months adds up exactly', () {
@@ -57,6 +60,17 @@ void main() {
       expect(a.hashCode, b.hashCode);
       expect(<Money>{a, b}.length, 1);
     });
+  });
+
+  group('whole-peso ceiling', () {
+    test(
+      'always rounds a centavo fraction up and leaves exact pesos alone',
+      () {
+        expect(Money.parse('499.01').roundUpToWholePeso(), Money.of(500));
+        expect(Money.parse('499.99').roundUpToWholePeso(), Money.of(500));
+        expect(Money.parse('499.00').roundUpToWholePeso(), Money.of(499));
+      },
+    );
   });
 
   group('parsing', () {

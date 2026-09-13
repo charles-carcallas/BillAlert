@@ -4,7 +4,7 @@
 -- transactional operations that must never half-complete.
 --
 --   fn_record_meter_reading      FR-21a  Meter Reader captures, unpriced
---   fn_post_bill_amount          FR-21b  Admin transcribes the amount
+--   fn_post_bill_amount          FR-21b  Admin posts a whole-peso amount
 --   fn_record_payment            FR-30   Cashier collects
 --   fn_issue_disconnection_notice MTR-15 Meter Reader serves notice
 --
@@ -369,7 +369,8 @@ end $$;
 
 
 -- =====================================================================
--- FR-21b — Admin posts the amount the cooperative returned.
+-- FR-21b — Admin posts the amount the cooperative returned, rounded up to
+-- the next whole peso whenever it contains centavos.
 --
 -- This is the moment a bill becomes payable, and the moment the consumer
 -- is told about it (FR-13). The mockup: "Posting sends the consumer's
@@ -416,7 +417,7 @@ begin
   end if;
 
   update bills
-     set total_amount = round(p_amount, 2),
+     set total_amount = ceil(p_amount),
          due_date     = p_due_date,
          priced_at    = p_posted_at,
          priced_by    = app.current_user_id()

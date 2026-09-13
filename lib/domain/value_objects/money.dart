@@ -72,9 +72,22 @@ final class Money implements Comparable<Money> {
     return parsed;
   }
 
-  Money operator +(Money other) => Money.fromCentavos(centavos + other.centavos);
+  Money operator +(Money other) =>
+      Money.fromCentavos(centavos + other.centavos);
 
-  Money operator -(Money other) => Money.fromCentavos(centavos - other.centavos);
+  Money operator -(Money other) =>
+      Money.fromCentavos(centavos - other.centavos);
+
+  /// Applies BillAlert's whole-peso billing rule.
+  ///
+  /// An exact peso stays unchanged; any centavo fraction moves to the next
+  /// peso. This is a ceiling operation, not ordinary nearest-peso rounding:
+  /// ₱499.01 and ₱499.99 both become ₱500.00.
+  Money roundUpToWholePeso() {
+    final int remainder = centavos % 100;
+    if (remainder == 0) return this;
+    return Money.fromCentavos(centavos + (100 - remainder));
+  }
 
   bool operator <(Money other) => centavos < other.centavos;
   bool operator <=(Money other) => centavos <= other.centavos;
@@ -125,7 +138,8 @@ final class Money implements Comparable<Money> {
   }
 
   @override
-  bool operator ==(Object other) => other is Money && other.centavos == centavos;
+  bool operator ==(Object other) =>
+      other is Money && other.centavos == centavos;
 
   @override
   int get hashCode => centavos.hashCode;

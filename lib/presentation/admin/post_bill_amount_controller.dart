@@ -58,8 +58,8 @@ final class PostBillAmountState {
 ///
 /// The screen hands over the text that was typed. Everything after that is
 /// this class calling one use case, which writes to the outbox. There is no
-/// Supabase call in here and no arithmetic: BillAlert never computes a bill
-/// amount, it transcribes one.
+/// Supabase call in here and no tariff arithmetic: BillAlert transcribes the
+/// cooperative amount and applies only the required whole-peso ceiling.
 class PostBillAmountController extends Notifier<PostBillAmountState> {
   /// The load currently in flight, if any.
   ///
@@ -138,6 +138,7 @@ class PostBillAmountController extends Notifier<PostBillAmountState> {
       );
       return;
     }
+    final Money roundedAmount = amount.roundUpToWholePeso();
     if (dueDate == null) {
       state = state.copyWith(
         queue: state.queue,
@@ -170,7 +171,7 @@ class PostBillAmountController extends Notifier<PostBillAmountState> {
         state = state.copyWith(
           queue: state.queue,
           postedMessage:
-              '${amount.format()} posted for ${entry.consumerName}.',
+              '${roundedAmount.format()} posted for ${entry.consumerName}.',
         );
     }
   }
@@ -183,5 +184,5 @@ class PostBillAmountController extends Notifier<PostBillAmountState> {
 
 final postBillAmountControllerProvider =
     NotifierProvider<PostBillAmountController, PostBillAmountState>(
-  PostBillAmountController.new,
-);
+      PostBillAmountController.new,
+    );

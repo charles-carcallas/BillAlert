@@ -13,8 +13,8 @@ import 'post_bill_amount_controller.dart';
 ///
 /// The Area President types in the peso figure the cooperative returned.
 /// Nothing on this screen calculates it: there is no tariff and no rate
-/// table in BillAlert, and any multiplication that produced pesos here would
-/// be a misunderstanding of the whole domain.
+/// table in BillAlert. The one adjustment is the required whole-peso ceiling:
+/// any amount with centavos is rounded up before it is posted.
 ///
 /// The consumption sits directly above the amount box on purpose. The
 /// likeliest error in the system is a transcription typo, and ₱6,583.00 next
@@ -261,7 +261,7 @@ class _Header extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             'Transcribe the amount and the due date from what the cooperative '
-            'returned. BillAlert does not calculate either one.',
+            'returned. BillAlert does not derive either one from consumption.',
             style: text.bodyMedium,
           ),
         ],
@@ -443,6 +443,11 @@ class _QueueCardState extends State<_QueueCard> {
                     ),
                     onChanged: (_) => setState(() {}),
                   ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Any centavos are always rounded up to the next peso.',
+                    style: text.bodySmall,
+                  ),
                   const SizedBox(height: 16),
 
                   Text('Due date', style: text.titleSmall),
@@ -490,7 +495,11 @@ class _QueueCardState extends State<_QueueCard> {
   /// controller would then reject.
   String _buttonLabel() {
     final Money? amount = Money.tryParse(_amount.text);
-    return amount == null ? 'Post amount' : 'Post · ${amount.format()}';
+    if (amount == null) return 'Post amount';
+    final Money rounded = amount.roundUpToWholePeso();
+    return amount == rounded
+        ? 'Post · ${rounded.format()}'
+        : 'Post · ${rounded.format()} (rounded up)';
   }
 
   Future<void> _pickDueDate() async {

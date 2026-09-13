@@ -18,9 +18,11 @@ short, cut visual fidelity, never wiring. **Never insert placeholder data to
 make a screen look finished** — if a screen cannot get real data, render an
 honest empty state saying so.
 
-**BillAlert never computes a bill amount.** There is no tariff and no rate
-table. The cooperative returns a peso figure and the Admin types it in. If you
-write a multiplication that produces pesos, you have misunderstood the domain.
+**BillAlert never derives a bill amount from consumption.** There is no tariff
+and no rate table. The cooperative returns a peso figure and the Admin types
+it in; the app's only adjustment is to always round any centavos up to the next
+whole peso before posting. If you write a multiplication from kWh that
+produces pesos, you have misunderstood the domain.
 
 ## State: the core flow works end to end
 
@@ -184,7 +186,7 @@ Graded.
   `build/app/outputs/` is whatever was last built and carries no version
   marker.
 - `flutter analyze` should show only 7 issues, all in the gitignored
-  `scratch/`. `flutter test` should be **148 passing**.
+  `scratch/`. `flutter test` should be **150 passing**.
 - SQL lives in `supabase/migrations/` (01–05, 07) and `supabase/tests/`. That
   folder is the source of truth; the old copy under `Week10_DataModel/sql/`
   has been replaced with a pointer. Applying SQL needs the Supabase SQL editor

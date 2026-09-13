@@ -363,11 +363,11 @@ begin
   b := fn_record_meter_reading(c, 4668, timestamptz '2026-08-20 09:00+08');
   perform fn_post_bill_amount(b, 658.30, date '2026-09-08', timestamptz '2026-08-27 10:00+08');
   select * into r from bills where id = b;
-  -- The mockup: "Amount due ₱658.30 · Due date 8 September 2026 · Post · ₱658.30"
+  -- Whole-peso ceiling: the Admin enters ₱658.30 and the bill stores ₱659.00.
   perform t_result('TC-17','FR-21b',
     'Posting the cooperative''s amount makes the bill payable, with their due date',
-    r.status = 'unpaid' and r.total_amount = 658.30
-      and r.due_date = date '2026-09-08' and r.balance = 658.30 and r.priced_at is not null,
+    r.status = 'unpaid' and r.total_amount = 659.00
+      and r.due_date = date '2026-09-08' and r.balance = 659.00 and r.priced_at is not null,
     format('status=%s amount=%s due=%s balance=%s', r.status, r.total_amount, r.due_date, r.balance));
 exception when others then
   perform t_result('TC-17','FR-21b','Posting an amount', false, 'unexpected error: ' || sqlerrm);
