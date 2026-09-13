@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/errors/app_failure.dart';
 import '../../core/result/result.dart';
 import '../../domain/entities/app_user.dart';
 import '../../domain/entities/consumer.dart' as domain;
 import '../../domain/outbox/outbox_entry.dart';
+import '../auth/app_lock_controller.dart';
 import '../auth/auth_controller.dart';
 import '../consumer/consumer_app_bar.dart';
 import '../consumer/edit_contact_number_sheet.dart';
@@ -42,6 +44,19 @@ final profileConsumerProvider = FutureProvider<domain.Consumer?>((
   };
 });
 
+/// Whether this phone can use fingerprint sign-in, and whether it is on for
+/// the signed-in person. Read here, so the switch shows the setting's own
+/// answer rather than a copy of it that could drift.
+final fingerprintStatusProvider = FutureProvider<({bool available, bool on})>((
+  Ref ref,
+) async {
+  final AppUser? user = await ref.watch(authControllerProvider.future);
+  final bool available = await ref.watch(deviceUnlockProvider).isAvailable();
+  if (user == null || !available) return (available: available, on: false);
+  final bool on = await ref.watch(fingerprintSettingProvider).isOnFor(user.id);
+  return (available: true, on: on);
+});
+
 /// The Profile tab, for all four roles.
 ///
 /// One screen, not four. Everything on it comes from the signed-in [AppUser]
@@ -49,9 +64,8 @@ final profileConsumerProvider = FutureProvider<domain.Consumer?>((
 /// The Meter Reader's version and the Cashier's differ only in the words the
 /// user object already supplies.
 ///
-/// What is deliberately NOT here: the mockup's fingerprint unlock and theme
-/// picker. Neither is built, and a switch that does nothing is worse than an
-/// absent one.
+/// What is deliberately NOT here: the mockup's theme picker. It is not built,
+/// and a switch that does nothing is worse than an absent one.
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
@@ -78,6 +92,7 @@ class ProfileScreen extends ConsumerWidget {
         child: RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(pendingOutboxProvider);
+            ref.invalidate(fingerprintStatusProvider);
             if (user is ConsumerUser) ref.invalidate(profileConsumerProvider);
           },
           child: ListView(
@@ -162,6 +177,8 @@ class ProfileScreen extends ConsumerWidget {
                     // the back arrow has to return to it.
                     onTap: () => context.push(Routes.accountPassword),
                   ),
+                  const Divider(),
+                  _FingerprintRow(user: user),
                 ],
               ),
               const SizedBox(height: 24),
@@ -591,6 +608,66 @@ class _SettingRow extends StatelessWidget {
               child: trailing,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Fingerprint sign-in, on or off, for the signed-in person on this phone.
+///
+/// Both directions ask the phone to confirm first, through the same
+/// controller the offer after sign-in uses. Turning it off removes the lock,
+/// so it must not be something whoever picks up an open phone can do quietly.
+///
+/// On a phone with no screen lock, the switch is shown off and disabled with
+/// the reason beside it, rather than hidden or left tappable with nothing
+/// behind it.
+class _FingerprintRow extends ConsumerWidget {
+  final AppUser user;
+
+  const _FingerprintRow({required this.user});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = ref.watch(fingerprintStatusProvider);
+    final bool available = status.value?.available ?? false;
+    final bool on = status.value?.on ?? false;
+
+    final String subtitle = status.isLoading
+        ? 'Checking this phone…'
+        : available
+        ? "Unlock BillAlert with your fingerprint or your phone's PIN instead "
+              'of your password'
+        : 'This phone has no screen lock to unlock BillAlert with';
+
+    return _SettingRow(
+      title: 'Fingerprint sign-in',
+      subtitle: subtitle,
+      trailing: Switch(
+        value: on,
+        onChanged: status.isLoading || !available
+            ? null
+            : (bool turnOn) => _change(context, ref, turnOn),
+      ),
+    );
+  }
+
+  Future<void> _change(BuildContext context, WidgetRef ref, bool turnOn) async {
+    final AppLockController lock = ref.read(appLockControllerProvider.notifier);
+    final AppFailure? failure = turnOn
+        ? await lock.turnOnFor(user)
+        : await lock.turnOff();
+    ref.invalidate(fingerprintStatusProvider);
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          failure?.message ??
+              (turnOn
+                  ? 'Fingerprint sign-in is on for this phone.'
+                  : 'Fingerprint sign-in is off for this phone.'),
         ),
       ),
     );

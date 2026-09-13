@@ -209,4 +209,27 @@ void main() {
       },
     );
   });
+
+  group('turning it off', () {
+    test('asks the phone first, and a cancelled prompt leaves it on', () async {
+      setting.onFor = reader.id.value;
+      final container = containerWith();
+      final lock = container.read(appLockControllerProvider.notifier);
+
+      phone.failure = const AuthFailure('Unlock was cancelled.');
+      expect((await lock.turnOff())?.message, 'Unlock was cancelled.');
+      expect(
+        setting.onFor,
+        reader.id.value,
+        reason:
+            'Turning it off removes the lock. Whoever holds an open phone '
+            'must not be able to do that without the phone confirming.',
+      );
+
+      phone.failure = null;
+      expect(await lock.turnOff(), isNull);
+      expect(setting.onFor, isNull);
+      expect(phone.prompts, 2);
+    });
+  });
 }

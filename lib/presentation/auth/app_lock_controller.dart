@@ -114,6 +114,31 @@ class AppLockController extends Notifier<AppLockState> {
     }
   }
 
+  /// The Profile switch, turned off. Returns null on success.
+  ///
+  /// Confirms first, like turning it on. Turning it off removes the lock from
+  /// every future start of the app, and whoever is holding a phone that is
+  /// already open must not be able to do that without the phone's say-so.
+  Future<AppFailure?> turnOff() async {
+    final result = await ref
+        .read(deviceUnlockProvider)
+        .confirmIdentity(
+          reason: 'Confirm it’s you to turn off fingerprint sign-in',
+        );
+
+    if (result case Err(:final failure)) return failure;
+
+    try {
+      await ref.read(fingerprintSettingProvider).turnOff();
+    } catch (error) {
+      return ValidationFailure(
+        'Fingerprint sign-in could not be turned off on this phone. Try again.',
+        '$error',
+      );
+    }
+    return null;
+  }
+
   /// Signing out, or a session that ended. Nothing locked, nothing offered.
   /// The setting itself stays, so the next password sign-in on this phone
   /// keeps using it.
