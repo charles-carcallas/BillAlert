@@ -7,6 +7,7 @@ import '../../domain/value_objects/ph_date.dart';
 import '../common/failure_banner.dart';
 import '../providers.dart';
 import '../router.dart';
+import 'bill_details_sheet.dart';
 import 'consumer_app_bar.dart';
 import 'history_controller.dart';
 
@@ -334,6 +335,9 @@ class _MonthTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final TextTheme text = Theme.of(context).textTheme;
     final String status = bill.statusLabelOn(today);
+    final bool opensReceipt =
+        view == _HistoryView.payments && receiptNo != null;
+    final bool opensBill = view == _HistoryView.bills;
 
     final Widget row = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -370,7 +374,7 @@ class _MonthTile extends StatelessWidget {
               _StatusLabel(label: status),
             ],
           ),
-          if (receiptNo != null) ...<Widget>[
+          if (opensReceipt || opensBill) ...<Widget>[
             const SizedBox(width: 4),
             Icon(
               Icons.chevron_right,
@@ -382,14 +386,19 @@ class _MonthTile extends StatelessWidget {
       ),
     );
 
-    // Only a settled month has a receipt to open. The rest are ordinary list
-    // rows rather than controls that lead nowhere.
-    return receiptNo == null
-        ? row
-        : InkWell(
-            onTap: () => context.push(Routes.consumerReceiptFor(receiptNo!)),
-            child: row,
-          );
+    if (opensReceipt) {
+      return InkWell(
+        onTap: () => context.push(Routes.consumerReceiptFor(receiptNo!)),
+        child: row,
+      );
+    }
+    if (opensBill) {
+      return InkWell(
+        onTap: () => showConsumerBillDetails(context, bill: bill, today: today),
+        child: row,
+      );
+    }
+    return row;
   }
 }
 
