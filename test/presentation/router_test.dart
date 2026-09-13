@@ -118,6 +118,7 @@ void main() {
       Routes.accountPassword,
       Routes.serveNotice,
       Routes.newConsumer,
+      Routes.resetAccountPassword,
       Routes.noticeDocument,
       Routes.consumerReceipt,
       Routes.readingEntry,

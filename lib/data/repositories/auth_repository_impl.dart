@@ -5,6 +5,7 @@ import '../../core/config/app_config.dart';
 import '../../core/errors/app_failure.dart';
 import '../../core/result/result.dart';
 import '../../domain/entities/app_user.dart';
+import '../../domain/entities/managed_account.dart';
 import '../../domain/entities/staff_account.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../domain/value_objects/ids.dart';
@@ -218,6 +219,97 @@ class AuthRepositoryImpl implements AuthRepository {
       );
     } catch (error, stackTrace) {
       return Err<CreatedStaffAccount>(FailureMapper.from(error, stackTrace));
+    }
+  }
+
+  @override
+  Future<Result<List<ManagedAccount>>> managedAccounts(AreaId areaId) async {
+    try {
+      // Two reads, both under the Admin's own row-level security. A staff
+      // profile carries its area. A consumer's login profile does not, so
+      // households with a login are found through consumers.profile_id,
+      // whose row is area-scoped.
+      final staffRows = await _client
+          .from('profiles')
+          .select('id, first_name, last_name, username, role')
+          .eq('area_id', areaId.value)
+          .inFilter('role', <String>['meter_reader', 'cashier'])
+          .eq('account_status', 'active')
+          .order('last_name');
+
+      final householdRows = await _client
+          .from('consumers')
+          .select('profile_id, first_name, last_name, consumer_no')
+          .eq('area_id', areaId.value)
+          .not('profile_id', 'is', null)
+          .order('last_name');
+
+      return Ok<List<ManagedAccount>>(<ManagedAccount>[
+        for (final Map<String, dynamic> row in staffRows)
+          ManagedAccount(
+            id: ProfileId(row['id'] as String),
+            firstName: row['first_name'] as String,
+            lastName: row['last_name'] as String,
+            kind: row['role'] == 'cashier'
+                ? ManagedAccountKind.cashier
+                : ManagedAccountKind.meterReader,
+            reference: row['username'] as String,
+          ),
+        for (final Map<String, dynamic> row in householdRows)
+          ManagedAccount(
+            id: ProfileId(row['profile_id'] as String),
+            firstName: row['first_name'] as String,
+            lastName: row['last_name'] as String,
+            kind: ManagedAccountKind.consumer,
+            reference: row['consumer_no'] as String,
+          ),
+      ]);
+    } catch (error, stackTrace) {
+      return Err<List<ManagedAccount>>(FailureMapper.from(error, stackTrace));
+    }
+  }
+
+  @override
+  Future<Result<void>> resetAccountPassword({
+    required ManagedAccount account,
+    required String temporaryPassword,
+  }) async {
+    try {
+      // As with createStaffAccount: the Admin's JWT goes with the request, and
+      // the server decides whether this Area President may reset this
+      // account. The client sends no area and holds no privileged key.
+      final response = await _client.functions.invoke(
+        'reset-account-password',
+        body: <String, dynamic>{
+          'profile_id': account.id.value,
+          'temporary_password': temporaryPassword,
+        },
+      );
+
+      final value = response.data;
+      if (value is! Map) {
+        return const Err<void>(
+          ServerFailure(
+            'The server did not confirm the password reset. Please try again.',
+          ),
+        );
+      }
+
+      if (value['ok'] != true) {
+        final message = value['message'] is String
+            ? value['message'] as String
+            : 'The password could not be reset. Please try again.';
+        return Err<void>(switch (value['kind']) {
+          'validation' => ValidationFailure(message),
+          'permission' => PermissionFailure(message),
+          'conflict' => ConflictFailure(message),
+          _ => ServerFailure(message),
+        });
+      }
+
+      return const Ok<void>(null);
+    } catch (error, stackTrace) {
+      return Err<void>(FailureMapper.from(error, stackTrace));
     }
   }
 

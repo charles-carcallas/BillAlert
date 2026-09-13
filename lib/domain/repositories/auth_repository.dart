@@ -1,6 +1,8 @@
 import '../../core/result/result.dart';
 import '../entities/app_user.dart';
+import '../entities/managed_account.dart';
 import '../entities/staff_account.dart';
+import '../value_objects/ids.dart';
 
 /// Signing in, signing out, and knowing who is signed in.
 ///
@@ -39,6 +41,20 @@ abstract class AuthRepository {
     required String lastName,
     required String? contactNumber,
     required StaffRole role,
+    required String temporaryPassword,
+  });
+
+  /// The sign-ins in [areaId] whose password the signed-in Area President
+  /// may reset: that area's Meter Readers and Cashiers, and its households
+  /// that have a login.
+  Future<Result<List<ManagedAccount>>> managedAccounts(AreaId areaId);
+
+  /// Gives [account] a temporary password and requires them to replace it at
+  /// their next sign-in. Server-owned, like [createStaffAccount]: this client
+  /// never holds the key that changes another person's password, and the
+  /// server decides whether this Area President may reset this account.
+  Future<Result<void>> resetAccountPassword({
+    required ManagedAccount account,
     required String temporaryPassword,
   });
 }

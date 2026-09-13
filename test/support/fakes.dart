@@ -6,6 +6,7 @@ import 'package:billalert/data/sync/sync_service.dart';
 import 'package:billalert/domain/entities/app_user.dart';
 import 'package:billalert/domain/entities/bill.dart';
 import 'package:billalert/domain/entities/consumer.dart';
+import 'package:billalert/domain/entities/managed_account.dart';
 import 'package:billalert/domain/entities/staff_account.dart';
 import 'package:billalert/domain/outbox/outbox_entry.dart';
 import 'package:billalert/domain/outbox/outbox_operation.dart';
@@ -339,6 +340,35 @@ final class FakeAuthRepository implements AuthRepository {
         contactNumber: contactNumber,
       ),
     );
+  }
+
+  /// What [managedAccounts] returns, unless [managedFailure] is set.
+  List<ManagedAccount> managed = <ManagedAccount>[];
+  AppFailure? managedFailure;
+
+  int resetCalls = 0;
+  ManagedAccount? resetAccount;
+  String? resetTemporaryPassword;
+  AppFailure? nextResetFailure;
+
+  @override
+  Future<Result<List<ManagedAccount>>> managedAccounts(AreaId areaId) async {
+    final AppFailure? failure = managedFailure;
+    return failure == null
+        ? Ok<List<ManagedAccount>>(managed)
+        : Err<List<ManagedAccount>>(failure);
+  }
+
+  @override
+  Future<Result<void>> resetAccountPassword({
+    required ManagedAccount account,
+    required String temporaryPassword,
+  }) async {
+    resetCalls++;
+    resetAccount = account;
+    resetTemporaryPassword = temporaryPassword;
+    final AppFailure? failure = nextResetFailure;
+    return failure == null ? const Ok<void>(null) : Err<void>(failure);
   }
 
   void dispose() {

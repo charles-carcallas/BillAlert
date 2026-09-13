@@ -8,6 +8,7 @@ import '../data/sync/sync_service.dart';
 import '../domain/entities/app_user.dart';
 import '../domain/entities/bill.dart';
 import '../domain/entities/consumer.dart';
+import '../domain/entities/managed_account.dart';
 import '../domain/entities/staff_account.dart';
 import '../domain/outbox/outbox_entry.dart';
 import '../domain/outbox/outbox_operation.dart';
@@ -391,6 +392,40 @@ final class _DemoAuthRepository implements AuthRepository {
       'reassign that account before creating another.',
     ),
   );
+
+  @override
+  Future<Result<List<ManagedAccount>>> managedAccounts(AreaId areaId) async =>
+      const Ok<List<ManagedAccount>>(<ManagedAccount>[
+        ManagedAccount(
+          id: ProfileId('demo-reader'),
+          firstName: 'Ledesman',
+          lastName: 'Dormal',
+          kind: ManagedAccountKind.meterReader,
+          reference: 'reader',
+        ),
+        ManagedAccount(
+          id: ProfileId('demo-cashier'),
+          firstName: 'Maria',
+          lastName: 'Cañete',
+          kind: ManagedAccountKind.cashier,
+          reference: 'cashier',
+        ),
+        ManagedAccount(
+          id: ProfileId('demo-consumer-profile'),
+          firstName: 'Elena',
+          lastName: 'Bongcaras',
+          kind: ManagedAccountKind.consumer,
+          reference: '2018-0442-TUB',
+        ),
+      ]);
+
+  /// Demo sign-ins keep the password "demo" so a rehearsal never locks
+  /// itself out. The reset is accepted and changes nothing.
+  @override
+  Future<Result<void>> resetAccountPassword({
+    required ManagedAccount account,
+    required String temporaryPassword,
+  }) async => const Ok<void>(null);
   @override
   Future<Result<void>> signOut() async {
     current = null;

@@ -8,6 +8,7 @@ import 'admin/disconnections_screen.dart';
 import 'admin/new_consumer_screen.dart';
 import 'admin/notice_document_screen.dart';
 import 'admin/post_bill_amount_screen.dart';
+import 'admin/reset_password_screen.dart';
 import 'admin/serve_notice_screen.dart';
 import 'auth/app_lock_controller.dart';
 import 'auth/auth_controller.dart';
@@ -51,6 +52,10 @@ class Routes {
   /// a confirmation with a Done that pops, and there is nothing to pop back
   /// to from a tab root.
   static const String newConsumer = '/admin/accounts/new';
+
+  /// Resetting a forgotten password. A task outside the shell, like creating
+  /// an account: it ends in a confirmation and a Done that pops.
+  static const String resetAccountPassword = '/admin/accounts/reset';
 
   /// One served notice, as a document, with the outcome recorded from it.
   ///
@@ -139,6 +144,10 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: Routes.newConsumer,
         builder: (_, _) => const AdminNewConsumerScreen(),
+      ),
+      GoRoute(
+        path: Routes.resetAccountPassword,
+        builder: (_, _) => const AdminResetPasswordScreen(),
       ),
       GoRoute(
         path: Routes.noticeDocument,

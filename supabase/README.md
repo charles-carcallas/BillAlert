@@ -22,6 +22,7 @@ Apply to a fresh database in this order:
 | `migrations/08_calendar_cycles.sql` | creates billing cycles from calendar months without pricing bills |
 | `migrations/09_staff_accounts.sql` | server-only profile helper for Meter Reader and Cashier account creation |
 | `migrations/10_consumer_contact_number.sql` | lets a consumer update only their own household SMS number through a narrow authenticated function |
+| `migrations/11_account_password_reset.sql` | server-only rules for an Area President resetting a forgotten password in their own area |
 
 `07` is not optional. Every policy calls a helper in the `app` schema, and
 without the grant every request fails with
@@ -38,6 +39,18 @@ Deploy the function after applying migration `09`:
 
 ```sh
 supabase functions deploy create-staff-account
+```
+
+Password resets work the same way. An Area President resets a forgotten
+password through the authenticated `reset-account-password` Edge Function.
+It checks the rules in `11` — the caller's own area only, a Meter Reader,
+Cashier or household login, never another Area President or themselves —
+then requires the account to choose a new password at its next sign-in, and
+only then sets the temporary password with the Auth Admin API. Deploy it after
+applying migration `11`:
+
+```sh
+supabase functions deploy reset-account-password
 ```
 
 There is no `06` migration: `06_tests.sql` is a test suite, and lives in
