@@ -61,6 +61,10 @@ class BillRepositoryImpl implements BillRepository {
       'total_amount, due_date, amount_paid';
 
   /// [refreshFor] additionally caches when the bill was generated.
+  /// The same columns, for the background notification check, which reads
+  /// bills without the cache and so without this class.
+  static const String billColumns = _billColumns;
+
   static const String _cachedBillColumns = '$_billColumns, generated_at';
 
   /// FR-21b. The Admin queue: readings with no amount yet, oldest first.

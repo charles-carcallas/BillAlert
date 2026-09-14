@@ -3,6 +3,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../data/local/app_database.dart';
+import '../data/notifications/android_phone_notifier.dart';
+import '../data/notifications/supabase_alert_feed.dart';
+import '../data/notifications/workmanager_background_alerts.dart';
 import '../data/repositories/auth_repository_impl.dart';
 import '../data/repositories/bill_repository_impl.dart';
 import '../data/repositories/consumer_repository_impl.dart';
@@ -15,6 +18,7 @@ import '../data/security/local_auth_device_unlock.dart';
 import '../data/security/secure_fingerprint_setting.dart';
 import '../data/sync/supabase_outbox_gateway.dart';
 import '../data/sync/sync_service.dart';
+import '../domain/notifications/phone_alerts.dart';
 import '../domain/outbox/outbox_operation.dart';
 import '../domain/repositories/auth_repository.dart';
 import '../domain/repositories/bill_repository.dart';
@@ -33,6 +37,7 @@ import '../domain/usecases/auth/change_password.dart';
 import '../domain/usecases/auth/sign_in.dart';
 import '../domain/usecases/auth/sign_out.dart';
 import '../domain/usecases/cashier/record_cash_payment.dart';
+import '../domain/usecases/consumer/refresh_phone_alerts.dart';
 import '../domain/usecases/reader/load_area_roster.dart';
 import '../domain/usecases/reader/record_meter_reading.dart';
 import '../domain/value_objects/ids.dart';
@@ -72,6 +77,41 @@ final deviceUnlockProvider = Provider<DeviceUnlock>(
 /// Whether fingerprint sign-in is on for this phone, and for whom.
 final fingerprintSettingProvider = Provider<FingerprintSetting>(
   (Ref ref) => const SecureFingerprintSetting(),
+);
+
+/// Android's notification tray. One instance sits behind both providers
+/// below, so the tap handler the household's tabs register is the one used
+/// by the notices they show.
+final _androidPhoneNotifierProvider = Provider<AndroidPhoneNotifier>(
+  (Ref ref) => AndroidPhoneNotifier(),
+);
+
+final phoneNotifierProvider = Provider<PhoneNotifier>(
+  (Ref ref) => ref.watch(_androidPhoneNotifierProvider),
+);
+
+final notificationPermissionProvider = Provider<NotificationPermission>(
+  (Ref ref) => ref.watch(_androidPhoneNotifierProvider),
+);
+
+/// The household's queued notices and unpaid bills, read straight from
+/// Supabase, so the same code runs in the background isolate.
+final alertFeedProvider = Provider<AlertFeed>(
+  (Ref ref) => SupabaseAlertFeed(ref.watch(supabaseClientProvider)),
+);
+
+/// The check Android runs about every fifteen minutes while the app is closed.
+final backgroundAlertsProvider = Provider<BackgroundAlerts>(
+  (Ref ref) => const WorkmanagerBackgroundAlerts(),
+);
+
+/// Shows queued notices and schedules due-date reminders, once, now.
+final refreshPhoneAlertsProvider = Provider<RefreshPhoneAlerts>(
+  (Ref ref) => RefreshPhoneAlerts(
+    feed: ref.watch(alertFeedProvider),
+    phone: ref.watch(phoneNotifierProvider),
+    clock: ref.watch(phClockProvider),
+  ),
 );
 
 /// Mints the idempotency key for a queued operation. Injected rather than

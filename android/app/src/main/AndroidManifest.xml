@@ -13,6 +13,14 @@
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
+    <!--
+      Due-date reminders are scheduled with Android's alarm service, and a
+      restart clears every alarm. This lets flutter_local_notifications put
+      them back after the phone boots. POST_NOTIFICATIONS itself comes from the
+      plugin's own manifest.
+    -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+
     <application
         android:label="billalert"
         android:name="${applicationName}"
@@ -39,6 +47,18 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Show scheduled due-date reminders, and reschedule them after a
+             restart or an app update. Without these, zonedSchedule succeeds
+             and the reminder never appears. -->
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

@@ -6,6 +6,7 @@ import '../../domain/value_objects/ph_date.dart';
 import '../common/failure_banner.dart';
 import 'consumer_app_bar.dart';
 import 'inbox_controller.dart';
+import 'phone_notifications_banner.dart';
 
 /// CON-05 — Consumer › Inbox.
 ///
@@ -50,6 +51,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: <Widget>[
+              const PhoneNotificationsBanner(),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(

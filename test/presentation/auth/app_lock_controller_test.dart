@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/fakes.dart';
 import '../../support/fingerprint_fakes.dart';
+import '../../support/phone_alert_fakes.dart';
 
 /// When a signed-in session is held behind the phone's screen lock, and what
 /// lets somebody through.
@@ -49,6 +50,10 @@ void main() {
         deviceUnlockProvider.overrideWithValue(phone),
         fingerprintSettingProvider.overrideWithValue(setting),
         syncServiceProvider.overrideWithValue(FakeSyncService()),
+        // Signing out now clears the notification tray and stops the
+        // background check; neither has a phone behind it in a test.
+        backgroundAlertsProvider.overrideWithValue(FakeBackgroundAlerts()),
+        phoneNotifierProvider.overrideWithValue(FakePhoneNotifier()),
         if (auth != null) authRepositoryProvider.overrideWithValue(auth),
       ],
     );

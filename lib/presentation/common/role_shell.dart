@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../domain/entities/app_user.dart';
 import '../auth/auth_controller.dart';
 import '../auth/fingerprint_offer.dart';
+import '../consumer/phone_alerts_gate.dart';
 import '../theme.dart';
 
 /// The bottom navigation every signed-in role sits inside.
@@ -41,7 +42,11 @@ class RoleShell extends ConsumerWidget {
       // only the bar along the bottom and the surface behind it.
       // Every role lands here after signing in, which makes it the place to
       // ask — once — about fingerprint sign-in for next time.
-      body: FingerprintOfferGate(child: child),
+      // Phone notifications are a household's: staff are never sent any, so
+      // only a household's tabs start the background check.
+      body: FingerprintOfferGate(
+        child: user is ConsumerUser ? PhoneAlertsGate(child: child) : child,
+      ),
       // Built directly rather than with NavigationBar. Material 3 draws its
       // selection indicator behind the ICON only and gives no way to extend
       // it around the label, so the selected tab read as a highlighted glyph

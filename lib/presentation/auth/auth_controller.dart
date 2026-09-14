@@ -105,6 +105,11 @@ class AuthController extends AsyncNotifier<AppUser?> {
   Future<AppFailure?> signOut() async {
     final result = await ref.read(signOutProvider)();
     await ref.read(syncServiceProvider).stop();
+    // GEN-06 reaches the notification tray too. The next person to sign in on
+    // this phone must not be reminded about the last household's bills, nor
+    // see its notices.
+    await ref.read(backgroundAlertsProvider).stop();
+    await ref.read(phoneNotifierProvider).cancelAll();
     ref.read(appLockControllerProvider.notifier).reset();
     state = const AsyncData<AppUser?>(null);
 

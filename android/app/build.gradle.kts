@@ -24,6 +24,10 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
+        // flutter_local_notifications uses java.time for scheduled reminders,
+        // which Android before 8.0 lacks. Desugaring backports it; the plugin
+        // requires this even for apps that never schedule anything.
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -65,4 +69,13 @@ dependencies {
     // not on the classpath, those themes would not exist and the APK would
     // not build.
     implementation("androidx.appcompat:appcompat:1.7.1")
+
+    // Pairs with isCoreLibraryDesugaringEnabled above; the version is the one
+    // flutter_local_notifications 22 documents.
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+
+    // The plugin's README reports Flutter apps with desugaring crashing on
+    // Android 12L and later, and gives these as the fix.
+    implementation("androidx.window:window:1.0.0")
+    implementation("androidx.window:window-java:1.0.0")
 }
