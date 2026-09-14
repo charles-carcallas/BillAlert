@@ -57,8 +57,23 @@ void main() {
 
       expect(phone.shown, hasLength(1));
       expect(phone.shown.single.title, 'Your bill is ready');
-      expect(phone.shown.single.payload, PhoneNoticePayload.inbox);
+      // No bill on this notice, so tapping it opens the Inbox at it.
+      expect(phone.shown.single.payload, 'notice:n-1');
       expect(feed.markedShown.single.value, 'n-1');
+    });
+
+    test('a notice about a bill opens that bill when tapped', () async {
+      feed.pending = const <PendingPhoneAlert>[
+        PendingPhoneAlert(
+          id: NotificationId('n-1'),
+          type: 'bill_ready',
+          bill: BillId('b-7'),
+        ),
+      ];
+
+      await refresh()();
+
+      expect(phone.shown.single.payload, 'bill:b-7');
     });
 
     test(
@@ -105,7 +120,7 @@ void main() {
       expect(reminder.atUtc, DateTime.utc(2026, 9, 25));
       expect(reminder.notice.title, 'Bill due in 3 days');
       expect(reminder.notice.body, contains('28 September'));
-      expect(reminder.notice.payload, PhoneNoticePayload.bill);
+      expect(reminder.notice.payload, 'bill:b-1');
     });
 
     test("use the server's setting, not a number fixed in the app", () async {

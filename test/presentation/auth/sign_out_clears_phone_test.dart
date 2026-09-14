@@ -24,7 +24,7 @@ void main() {
         id: 1,
         title: 'Bill due in 3 days',
         body: 'Your August 2026 bill is due on 28 September.',
-        payload: PhoneNoticePayload.bill,
+        payload: 'bill:b-1',
       ),
       DateTime.utc(2026, 9, 25),
     );

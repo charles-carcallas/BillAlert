@@ -202,8 +202,14 @@ final class FakeConsumerRepository implements ConsumerRepository {
   /// standing in for a consumer rather than staff.
   Consumer? me;
 
+  /// Returned by [signedInConsumer] instead of [me] when set.
+  AppFailure? signedInFailure;
+
   @override
-  Future<Result<Consumer?>> signedInConsumer() async => Ok<Consumer?>(me);
+  Future<Result<Consumer?>> signedInConsumer() async {
+    final AppFailure? failure = signedInFailure;
+    return failure == null ? Ok<Consumer?>(me) : Err<Consumer?>(failure);
+  }
 
   @override
   Future<Result<String>> updateOwnContactNumber(String contactNumber) async {
@@ -436,8 +442,17 @@ final class FakeBillRepository implements BillRepository {
     int limit = 12,
   }) async => const Ok<List<Bill>>(<Bill>[]);
 
+  /// What [byId] finds, by bill id. Missing means "no such bill", which is
+  /// also how row-level security makes another household's bill look.
+  final Map<String, Bill> billsById = <String, Bill>{};
+  AppFailure? byIdFailure;
+
   @override
-  Future<Result<Bill?>> byId(BillId id) async => const Ok<Bill?>(null);
+  Future<Result<Bill?>> byId(BillId id) async {
+    final AppFailure? failure = byIdFailure;
+    if (failure != null) return Err<Bill?>(failure);
+    return Ok<Bill?>(billsById[id.value]);
+  }
 
   @override
   Future<Result<List<Bill>>> payableFor(ConsumerId consumerId) async =>

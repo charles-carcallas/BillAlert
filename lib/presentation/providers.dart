@@ -37,6 +37,7 @@ import '../domain/usecases/auth/change_password.dart';
 import '../domain/usecases/auth/sign_in.dart';
 import '../domain/usecases/auth/sign_out.dart';
 import '../domain/usecases/cashier/record_cash_payment.dart';
+import '../domain/usecases/consumer/open_tapped_notice.dart';
 import '../domain/usecases/consumer/refresh_phone_alerts.dart';
 import '../domain/usecases/reader/load_area_roster.dart';
 import '../domain/usecases/reader/record_meter_reading.dart';
@@ -111,6 +112,15 @@ final refreshPhoneAlertsProvider = Provider<RefreshPhoneAlerts>(
     feed: ref.watch(alertFeedProvider),
     phone: ref.watch(phoneNotifierProvider),
     clock: ref.watch(phClockProvider),
+  ),
+);
+
+/// Decides where a tapped notification lands, after checking it belongs to
+/// the household signed in now.
+final openTappedNoticeProvider = Provider<OpenTappedNotice>(
+  (Ref ref) => OpenTappedNotice(
+    consumers: ref.watch(consumerRepositoryProvider),
+    bills: ref.watch(billRepositoryProvider),
   ),
 );
 

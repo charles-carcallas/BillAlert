@@ -14,7 +14,11 @@ final class PendingPhoneAlert {
   /// bill_ready, pre_due_reminder, overdue or disconnection.
   final String type;
 
-  const PendingPhoneAlert({required this.id, required this.type});
+  /// The bill the notice is about. Null for a notice with no bill, such as a
+  /// disconnection notice.
+  final BillId? bill;
+
+  const PendingPhoneAlert({required this.id, required this.type, this.bill});
 }
 
 /// What the phone needs from the server to keep its household told.
@@ -40,13 +44,62 @@ abstract class AlertFeed {
   Future<Result<int?>> reminderDaysBeforeDue();
 }
 
-/// Where tapping a notification takes the household.
-abstract final class PhoneNoticePayload {
-  /// A notice the server queued: open the Inbox, where it is listed.
-  static const String inbox = 'inbox';
+/// What tapping a notification should open, carried in its payload.
+///
+/// Phase 1: "open the app at the related bill or notice when a push
+/// notification is selected". The payload names the bill or notice; whether
+/// it may be shown is decided later, by OpenTappedNotice, against whoever is
+/// signed in when it is tapped.
+sealed class NoticeTarget {
+  const NoticeTarget();
 
-  /// A due-date reminder: open the Bill tab, where the bill is.
-  static const String bill = 'bill';
+  String encode();
+
+  /// Reads a payload back. Anything it does not recognise — including a
+  /// payload from an older build, or none at all — opens the plain Inbox:
+  /// a tap must never go somewhere it cannot explain.
+  static NoticeTarget decode(String? payload) {
+    if (payload != null) {
+      if (payload.startsWith(BillNoticeTarget._prefix)) {
+        final String id = payload.substring(BillNoticeTarget._prefix.length);
+        if (id.isNotEmpty) return BillNoticeTarget(BillId(id));
+      }
+      if (payload.startsWith(InboxNoticeTarget._prefix)) {
+        final String id = payload.substring(InboxNoticeTarget._prefix.length);
+        if (id.isNotEmpty) {
+          return InboxNoticeTarget(notice: NotificationId(id));
+        }
+      }
+    }
+    return const InboxNoticeTarget();
+  }
+}
+
+/// Open one bill: the reminder's bill, or the bill a notice is about.
+final class BillNoticeTarget extends NoticeTarget {
+  static const String _prefix = 'bill:';
+
+  final BillId bill;
+
+  const BillNoticeTarget(this.bill);
+
+  @override
+  String encode() => '$_prefix${bill.value}';
+}
+
+/// Open the Inbox, at [notice] when there is one.
+final class InboxNoticeTarget extends NoticeTarget {
+  static const String _prefix = 'notice:';
+
+  final NotificationId? notice;
+
+  const InboxNoticeTarget({this.notice});
+
+  @override
+  String encode() {
+    final NotificationId? id = notice;
+    return id == null ? 'inbox' : '$_prefix${id.value}';
+  }
 }
 
 /// One notification for the phone's tray, now or at a scheduled time.

@@ -3,16 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../domain/notifications/phone_alerts.dart';
+import '../../domain/usecases/consumer/open_tapped_notice.dart';
 import '../providers.dart';
-import '../router.dart';
+import 'bill_details_sheet.dart';
+import 'inbox_focus.dart';
 
 /// Keeps a household's phone told about its bills, while the app is open and
-/// after it is closed.
+/// after it is closed, and opens the right bill or notice when one is tapped.
 ///
 /// It wraps the household's tabs, so it only exists after signing in and
-/// after the fingerprint lock. A tapped notification can therefore only ever
-/// open the signed-in household's own tabs, whose rows row-level security
-/// already limits to that household.
+/// after the fingerprint lock. A tap is then checked against whoever is signed
+/// in at that moment — see OpenTappedNotice — before anything is shown.
 class PhoneAlertsGate extends ConsumerStatefulWidget {
   final Widget child;
 
@@ -50,7 +51,7 @@ class _PhoneAlertsGateState extends ConsumerState<PhoneAlertsGate> {
       if (!_launchHandled) {
         _launchHandled = true;
         final String? payload = await phone.launchPayload();
-        if (payload != null) _open(payload);
+        if (payload != null) await _open(payload);
       }
 
       if (!mounted) return;
@@ -73,13 +74,36 @@ class _PhoneAlertsGateState extends ConsumerState<PhoneAlertsGate> {
     }
   }
 
-  void _open(String? payload) {
-    if (!mounted) return;
-    switch (payload) {
-      case PhoneNoticePayload.inbox:
-        context.go('/consumer/inbox');
-      case PhoneNoticePayload.bill:
-        context.go(Routes.consumer);
+  /// A tapped notification: open its bill, or the Inbox at its notice.
+  Future<void> _open(String? payload) async {
+    try {
+      if (!mounted) return;
+      final TappedNoticeDestination destination = await ref.read(
+        openTappedNoticeProvider,
+      )(payload);
+      if (!mounted) return;
+
+      switch (destination) {
+        case ShowBill(:final bill):
+          // The bill sheet's home is History, so it opens over that tab and
+          // closing it leaves the household somewhere that makes sense.
+          context.go('/consumer/history');
+          await WidgetsBinding.instance.endOfFrame;
+          if (!mounted) return;
+          await showConsumerBillDetails(
+            context,
+            bill: bill,
+            today: ref.read(phClockProvider).today(),
+          );
+        case ShowInbox(:final highlight, :final explanation):
+          ref
+              .read(inboxFocusProvider.notifier)
+              .focus(highlight: highlight, explanation: explanation);
+          context.go('/consumer/inbox');
+      }
+    } catch (_) {
+      // A tap that cannot be followed leaves the household where they are,
+      // which is still inside their own account.
     }
   }
 }

@@ -48,7 +48,7 @@ class SupabaseAlertFeed implements AlertFeed {
     try {
       final rows = await _client
           .from('notifications')
-          .select('id, notif_type')
+          .select('id, notif_type, bill_id')
           .eq('consumer_id', household.value)
           .eq('channel', 'push')
           .eq('status', 'pending')
@@ -62,6 +62,9 @@ class SupabaseAlertFeed implements AlertFeed {
           PendingPhoneAlert(
             id: NotificationId(row['id'] as String),
             type: row['notif_type'] as String? ?? '',
+            bill: row['bill_id'] is String
+                ? BillId(row['bill_id'] as String)
+                : null,
           ),
       ]);
     } catch (error, stackTrace) {

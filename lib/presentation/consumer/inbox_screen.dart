@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/repositories/notification_repository.dart';
+import '../../domain/value_objects/ids.dart';
 import '../../domain/value_objects/ph_date.dart';
 import '../common/failure_banner.dart';
 import 'consumer_app_bar.dart';
 import 'inbox_controller.dart';
+import 'inbox_focus.dart';
 import 'phone_notifications_banner.dart';
 
 /// CON-05 — Consumer › Inbox.
@@ -30,12 +32,52 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
   _InboxFilter _filter = _InboxFilter.all;
   bool _markingAll = false;
 
+  /// Read while mounted, because Riverpod does not allow `ref` in dispose.
+  late final InboxFocusController _focus = ref.read(
+    inboxFocusProvider.notifier,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _focus;
+  }
+
+  @override
+  void dispose() {
+    // Leaving the Inbox ends the pointing. Deferred, because a provider may
+    // not change while the widget tree is being torn down.
+    final InboxFocusController focus = _focus;
+    Future<void>.microtask(focus.clear);
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(inboxControllerProvider);
     final controller = ref.read(inboxControllerProvider.notifier);
     final TextTheme text = Theme.of(context).textTheme;
+
+    // Opened from a tapped phone notification: point at that notice, and say
+    // plainly when it is not one of this household's. The list below comes
+    // from this household's rows only, so absence from it is the check.
+    final InboxFocus focus = ref.watch(inboxFocusProvider);
+    final NotificationId? highlight = focus.highlight;
+    final bool highlightMissing =
+        highlight != null &&
+        !state.isLoading &&
+        state.failure == null &&
+        !state.alerts.any(
+          (AppNotification alert) => alert.id.value == highlight.value,
+        );
+    final String? focusMessage =
+        focus.explanation ??
+        (highlightMissing ? "That notification isn't on this account." : null);
+
     final List<AppNotification> visibleAlerts = state.alerts.where((alert) {
+      // The notice a tapped notification points at stays in view whatever
+      // the filter says.
+      if (highlight != null && alert.id.value == highlight.value) return true;
       return switch (_filter) {
         _InboxFilter.all => true,
         _InboxFilter.unread => !alert.isRead,
@@ -52,6 +94,14 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: <Widget>[
               const PhoneNotificationsBanner(),
+              if (focusMessage != null) ...<Widget>[
+                _FocusMessage(
+                  message: focusMessage,
+                  onDismiss: () =>
+                      ref.read(inboxFocusProvider.notifier).clear(),
+                ),
+                const SizedBox(height: 14),
+              ],
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
@@ -169,6 +219,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                   _AlertTile(
                     alert: alert,
                     onTap: () => controller.markRead(alert),
+                    highlighted:
+                        highlight != null && alert.id.value == highlight.value,
                   ),
             ],
           ),
@@ -179,6 +231,40 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
 
   static bool _isUrgent(AppNotification alert) =>
       alert.type == 'overdue' || alert.type == 'disconnection';
+}
+
+/// Why a tapped notification landed here, or that its notice is not here.
+class _FocusMessage extends StatelessWidget {
+  final String message;
+  final VoidCallback onDismiss;
+
+  const _FocusMessage({required this.message, required this.onDismiss});
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme colours = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 10, 4, 10),
+      decoration: BoxDecoration(
+        color: colours.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: <Widget>[
+          Icon(Icons.info_outline, size: 20, color: colours.onSurfaceVariant),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(message, style: Theme.of(context).textTheme.bodyMedium),
+          ),
+          IconButton(
+            tooltip: 'Dismiss',
+            onPressed: onDismiss,
+            icon: const Icon(Icons.close, size: 18),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _FilterChoice extends StatelessWidget {
@@ -208,7 +294,14 @@ class _AlertTile extends StatelessWidget {
   final AppNotification alert;
   final VoidCallback onTap;
 
-  const _AlertTile({required this.alert, required this.onTap});
+  /// The notice a tapped phone notification opened the Inbox at.
+  final bool highlighted;
+
+  const _AlertTile({
+    required this.alert,
+    required this.onTap,
+    this.highlighted = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -237,11 +330,15 @@ class _AlertTile extends StatelessWidget {
         : colours.primary;
 
     return Container(
+      key: highlighted ? const ValueKey<String>('inbox-highlighted') : null,
       margin: const EdgeInsets.only(bottom: 10),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: background,
-        border: Border.all(color: border),
+        border: Border.all(
+          color: highlighted ? colours.primary : border,
+          width: highlighted ? 2 : 1,
+        ),
         borderRadius: BorderRadius.circular(14),
       ),
       child: InkWell(

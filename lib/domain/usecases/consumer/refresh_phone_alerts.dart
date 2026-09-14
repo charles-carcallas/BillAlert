@@ -98,12 +98,19 @@ final class RefreshPhoneAlerts {
 
     for (final PendingPhoneAlert alert in alerts) {
       final (String title, String body) = _wordingFor(alert.type);
+      final BillId? bill = alert.bill;
       await phone.show(
         PhoneNotice(
           id: stableNoticeId('alert:${alert.id.value}'),
           title: title,
           body: body,
-          payload: PhoneNoticePayload.inbox,
+          // A notice about a bill opens that bill. A notice with no bill — a
+          // disconnection notice — opens the Inbox at that notice.
+          payload:
+              (bill == null
+                      ? InboxNoticeTarget(notice: alert.id)
+                      : BillNoticeTarget(bill))
+                  .encode(),
         ),
       );
       // Shown first, marked second. If marking fails, the next run shows it
@@ -149,7 +156,7 @@ final class RefreshPhoneAlerts {
               'Your ${bill.cycle.displayName} bill is due on '
               '${_dayAndMonth(due)}. If you have already paid, you can ignore '
               'this.',
-          payload: PhoneNoticePayload.bill,
+          payload: BillNoticeTarget(bill.id).encode(),
         ),
         atUtc: at,
       );
