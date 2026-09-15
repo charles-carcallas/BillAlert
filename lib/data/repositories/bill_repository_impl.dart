@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/errors/app_failure.dart';
 import '../../core/result/result.dart';
 import '../../domain/entities/bill.dart';
 import '../../domain/repositories/bill_repository.dart';
@@ -8,6 +9,7 @@ import '../../domain/value_objects/cycle_label.dart';
 import '../../domain/value_objects/ids.dart';
 import '../../domain/value_objects/kwh.dart';
 import '../../domain/value_objects/money.dart';
+import '../../domain/value_objects/ph_date.dart';
 import '../local/app_database.dart';
 import '../supabase/failure_mapper.dart';
 
@@ -67,6 +69,9 @@ class BillRepositoryImpl implements BillRepository {
 
   static const String _cachedBillColumns = '$_billColumns, generated_at';
 
+  static String _consumerCacheKey(ConsumerId id) =>
+      'consumer_bills:${id.value}';
+
   /// FR-21b. The Admin queue: readings with no amount yet, oldest first.
   ///
   /// The view carries no `total_amount`, `due_date` or `amount_paid` column
@@ -76,7 +81,9 @@ class BillRepositoryImpl implements BillRepository {
   /// bill they are pricing and what it consumed, and the view already
   /// returns both alongside the bill columns.
   @override
-  Future<Result<List<AwaitingAmountEntry>>> awaitingAmount(AreaId areaId) async {
+  Future<Result<List<AwaitingAmountEntry>>> awaitingAmount(
+    AreaId areaId,
+  ) async {
     try {
       final rows = await _client
           .from('v_readings_awaiting_amount')
@@ -111,9 +118,25 @@ class BillRepositoryImpl implements BillRepository {
           .eq('consumer_id', consumerId.value)
           .maybeSingle();
 
+      if (row != null) await _upsertCachedBill(row);
+      await _markConsumerBillsRefreshed(consumerId);
       return Ok<Bill?>(row == null ? null : Bill.fromJson(row));
     } catch (error, stackTrace) {
-      return Err<Bill?>(FailureMapper.from(error, stackTrace));
+      final failure = FailureMapper.from(error, stackTrace);
+      if (failure is NetworkFailure) {
+        final cached = await _cachedBillsFor(consumerId);
+        switch (cached) {
+          case Err(:final failure):
+            return Err<Bill?>(failure);
+          case Ok(:final value):
+            if (value.isNotEmpty || await _hasConsumerBillsCache(consumerId)) {
+              final open = value.where((Bill bill) => !bill.isSettled).toList()
+                ..sort(_currentBillOrder);
+              return Ok<Bill?>(open.isEmpty ? null : open.first);
+            }
+        }
+      }
+      return Err<Bill?>(failure);
     }
   }
 
@@ -135,9 +158,25 @@ class BillRepositoryImpl implements BillRepository {
           .order('period_start', ascending: false)
           .limit(limit);
 
+      await _replaceCachedBills(consumerId, rows);
+      await _markConsumerBillsRefreshed(consumerId);
       return Ok<List<Bill>>(rows.map(Bill.fromJson).toList());
     } catch (error, stackTrace) {
-      return Err<List<Bill>>(FailureMapper.from(error, stackTrace));
+      final failure = FailureMapper.from(error, stackTrace);
+      if (failure is NetworkFailure) {
+        final cached = await _cachedBillsFor(consumerId);
+        switch (cached) {
+          case Err(:final failure):
+            return Err<List<Bill>>(failure);
+          case Ok(:final value):
+            if (value.isNotEmpty || await _hasConsumerBillsCache(consumerId)) {
+              final history = List<Bill>.of(value)
+                ..sort((Bill a, Bill b) => b.cycle.compareTo(a.cycle));
+              return Ok<List<Bill>>(history.take(limit).toList());
+            }
+        }
+      }
+      return Err<List<Bill>>(failure);
     }
   }
 
@@ -153,8 +192,45 @@ class BillRepositoryImpl implements BillRepository {
 
       return Ok<Bill?>(row == null ? null : Bill.fromJson(row));
     } catch (error, stackTrace) {
-      return Err<Bill?>(FailureMapper.from(error, stackTrace));
+      final failure = FailureMapper.from(error, stackTrace);
+      if (failure is NetworkFailure) {
+        // The bill an Inbox alert or a tapped notification points at is
+        // usually one the Bill or History tab has already cached. The cache
+        // holds only the signed-in account's rows: it is emptied when someone
+        // else signs in on this phone.
+        try {
+          final CachedBillRow? cached = await (_db.select(
+            _db.cachedBills,
+          )..where((table) => table.id.equals(id.value))).getSingleOrNull();
+          if (cached != null) return Ok<Bill?>(_billFromCacheRow(cached));
+        } catch (_) {
+          // An unreadable cached row is no better than none. The connection
+          // problem below is the thing the household can act on.
+        }
+      }
+      // Not "no such bill": without signal, a bill missing from the cache may
+      // still exist.
+      return Err<Bill?>(failure);
     }
+  }
+
+  static Bill _billFromCacheRow(CachedBillRow row) {
+    final cycle = CycleLabel.tryParse(row.cycleLabel);
+    if (cycle == null) {
+      throw const FormatException('Cached bill has an invalid cycle.');
+    }
+    return Bill(
+      id: BillId(row.id),
+      billNo: BillNumber(row.billNo),
+      consumerId: ConsumerId(row.consumerId),
+      cycle: cycle,
+      consumption: Kwh.fromHundredths(row.consumptionHundredths),
+      totalAmount: row.totalAmountCentavos == null
+          ? null
+          : Money.fromCentavos(row.totalAmountCentavos!),
+      dueDate: row.dueDate == null ? null : PhDate.tryParse(row.dueDate!),
+      amountPaid: Money.fromCentavos(row.amountPaidCentavos),
+    );
   }
 
   /// What a cashier may collect against.
@@ -243,7 +319,9 @@ class BillRepositoryImpl implements BillRepository {
           final Kwh consumption =
               Kwh.tryParse(row['consumption'].toString()) ?? Kwh.zero;
 
-          await _db.into(_db.cachedBills).insertOnConflictUpdate(
+          await _db
+              .into(_db.cachedBills)
+              .insertOnConflictUpdate(
                 CachedBillsCompanion.insert(
                   id: row['bill_id'] as String,
                   billNo: row['bill_no'] as String,
@@ -265,5 +343,100 @@ class BillRepositoryImpl implements BillRepository {
     } catch (error, stackTrace) {
       return Err<void>(FailureMapper.from(error, stackTrace));
     }
+  }
+
+  Future<void> _replaceCachedBills(
+    ConsumerId consumerId,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    await _db.transaction(() async {
+      await (_db.delete(
+        _db.cachedBills,
+      )..where((table) => table.consumerId.equals(consumerId.value))).go();
+      for (final row in rows) {
+        await _db
+            .into(_db.cachedBills)
+            .insertOnConflictUpdate(_cachedBillCompanion(row));
+      }
+    });
+  }
+
+  Future<void> _upsertCachedBill(Map<String, dynamic> row) => _db
+      .into(_db.cachedBills)
+      .insertOnConflictUpdate(_cachedBillCompanion(row));
+
+  static CachedBillsCompanion _cachedBillCompanion(Map<String, dynamic> row) {
+    final cycle = CycleLabel.fromRow(row);
+    if (cycle == null) {
+      throw const FormatException('Cannot cache a bill without its cycle.');
+    }
+    final total = row['total_amount'] == null
+        ? null
+        : Money.tryParse(row['total_amount'].toString());
+    final paid = row['amount_paid'] == null
+        ? Money.zero
+        : Money.tryParse(row['amount_paid'].toString()) ?? Money.zero;
+    final consumption = Kwh.tryParse(row['consumption'].toString()) ?? Kwh.zero;
+
+    return CachedBillsCompanion.insert(
+      id: row['bill_id'] as String,
+      billNo: row['bill_no'] as String,
+      consumerId: row['consumer_id'] as String,
+      cycleLabel: cycle.value,
+      consumptionHundredths: consumption.hundredths,
+      amountPaidCentavos: Value<int>(paid.centavos),
+      totalAmountCentavos: Value<int?>(total?.centavos),
+      dueDate: Value<String?>(row['due_date'] as String?),
+      generatedAt: Value<String?>(row['generated_at'] as String?),
+    );
+  }
+
+  Future<Result<List<Bill>>> _cachedBillsFor(ConsumerId consumerId) async {
+    try {
+      final query = _db.select(_db.cachedBills)
+        ..where((table) => table.consumerId.equals(consumerId.value));
+      final rows = await query.get();
+      return Ok<List<Bill>>(rows.map(_billFromCacheRow).toList());
+    } catch (error) {
+      return Err<List<Bill>>(
+        ServerFailure(
+          'Could not read the bills saved on this phone.',
+          error.toString(),
+        ),
+      );
+    }
+  }
+
+  Future<void> _markConsumerBillsRefreshed(ConsumerId consumerId) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+    await _db
+        .into(_db.syncMeta)
+        .insertOnConflictUpdate(
+          SyncMetaCompanion.insert(
+            tableName_: _consumerCacheKey(consumerId),
+            lastRefreshedAt: Value<String?>(now),
+            lastAttemptAt: Value<String?>(now),
+            lastError: const Value<String?>(null),
+          ),
+        );
+  }
+
+  Future<bool> _hasConsumerBillsCache(ConsumerId consumerId) async {
+    final query = _db.select(
+      _db.syncMeta,
+    )..where((table) => table.tableName_.equals(_consumerCacheKey(consumerId)));
+    return await query.getSingleOrNull() != null;
+  }
+
+  static int _currentBillOrder(Bill a, Bill b) {
+    final aDue = a.dueDate;
+    final bDue = b.dueDate;
+    if (aDue == null && bDue != null) return 1;
+    if (aDue != null && bDue == null) return -1;
+    if (aDue != null && bDue != null) {
+      final byDue = aDue.compareTo(bDue);
+      if (byDue != 0) return byDue;
+    }
+    return a.cycle.compareTo(b.cycle);
   }
 }

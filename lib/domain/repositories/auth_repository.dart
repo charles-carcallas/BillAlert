@@ -1,5 +1,6 @@
 import '../../core/result/result.dart';
 import '../entities/app_user.dart';
+import '../entities/household_login.dart';
 import '../entities/managed_account.dart';
 import '../entities/staff_account.dart';
 import '../value_objects/ids.dart';
@@ -55,6 +56,21 @@ abstract class AuthRepository {
   /// server decides whether this Area President may reset this account.
   Future<Result<void>> resetAccountPassword({
     required ManagedAccount account,
+    required String temporaryPassword,
+  });
+
+  /// MTR-04: the active households in [areaId] that cannot sign in yet.
+  Future<Result<List<HouseholdWithoutLogin>>> householdsWithoutLogin(
+    AreaId areaId,
+  );
+
+  /// MTR-04: gives [household] a sign-in with [username] and a temporary
+  /// password it must replace at first sign-in. Server-owned, like
+  /// [createStaffAccount]: the server checks the household is in this Area
+  /// President's area and has no sign-in, and takes the name from its record.
+  Future<Result<CreatedHouseholdLogin>> createHouseholdLogin({
+    required HouseholdWithoutLogin household,
+    required String username,
     required String temporaryPassword,
   });
 }

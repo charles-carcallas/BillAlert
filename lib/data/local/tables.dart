@@ -19,7 +19,10 @@ import 'package:drift/drift.dart';
 /// number of centavos and kWh an INTEGER number of hundredths, matching the
 /// Money and Kwh value objects and the server's `numeric(12,2)`. Never `real` —
 /// that is a double, and binary floating point cannot hold 0.10 exactly.
-@TableIndex(name: 'idx_cached_consumers_name', columns: <Symbol>{#lastName, #firstName})
+@TableIndex(
+  name: 'idx_cached_consumers_name',
+  columns: <Symbol>{#lastName, #firstName},
+)
 @TableIndex(name: 'idx_cached_consumers_area', columns: <Symbol>{#areaId})
 @DataClassName('CachedConsumerRow')
 class CachedConsumers extends Table {
@@ -37,8 +40,9 @@ class CachedConsumers extends Table {
   TextColumn get accountStatus => text().named('account_status')();
 
   /// MTR-08, in hundredths of a kWh. See the note above.
-  IntColumn get previousReadingHundredths =>
-      integer().named('previous_reading_hundredths').withDefault(const Constant(0))();
+  IntColumn get previousReadingHundredths => integer()
+      .named('previous_reading_hundredths')
+      .withDefault(const Constant(0))();
 
   TextColumn get previousReadingDate =>
       text().named('previous_reading_date').nullable()();
@@ -91,9 +95,24 @@ class CachedPayments extends Table {
   String get tableName => 'cached_payments';
 
   TextColumn get id => text()();
+
+  /// Nullable only for databases upgraded from the original unused cache
+  /// shape. Every row written by the current app carries the household id.
+  TextColumn get consumerId => text().named('consumer_id').nullable()();
   TextColumn get billId => text().named('bill_id').nullable()();
+  TextColumn get billNo => text().named('bill_no').nullable()();
+  TextColumn get cycleLabel => text().named('cycle_label').nullable()();
   TextColumn get receiptNo => text().named('receipt_no')();
+  TextColumn get consumerName => text().named('consumer_name').nullable()();
+  TextColumn get verificationCode =>
+      text().named('verification_code').nullable()();
   IntColumn get amountPaidCentavos => integer().named('amount_paid_centavos')();
+  IntColumn get transactionTotalCentavos =>
+      integer().named('transaction_total_centavos').nullable()();
+  IntColumn get cashTenderedCentavos =>
+      integer().named('cash_tendered_centavos').nullable()();
+  IntColumn get changeDueCentavos =>
+      integer().named('change_due_centavos').nullable()();
   TextColumn get paidAt => text().named('paid_at')();
 
   @override
@@ -111,6 +130,10 @@ class CachedNotifications extends Table {
   String get tableName => 'cached_notifications';
 
   TextColumn get id => text()();
+
+  /// Cache ownership is also enforced by cache_owner; this id makes each
+  /// repository query say explicitly which household it is serving.
+  TextColumn get consumerId => text().named('consumer_id').nullable()();
   TextColumn get notifType => text().named('notif_type')();
   TextColumn get channel => text()();
   TextColumn get message => text()();
@@ -118,6 +141,15 @@ class CachedNotifications extends Table {
   BoolColumn get isRead =>
       boolean().named('is_read').withDefault(const Constant(false))();
   TextColumn get createdAt => text().named('created_at')();
+
+  /// The bill or disconnection notice an alert is about, and how far its
+  /// delivery got, so an alert opened with no signal still shows them.
+  /// Nullable: rows cached before schema v5 did not carry them.
+  TextColumn get billId => text().named('bill_id').nullable()();
+  TextColumn get disconnectionId =>
+      text().named('disconnection_id').nullable()();
+  TextColumn get failedReason => text().named('failed_reason').nullable()();
+  TextColumn get sentAt => text().named('sent_at').nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => <Column<Object>>{id};
@@ -145,10 +177,20 @@ class CacheOwner extends Table {
 
   TextColumn get profileId => text().named('profile_id')();
 
+  /// The remaining profile fields let an already authenticated person open
+  /// their encrypted cache when the phone has no signal. They are nullable
+  /// only for databases created before schema v3; a successful online
+  /// profile load fills all of them together.
+  TextColumn get username => text().nullable()();
+  TextColumn get firstName => text().named('first_name').nullable()();
+  TextColumn get lastName => text().named('last_name').nullable()();
+  BoolColumn get mustChangePassword =>
+      boolean().named('must_change_password').nullable()();
+
   TextColumn get role => text().check(
-        // ignore: recursive_getters
-        role.isIn(<String>['admin', 'meter_reader', 'cashier', 'consumer']),
-      )();
+    // ignore: recursive_getters
+    role.isIn(<String>['admin', 'meter_reader', 'cashier', 'consumer']),
+  )();
 
   TextColumn get areaId => text().named('area_id').nullable()();
   TextColumn get cachedAt => text().named('cached_at')();
@@ -201,17 +243,17 @@ class OutboxRows extends Table {
   /// the schema allows — whether the app queues each of them yet is a separate
   /// question.
   TextColumn get operation => text().check(
-        // ignore: recursive_getters
-        operation.isIn(<String>[
-          'record_reading',
-          'create_consumer',
-          'update_consumer',
-          'issue_notice',
-          'record_payment',
-          'post_amount',
-          'close_notice',
-        ]),
-      )();
+    // ignore: recursive_getters
+    operation.isIn(<String>[
+      'record_reading',
+      'create_consumer',
+      'update_consumer',
+      'issue_notice',
+      'record_payment',
+      'post_amount',
+      'close_notice',
+    ]),
+  )();
 
   TextColumn get payloadJson => text().named('payload_json')();
 
@@ -220,7 +262,9 @@ class OutboxRows extends Table {
   /// meaning and must never be replaced by the upload time.
   TextColumn get capturedAt => text().named('captured_at')();
 
-  TextColumn get status => text().withDefault(const Constant('pending')).check(
+  TextColumn get status => text()
+      .withDefault(const Constant('pending'))
+      .check(
         // ignore: recursive_getters
         status.isIn(<String>['pending', 'syncing', 'failed', 'synced']),
       )();
@@ -248,11 +292,9 @@ class OutboxReadingKeys extends Table {
   @override
   String get tableName => 'outbox_reading_keys';
 
-  TextColumn get clientUuid => text().named('client_uuid').references(
-        OutboxRows,
-        #clientUuid,
-        onDelete: KeyAction.cascade,
-      )();
+  TextColumn get clientUuid => text()
+      .named('client_uuid')
+      .references(OutboxRows, #clientUuid, onDelete: KeyAction.cascade)();
   TextColumn get consumerId => text().named('consumer_id')();
 
   /// 'YYYY-MM'
@@ -263,6 +305,6 @@ class OutboxReadingKeys extends Table {
 
   @override
   List<String> get customConstraints => <String>[
-        'UNIQUE (consumer_id, cycle_label)',
-      ];
+    'UNIQUE (consumer_id, cycle_label)',
+  ];
 }

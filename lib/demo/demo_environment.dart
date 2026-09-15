@@ -8,6 +8,7 @@ import '../data/sync/sync_service.dart';
 import '../domain/entities/app_user.dart';
 import '../domain/entities/bill.dart';
 import '../domain/entities/consumer.dart';
+import '../domain/entities/household_login.dart';
 import '../domain/entities/managed_account.dart';
 import '../domain/entities/staff_account.dart';
 import '../domain/outbox/outbox_entry.dart';
@@ -315,6 +316,9 @@ final class _DemoStore {
           message: 'Your July 2026 bill is overdue. Amount due: ₱541.20.',
           isRead: false,
           createdAt: DateTime.utc(2026, 8, 29, 0, 5),
+          billId: const BillId('demo-elena-july'),
+          status: 'sent',
+          sentAt: DateTime.utc(2026, 8, 29, 0, 20),
         ),
         AppNotification(
           id: const NotificationId('demo-alert-ready'),
@@ -323,6 +327,9 @@ final class _DemoStore {
           message: 'Your July 2026 bill is ready. Due 28 August 2026.',
           isRead: true,
           createdAt: DateTime.utc(2026, 8, 7, 2, 30),
+          billId: const BillId('demo-elena-july'),
+          status: 'sent',
+          sentAt: DateTime.utc(2026, 8, 7, 2, 45),
         ),
       ],
     );
@@ -426,6 +433,43 @@ final class _DemoAuthRepository implements AuthRepository {
     required ManagedAccount account,
     required String temporaryPassword,
   }) async => const Ok<void>(null);
+
+  /// Two demo households have no sign-in, so the flow has someone to serve.
+  @override
+  Future<Result<List<HouseholdWithoutLogin>>> householdsWithoutLogin(
+    AreaId areaId,
+  ) async => const Ok<List<HouseholdWithoutLogin>>(<HouseholdWithoutLogin>[
+    HouseholdWithoutLogin(
+      id: ConsumerId('demo-teresita'),
+      consumerNo: ConsumerNumber('2017-0228-TUB'),
+      firstName: 'Teresita',
+      lastName: 'Daguplo',
+      purok: 'Purok 4',
+    ),
+    HouseholdWithoutLogin(
+      id: ConsumerId('demo-odelon'),
+      consumerNo: ConsumerNumber('2022-1287-TUB'),
+      firstName: 'Odelon',
+      lastName: 'Paredes',
+    ),
+  ]);
+
+  /// Accepted and changes nothing, like a demo password reset: the demo
+  /// sign-ins are fixed, so a rehearsal never creates one it cannot use.
+  @override
+  Future<Result<CreatedHouseholdLogin>> createHouseholdLogin({
+    required HouseholdWithoutLogin household,
+    required String username,
+    required String temporaryPassword,
+  }) async => Ok<CreatedHouseholdLogin>(
+    CreatedHouseholdLogin(
+      id: const ProfileId('demo-household-login'),
+      username: username,
+      household: household,
+      temporaryPassword: temporaryPassword,
+    ),
+  );
+
   @override
   Future<Result<void>> signOut() async {
     current = null;
@@ -513,6 +557,7 @@ final class _DemoConsumerRepository implements ConsumerRepository {
     required ProfileId createdBy,
     String? contactNumber,
     String? purok,
+    String? meterSerialNo,
   }) async {
     final value = Consumer(
       id: ConsumerId('demo-${store.consumers.length + 1}'),
@@ -524,6 +569,7 @@ final class _DemoConsumerRepository implements ConsumerRepository {
       previousReading: Kwh.zero,
       contactNumber: contactNumber,
       purok: purok,
+      meterSerialNo: meterSerialNo,
     );
     store.consumers.add(value);
     return Ok<Consumer>(value);
@@ -662,14 +708,8 @@ final class _DemoNotificationRepository implements NotificationRepository {
     final index = store.notifications.indexWhere((n) => n.id == id);
     if (index >= 0) {
       final old = store.notifications[index];
-      store.notifications[index] = AppNotification(
-        id: old.id,
-        type: old.type,
-        channel: old.channel,
-        message: old.message,
-        isRead: true,
-        createdAt: old.createdAt,
-      );
+      // Keeps the bill or notice it is about, which a rebuilt copy would drop.
+      store.notifications[index] = old.asRead();
     }
     return const Ok<void>(null);
   }

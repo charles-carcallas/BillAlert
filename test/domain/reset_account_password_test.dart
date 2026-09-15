@@ -17,63 +17,35 @@ void main() {
   );
 
   late FakeAuthRepository auth;
+  late ResetAccountPassword reset;
 
-  setUp(() => auth = FakeAuthRepository());
-
-  String messageOf(Result<void> result) => switch (result) {
-    Err(:final failure) => failure.message,
-    Ok() => fail('expected the reset to be refused'),
-  };
-
-  test(
-    'a temporary password under 8 characters never reaches the server',
-    () async {
-      final result = await ResetAccountPassword(auth: auth)(
-        account: reader,
-        temporaryPassword: 'short',
-        confirmPassword: 'short',
-      );
-
-      expect(messageOf(result), contains('at least 8'));
-      expect(auth.resetCalls, 0);
-    },
-  );
-
-  test('passwords that do not match never reach the server', () async {
-    final result = await ResetAccountPassword(auth: auth)(
-      account: reader,
-      temporaryPassword: 'Temporary-2026',
-      confirmPassword: 'Temporary-2025',
+  setUp(() {
+    auth = FakeAuthRepository();
+    reset = ResetAccountPassword(
+      auth: auth,
+      newTemporaryPassword: () => 'BillAlert0042',
     );
-
-    expect(messageOf(result), contains('do not match'));
-    expect(auth.resetCalls, 0);
   });
 
-  test('a valid temporary password is sent for the chosen account', () async {
-    final result = await ResetAccountPassword(auth: auth)(
-      account: reader,
-      temporaryPassword: 'Temporary-2026',
-      confirmPassword: 'Temporary-2026',
-    );
+  test('a new temporary password is made, sent, and returned once', () async {
+    final result = await reset(account: reader);
 
-    expect(result, isA<Ok<void>>());
     expect(auth.resetCalls, 1);
     expect(auth.resetAccount?.id.value, 'reader-1');
-    expect(auth.resetTemporaryPassword, 'Temporary-2026');
+    expect(auth.resetTemporaryPassword, 'BillAlert0042');
+    expect((result as Ok<String>).value, 'BillAlert0042');
   });
 
-  test("the server's refusal reaches the caller unchanged", () async {
+  test("the server's refusal reaches the caller, with no password", () async {
     auth.nextResetFailure = const PermissionFailure(
       'That account is not in your service area.',
     );
 
-    final result = await ResetAccountPassword(auth: auth)(
-      account: reader,
-      temporaryPassword: 'Temporary-2026',
-      confirmPassword: 'Temporary-2026',
-    );
+    final result = await reset(account: reader);
 
-    expect(messageOf(result), 'That account is not in your service area.');
+    expect(
+      (result as Err<String>).failure.message,
+      'That account is not in your service area.',
+    );
   });
 }

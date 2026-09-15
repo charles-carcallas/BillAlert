@@ -48,7 +48,7 @@ class CurrentBillScreen extends ConsumerWidget {
               else if (state.currentBill == null &&
                   !state.isLoading &&
                   state.failure == null)
-                const _NoCurrentBill()
+                _NoCurrentBill(history: state.history)
               else if (state.currentBill case final Bill bill) ...<Widget>[
                 _CurrentAmountPanel(bill: bill, today: today),
                 if (bill.isOverdueOn(today)) ...<Widget>[
@@ -353,31 +353,128 @@ class _PastDueNotice extends StatelessWidget {
 }
 
 class _NoCurrentBill extends StatelessWidget {
-  const _NoCurrentBill();
+  final List<Bill> history;
+
+  const _NoCurrentBill({required this.history});
 
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
     final colours = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 56),
-      child: Column(
-        children: <Widget>[
-          Icon(
-            Icons.description_outlined,
-            size: 42,
-            color: colours.onSurfaceVariant,
+    final List<Bill> settled =
+        history.where((Bill bill) => bill.isSettled).toList()
+          ..sort((Bill a, Bill b) => b.cycle.compareTo(a.cycle));
+    final Bill? latestPaid = settled.isEmpty ? null : settled.first;
+    final bool hasBillingHistory = history.isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        // Keep the primary card in the same place on every visit. With no
+        // payable bill its value area is deliberately blank: ₱0.00 would
+        // look like a real bill amount, which the server never issued.
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: colours.surfaceContainerLowest,
+            border: Border.all(color: colours.outlineVariant),
+            borderRadius: BorderRadius.circular(16),
           ),
-          const SizedBox(height: 12),
-          Text('No current bill yet', style: text.titleMedium),
-          const SizedBox(height: 4),
-          Text(
-            'Your current bill will appear after your meter has been read.',
-            style: text.bodyMedium,
-            textAlign: TextAlign.center,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text('Amount due', style: text.bodyMedium),
+              const SizedBox(height: 4),
+              const SizedBox(height: 48),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: colours.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Icon(
+                      hasBillingHistory
+                          ? Icons.check_circle_outline
+                          : Icons.schedule_outlined,
+                      size: 17,
+                      color: colours.primary,
+                    ),
+                    const SizedBox(width: 7),
+                    Text(
+                      hasBillingHistory
+                          ? 'No payment needed'
+                          : 'No current bill',
+                      style: text.titleSmall?.copyWith(
+                        color: colours.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: colours.surfaceContainerLowest,
+            border: Border.all(color: colours.outlineVariant),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            children: <Widget>[
+              Icon(
+                hasBillingHistory ? Icons.task_alt : Icons.description_outlined,
+                size: 42,
+                color: colours.primary,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                hasBillingHistory
+                    ? 'You’re all caught up'
+                    : 'No current bill yet',
+                style: text.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                hasBillingHistory
+                    ? 'You have no unpaid bills right now.'
+                    : 'Your current bill will appear after your meter has '
+                          'been read.',
+                style: text.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+              if (latestPaid != null) ...<Widget>[
+                const SizedBox(height: 14),
+                Text(
+                  'Latest paid bill · ${latestPaid.cycle.displayName}',
+                  style: text.bodySmall?.copyWith(
+                    color: colours.onSurfaceVariant,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => context.go('/consumer/history'),
+                  icon: const Icon(Icons.history),
+                  label: const Text('View billing history'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

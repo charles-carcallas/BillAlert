@@ -46,10 +46,16 @@ class InboxController extends Notifier<InboxState> {
         .read(consumerRepositoryProvider)
         .signedInConsumer();
 
-    final Consumer? me = switch (consumerResult) {
-      Ok(:final value) => value,
-      Err() => null,
-    };
+    final Consumer? me;
+    switch (consumerResult) {
+      case Ok(:final value):
+        me = value;
+      case Err(:final failure):
+        // A failed offline identity refresh must not masquerade as an account
+        // with no household and wipe the alerts already visible.
+        state = InboxState(alerts: state.alerts, failure: failure);
+        return;
+    }
 
     if (me == null) {
       state = const InboxState(
@@ -68,7 +74,7 @@ class InboxController extends Notifier<InboxState> {
       case Ok(:final value):
         state = InboxState(alerts: value);
       case Err(:final failure):
-        state = InboxState(failure: failure);
+        state = InboxState(alerts: state.alerts, failure: failure);
     }
   }
 

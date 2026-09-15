@@ -380,7 +380,8 @@ begin
   c := t_mkconsumer(t_area_a(), '+63 917 555 0333');
   b := fn_record_meter_reading(c, 300, timestamptz '2026-08-20 09:00+08');
   perform fn_post_bill_amount(b, 500.00, date '2026-09-08', timestamptz '2026-08-27 10:00+08');
-  select * into n from notifications where bill_id = b and notif_type = 'bill_ready';
+  select * into n from notifications
+   where bill_id = b and notif_type = 'bill_ready' and channel = 'push';
   -- The mockup: "Posting sends the consumer's bill-ready alert automatically."
   perform t_result('TC-18','FR-13, SYS-01',
     'Posting the amount is what fires the bill-ready alert, automatically',
@@ -392,17 +393,26 @@ end $$;
 
 -- TC-19 ---------------------------------------------------------------
 do $$
-declare c uuid; b uuid; ch notification_channel;
+declare c uuid; b uuid; pushes int; txt record;
 begin
   c := t_mkconsumer(t_area_a(), '+63 917 555 0334');
   b := fn_record_meter_reading(c, 300, timestamptz '2026-08-20 09:00+08');
   perform fn_post_bill_amount(b, 500.00, date '2026-09-08', timestamptz '2026-08-27 10:00+08');
-  select channel into ch from notifications where bill_id = b and notif_type = 'bill_ready';
-  -- Objective 3 reserves SMS for overdue and disconnection; a bill-ready
-  -- alert is the highest-volume message the system sends, so it goes by push.
+  select count(*) into pushes from notifications
+   where bill_id = b and notif_type = 'bill_ready' and channel = 'push';
+  select * into txt from notifications
+   where bill_id = b and notif_type = 'bill_ready' and channel = 'sms';
+  -- Objective 3, revised in 14_bill_sms.sql: the app alert stays the alert of
+  -- record, and the household also gets the bill by text so a keypad phone is
+  -- not left out. The text is stored read, so the Inbox badge counts the bill
+  -- once.
   perform t_result('TC-19','Objective 3, FR-16',
-    'The bill-ready alert goes by PUSH, not SMS — SMS is reserved for overdue and disconnection',
-    ch = 'push', format('channel=%s (expected push)', ch));
+    'The bill-ready alert goes by PUSH, and by SMS as well to the household''s number',
+    pushes = 1 and txt.id is not null and txt.status = 'pending'
+      and txt.dispatch_state = 'ready' and txt.is_read
+      and txt.destination_number = '+639175550334',
+    format('push=%s sms status=%s state=%s read=%s to=%s',
+      pushes, txt.status, txt.dispatch_state, txt.is_read, txt.destination_number));
 exception when others then
   perform t_result('TC-19','Objective 3, FR-16','Bill-ready uses push', false, 'unexpected error: ' || sqlerrm);
 end $$;
@@ -808,18 +818,21 @@ end $$;
 
 -- TC-44 ---------------------------------------------------------------
 do $$
-declare c uuid; b uuid; n record;
+declare c uuid; b uuid; n record; txt record;
 begin
   c := t_mkconsumer(t_area_a(), null);          -- no contact number on file
   b := fn_record_meter_reading(c, 100, timestamptz '2026-08-20 09:00+08');
   perform fn_post_bill_amount(b, 500.00, date '2026-09-08', timestamptz '2026-08-27 10:00+08');
-  select * into n from notifications where bill_id = b;
+  select * into n from notifications where bill_id = b and channel = 'push';
+  select * into txt from notifications where bill_id = b and channel = 'sms';
   -- Push is delivered to the device, not the number, so a missing mobile
-  -- must NOT fail a push alert the way it fails an SMS (TC-45).
+  -- must NOT fail a push alert the way it fails an SMS (TC-45). The bill's
+  -- text copy (14_bill_sms.sql) does fail, with its reason, so the gap shows.
   perform t_result('TC-44','SYS-04',
     'A push alert still queues for a consumer with no mobile number on file',
-    n.id is not null and n.channel = 'push' and n.status = 'pending',
-    format('channel=%s status=%s', n.channel, n.status));
+    n.id is not null and n.channel = 'push' and n.status = 'pending'
+      and txt.status = 'failed' and txt.failed_reason is not null,
+    format('push status=%s sms status=%s reason=%s', n.status, txt.status, txt.failed_reason));
 exception when others then
   perform t_result('TC-44','SYS-04','Push does not need a phone number',
     false, 'unexpected error: ' || sqlerrm);

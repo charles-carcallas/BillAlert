@@ -35,6 +35,85 @@ class AppTheme {
   /// Pure white used for input and card surfaces: #FFFFFF
   static const Color surfaceWhite = Color(0xFFFFFFFF);
 
+  static ThemeData dark() {
+    final scheme = ColorScheme.fromSeed(
+      seedColor: primary,
+      brightness: Brightness.dark,
+    );
+    final base = light();
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: scheme.surface,
+      textTheme: base.textTheme.apply(
+        bodyColor: scheme.onSurface,
+        displayColor: scheme.onSurface,
+      ),
+      appBarTheme: base.appBarTheme.copyWith(
+        backgroundColor: scheme.surface,
+        foregroundColor: scheme.onSurface,
+        shadowColor: scheme.outlineVariant,
+        titleTextStyle: base.appBarTheme.titleTextStyle?.copyWith(
+          color: scheme.onSurface,
+        ),
+        shape: Border(bottom: BorderSide(color: scheme.outlineVariant)),
+      ),
+      inputDecorationTheme: base.inputDecorationTheme.copyWith(
+        fillColor: scheme.surfaceContainerLowest,
+        hintStyle: base.inputDecorationTheme.hintStyle?.copyWith(
+          color: scheme.onSurfaceVariant,
+        ),
+        labelStyle: base.inputDecorationTheme.labelStyle?.copyWith(
+          color: scheme.onSurface,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: scheme.outline),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: scheme.outline),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: scheme.primary, width: 1.5),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: base.filledButtonTheme.style?.copyWith(
+          backgroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.disabled)
+                ? scheme.onSurface.withValues(alpha: 0.12)
+                : scheme.primary,
+          ),
+          foregroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.disabled)
+                ? scheme.onSurface.withValues(alpha: 0.38)
+                : scheme.onPrimary,
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: base.outlinedButtonTheme.style?.copyWith(
+          foregroundColor: WidgetStatePropertyAll(scheme.primary),
+          side: WidgetStatePropertyAll(
+            BorderSide(color: scheme.outline, width: 1.4),
+          ),
+        ),
+      ),
+      cardTheme: base.cardTheme.copyWith(
+        color: scheme.surfaceContainerLowest,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: scheme.outlineVariant),
+        ),
+      ),
+      dividerTheme: base.dividerTheme.copyWith(color: scheme.outlineVariant),
+      listTileTheme: base.listTileTheme,
+    );
+  }
+
   static ThemeData light() {
     final scheme = ColorScheme.fromSeed(
       seedColor: primary,

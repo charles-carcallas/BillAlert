@@ -8,11 +8,33 @@ import '../../value_objects/ids.dart';
 ///
 /// This deliberately does not create an auth user. Provisioning an auth user
 /// requires service-role credentials, and those credentials must never ship
-/// in the client app.
+/// in the client app. `RegisterHousehold` follows this with MTR-04's
+/// `CreateHouseholdLogin`, which does it through a server-side Edge Function.
 final class CreateConsumer {
   final ConsumerRepository consumers;
 
   const CreateConsumer({required this.consumers});
+
+  /// The first thing wrong with these household details, in the order the
+  /// form asks for them, or null when there is nothing.
+  static ValidationFailure? check({
+    required String consumerNo,
+    required String firstName,
+    required String lastName,
+  }) {
+    if (consumerNo.trim().isEmpty) {
+      return const ValidationFailure(
+        'Enter the consumer number from the household record.',
+      );
+    }
+    if (firstName.trim().isEmpty) {
+      return const ValidationFailure('Enter the consumer\'s first name.');
+    }
+    if (lastName.trim().isEmpty) {
+      return const ValidationFailure('Enter the consumer\'s last name.');
+    }
+    return null;
+  }
 
   Future<Result<Consumer>> call({
     required String consumerNo,
@@ -20,47 +42,36 @@ final class CreateConsumer {
     required String lastName,
     required String contactNumber,
     required String purok,
+    required String meterSerialNo,
     required AreaId areaId,
     required ProfileId createdBy,
   }) {
-    final String cleanConsumerNo = consumerNo.trim();
-    final String cleanFirstName = firstName.trim();
-    final String cleanLastName = lastName.trim();
+    final ValidationFailure? invalid = check(
+      consumerNo: consumerNo,
+      firstName: firstName,
+      lastName: lastName,
+    );
+    if (invalid != null) {
+      return Future<Result<Consumer>>.value(Err<Consumer>(invalid));
+    }
 
-    if (cleanConsumerNo.isEmpty) {
-      return Future<Result<Consumer>>.value(
-        const Err<Consumer>(
-          ValidationFailure(
-            'Enter the consumer number from the household record.',
-          ),
-        ),
-      );
-    }
-    if (cleanFirstName.isEmpty) {
-      return Future<Result<Consumer>>.value(
-        const Err<Consumer>(
-          ValidationFailure('Enter the consumer\'s first name.'),
-        ),
-      );
-    }
-    if (cleanLastName.isEmpty) {
-      return Future<Result<Consumer>>.value(
-        const Err<Consumer>(
-          ValidationFailure('Enter the consumer\'s last name.'),
-        ),
-      );
-    }
+    // "biec-08317" and "BIEC-08317" are the same meter. The database's unique
+    // index compares them exactly, so one spelling is chosen here.
+    final String cleanMeterSerialNo = meterSerialNo.trim().toUpperCase();
 
     return consumers.create(
-      consumerNo: ConsumerNumber(cleanConsumerNo),
-      firstName: cleanFirstName,
-      lastName: cleanLastName,
+      consumerNo: ConsumerNumber(consumerNo.trim()),
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
       areaId: areaId,
       createdBy: createdBy,
       // A blank optional value is absence. A real mobile number is preserved
       // exactly as typed; the database trigger owns its normalisation.
       contactNumber: contactNumber.trim().isEmpty ? null : contactNumber,
       purok: purok.trim().isEmpty ? null : purok.trim(),
+      // Optional: a household can be registered before its meter is
+      // commissioned, and the number added then.
+      meterSerialNo: cleanMeterSerialNo.isEmpty ? null : cleanMeterSerialNo,
     );
   }
 }

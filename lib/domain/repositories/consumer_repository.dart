@@ -11,9 +11,9 @@ import '../value_objects/ids.dart';
 abstract class ConsumerRepository {
   /// Creates a household record in the signed-in Area President's area.
   ///
-  /// This does not create an authentication account. Consumer authentication
-  /// needs a server-side provisioning path with service-role credentials,
-  /// which must never be present in the client application.
+  /// This does not create a sign-in. That needs service-role credentials,
+  /// which must never be present in the client application, so MTR-04 gives
+  /// the household one afterwards through `AuthRepository.createHouseholdLogin`.
   Future<Result<Consumer>> create({
     required ConsumerNumber consumerNo,
     required String firstName,
@@ -22,6 +22,7 @@ abstract class ConsumerRepository {
     required ProfileId createdBy,
     String? contactNumber,
     String? purok,
+    String? meterSerialNo,
   });
 
   /// MTR-02: the reader's assigned area only. Row-Level Security enforces

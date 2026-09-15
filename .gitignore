@@ -78,6 +78,10 @@ env.json
 # not, so a copy of the Supabase key could sit untracked beside it.
 *.bak
 
+# Supabase CLI state written by `npx supabase functions deploy`: the linked
+# project and a version cache. Local to one machine, not project source.
+supabase/.temp/
+
 # Local AI-agent workspace. These files contain machine-specific task context
 # and are not part of the BillAlert application or its project documentation.
 /.agents/

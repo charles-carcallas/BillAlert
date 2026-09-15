@@ -87,8 +87,10 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                       user == null
                           ? 'Please choose a new password.'
                           : forced
-                              ? 'Welcome, ${user.firstName}. Please choose a '
-                                  'new password before you continue.'
+                              ? 'Welcome, ${user.firstName}. You signed in '
+                                  'with a temporary password from your Area '
+                                  'President. Please choose your own password '
+                                  'before you continue.'
                               : 'Choose a new password for your account.',
                       style: Theme.of(context).textTheme.bodyLarge,
                     ),

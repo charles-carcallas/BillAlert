@@ -31,7 +31,8 @@ final class PhoneAlertReport {
 /// 2. Schedules a reminder for each unpaid bill, at 08:00 Philippine time,
 ///    `predue_reminder_days` before its due date. Android shows it at that
 ///    time whether or not the app is running, and whether or not there is
-///    signal. Reminders for bills since paid are cancelled.
+///    signal. Reminders for bills since paid are cancelled. Each reminder is
+///    urgent unless the household has turned urgent alerts off.
 ///
 /// The words are chosen here, and never include an amount: a notification can
 /// be read by whoever picks the phone up.
@@ -45,11 +46,13 @@ final class RefreshPhoneAlerts {
   final AlertFeed feed;
   final PhoneNotifier phone;
   final PhClock clock;
+  final UrgentAlertsSetting urgentAlerts;
 
   const RefreshPhoneAlerts({
     required this.feed,
     required this.phone,
     required this.clock,
+    required this.urgentAlerts,
   });
 
   Future<Result<PhoneAlertReport>> call() async {
@@ -135,6 +138,7 @@ final class RefreshPhoneAlerts {
       Err() => fallbackReminderDays,
     };
     final DateTime now = clock.nowUtc();
+    final bool urgent = await urgentAlerts.isOn();
     final Set<int> planned = <int>{};
 
     for (final Bill bill in bills) {
@@ -157,6 +161,9 @@ final class RefreshPhoneAlerts {
               '${_dayAndMonth(due)}. If you have already paid, you can ignore '
               'this.',
           payload: BillNoticeTarget(bill.id).encode(),
+          // Scheduled again on every refresh under the same id, so turning
+          // urgent alerts on or off reaches reminders already waiting.
+          urgent: urgent,
         ),
         atUtc: at,
       );

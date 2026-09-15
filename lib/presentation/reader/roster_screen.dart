@@ -110,18 +110,16 @@ class _RosterBodyState extends ConsumerState<_RosterBody> {
   @override
   Widget build(BuildContext context) {
     final roster = widget.view.roster;
-    final List<RosterEntry> matching = roster.entries
+    // The working list contains only houses that still need a reading.
+    // Queued readings are durable and visible in the sync status/Profile;
+    // leaving the household here would invite a duplicate visit. Synced
+    // readings stay represented by the progress totals rather than returning
+    // as a second, non-actionable list.
+    final List<RosterEntry> matching = roster.remaining
         .where(
           (RosterEntry entry) =>
               consumerMatchesSearch(entry.consumer, _search.text),
         )
-        .toList();
-
-    final List<RosterEntry> pending = matching
-        .where((RosterEntry e) => !e.isDone)
-        .toList();
-    final List<RosterEntry> done = matching
-        .where((RosterEntry e) => e.isDone)
         .toList();
 
     return RefreshIndicator(
@@ -147,7 +145,7 @@ class _RosterBodyState extends ConsumerState<_RosterBody> {
             _WaitingToSyncCard(count: roster.waitingToSync),
           ],
           const SizedBox(height: 16),
-          if (roster.entries.isNotEmpty) ...<Widget>[
+          if (roster.remaining.isNotEmpty) ...<Widget>[
             LocalSearchField(
               fieldKey: const ValueKey<String>('reader-roster-search'),
               controller: _search,
@@ -166,7 +164,22 @@ class _RosterBodyState extends ConsumerState<_RosterBody> {
               ),
             ),
 
-          if (roster.entries.isNotEmpty && matching.isEmpty)
+          if (roster.entries.isNotEmpty && roster.remaining.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 32),
+              child: Column(
+                children: <Widget>[
+                  Icon(Icons.task_alt, size: 40),
+                  SizedBox(height: 12),
+                  Text(
+                    'Every household has been recorded for this cycle.',
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+
+          if (roster.remaining.isNotEmpty && matching.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 32),
               child: Column(
@@ -189,28 +202,17 @@ class _RosterBodyState extends ConsumerState<_RosterBody> {
           // Still to read, first. A reader works down this list on foot, and
           // as the round progresses the finished houses would otherwise pile
           // up above the next one they actually have to walk to.
-          if (pending.isNotEmpty) ...<Widget>[
+          if (matching.isNotEmpty) ...<Widget>[
             Text(
-              'Still to read (${pending.length})',
+              'Still to read (${matching.length})',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
-            for (final RosterEntry entry in pending)
+            for (final RosterEntry entry in matching)
               _HouseholdTile(
                 entry: entry,
                 onOpen: () => _openEntry(context, ref, entry),
               ),
-          ],
-
-          if (done.isNotEmpty) ...<Widget>[
-            if (pending.isNotEmpty) const SizedBox(height: 20),
-            Text(
-              'Done this cycle (${done.length})',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            for (final RosterEntry entry in done)
-              _HouseholdTile(entry: entry, onOpen: null),
           ],
         ],
       ),

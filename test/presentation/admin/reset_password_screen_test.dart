@@ -54,6 +54,9 @@ void main() {
             () => FakeAuthController(signedInUser: signedIn),
           ),
           authRepositoryProvider.overrideWithValue(auth),
+          temporaryPasswordFactoryProvider.overrideWithValue(
+            () => 'BillAlert0042',
+          ),
         ],
         child: MaterialApp(
           theme: AppTheme.light(),
@@ -64,17 +67,21 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Future<void> fillAndSubmit(
-    WidgetTester tester, {
-    required String password,
-    String? confirm,
-  }) async {
-    await tester.enterText(find.byType(TextField).at(0), password);
-    await tester.enterText(find.byType(TextField).at(1), confirm ?? password);
+  Future<void> submit(WidgetTester tester) async {
     final Finder button = find.widgetWithText(FilledButton, 'Reset password');
     await tester.ensureVisible(button);
     await tester.pumpAndSettle();
     await tester.tap(button);
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> confirmDialog(WidgetTester tester) async {
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Reset password'),
+      ),
+    );
     await tester.pumpAndSettle();
   }
 
@@ -93,38 +100,58 @@ void main() {
     expect(find.text('Ledesman Dormal'), findsNothing);
   });
 
-  testWidgets(
-    'a confirmed reset sets the temporary password for that account',
-    (WidgetTester tester) async {
-      await open(tester);
+  testWidgets('choosing an account asks for no password at all', (
+    WidgetTester tester,
+  ) async {
+    await open(tester);
 
-      await tester.tap(find.text('Ledesman Dormal'));
-      await tester.pumpAndSettle();
-      expect(find.text('Set a temporary password'), findsOneWidget);
+    await tester.tap(find.text('Ledesman Dormal'));
+    await tester.pumpAndSettle();
 
-      await fillAndSubmit(tester, password: 'Temporary-2026');
+    expect(find.text('Reset this password'), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
+  });
 
-      // The final confirmation, because the current password stops working.
-      expect(find.text('Reset this password?'), findsOneWidget);
-      expect(auth.resetCalls, 0);
+  testWidgets('a confirmed reset shows the new temporary password once', (
+    WidgetTester tester,
+  ) async {
+    await open(tester);
+    await tester.tap(find.text('Ledesman Dormal'));
+    await tester.pumpAndSettle();
 
-      await tester.tap(
-        find.descendant(
-          of: find.byType(AlertDialog),
-          matching: find.text('Reset password'),
-        ),
-      );
-      await tester.pumpAndSettle();
+    await submit(tester);
 
-      expect(auth.resetCalls, 1);
-      expect(auth.resetAccount?.id.value, 'reader-1');
-      expect(auth.resetTemporaryPassword, 'Temporary-2026');
-      expect(
-        find.text('Temporary password set for Ledesman Dormal'),
-        findsOneWidget,
-      );
-    },
-  );
+    // The final confirmation, because the current password stops working.
+    expect(find.text('Reset this password?'), findsOneWidget);
+    expect(auth.resetCalls, 0);
+
+    await confirmDialog(tester);
+
+    expect(auth.resetCalls, 1);
+    expect(auth.resetAccount?.id.value, 'reader-1');
+    expect(auth.resetTemporaryPassword, 'BillAlert0042');
+    expect(
+      find.text('New temporary password for Ledesman Dormal'),
+      findsOneWidget,
+    );
+    expect(find.text('BillAlert0042'), findsOneWidget);
+    // A staff account's username is shown with it.
+    expect(find.text('ledesman.dormal'), findsOneWidget);
+  });
+
+  testWidgets("a household's reset shows the password but no username", (
+    WidgetTester tester,
+  ) async {
+    await open(tester);
+    await tester.tap(find.text('Virgilio Busalanan'));
+    await tester.pumpAndSettle();
+
+    await submit(tester);
+    await confirmDialog(tester);
+
+    expect(find.text('BillAlert0042'), findsOneWidget);
+    expect(find.text('Username'), findsNothing);
+  });
 
   testWidgets('choosing "Review" in the confirmation resets nothing', (
     WidgetTester tester,
@@ -133,32 +160,16 @@ void main() {
     await tester.tap(find.text('Ledesman Dormal'));
     await tester.pumpAndSettle();
 
-    await fillAndSubmit(tester, password: 'Temporary-2026');
+    await submit(tester);
     await tester.tap(find.text('Review'));
     await tester.pumpAndSettle();
 
     expect(auth.resetCalls, 0);
-    expect(find.text('Set a temporary password'), findsOneWidget);
+    expect(find.text('Reset this password'), findsOneWidget);
+    expect(find.text('BillAlert0042'), findsNothing);
   });
 
-  testWidgets('a short password is refused before any confirmation', (
-    WidgetTester tester,
-  ) async {
-    await open(tester);
-    await tester.tap(find.text('Ledesman Dormal'));
-    await tester.pumpAndSettle();
-
-    await fillAndSubmit(tester, password: 'short');
-
-    expect(find.text('Reset this password?'), findsNothing);
-    expect(
-      find.text('The temporary password must be at least 8 characters.'),
-      findsOneWidget,
-    );
-    expect(auth.resetCalls, 0);
-  });
-
-  testWidgets("the server's refusal is shown, and the form stays", (
+  testWidgets("the server's refusal is shown, and no password is", (
     WidgetTester tester,
   ) async {
     auth.nextResetFailure = const PermissionFailure(
@@ -168,20 +179,15 @@ void main() {
     await tester.tap(find.text('Virgilio Busalanan'));
     await tester.pumpAndSettle();
 
-    await fillAndSubmit(tester, password: 'Temporary-2026');
-    await tester.tap(
-      find.descendant(
-        of: find.byType(AlertDialog),
-        matching: find.text('Reset password'),
-      ),
-    );
-    await tester.pumpAndSettle();
+    await submit(tester);
+    await confirmDialog(tester);
 
     expect(
       find.text('That account is not in your service area.'),
       findsOneWidget,
     );
-    expect(find.text('Set a temporary password'), findsOneWidget);
+    expect(find.text('Reset this password'), findsOneWidget);
+    expect(find.text('BillAlert0042'), findsNothing);
   });
 
   testWidgets('anyone but an Area President is told why, not shown a list', (

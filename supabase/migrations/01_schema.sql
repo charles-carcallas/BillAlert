@@ -103,7 +103,8 @@ create table if not exists settings (
   cycle_start_day          smallint not null default 1  check (cycle_start_day between 1 and 28),
   -- ADM-16 automated reminder schedule.
   -- Objective 3: push carries no per-message cost, so reminders go by push
-  -- and SMS is reserved for overdue and disconnection.
+  -- and SMS is reserved for overdue and disconnection. Revised in
+  -- 14_bill_sms.sql: bill-ready alerts also go by text.
   predue_reminder_days     smallint not null default 3  check (predue_reminder_days between 0 and 30),
   predue_channel           notification_channel not null default 'push',
   billready_channel        notification_channel not null default 'push',

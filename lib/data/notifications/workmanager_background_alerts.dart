@@ -8,6 +8,7 @@ import '../../domain/notifications/phone_alerts.dart';
 import '../../domain/time/ph_clock.dart';
 import '../../domain/usecases/consumer/refresh_phone_alerts.dart';
 import 'android_phone_notifier.dart';
+import 'secure_urgent_alerts_setting.dart';
 import 'supabase_alert_feed.dart';
 
 const String _uniqueName = 'billalert-phone-alerts';
@@ -43,6 +44,7 @@ void phoneAlertsCallbackDispatcher() {
         feed: SupabaseAlertFeed(Supabase.instance.client),
         phone: phone,
         clock: const SystemPhClock(),
+        urgentAlerts: const SecureUrgentAlertsSetting(),
       )();
     } catch (_) {
       // Nothing to show anyone from here. The next period tries again.

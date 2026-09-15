@@ -50,13 +50,25 @@ class HistoryController extends Notifier<HistoryState> {
   Future<void> _doLoad() async {
     // Which household? The signed-in user has a profile id; bills hang off a
     // consumer id, and they are not the same value.
-    final consumerResult =
-        await ref.read(consumerRepositoryProvider).signedInConsumer();
+    final consumerResult = await ref
+        .read(consumerRepositoryProvider)
+        .signedInConsumer();
 
-    final Consumer? me = switch (consumerResult) {
-      Ok(:final value) => value,
-      Err() => null,
-    };
+    final Consumer? me;
+    switch (consumerResult) {
+      case Ok(:final value):
+        me = value;
+      case Err(:final failure):
+        // Losing signal while refreshing is not evidence that this account
+        // stopped belonging to its household. Keep the statement already on
+        // screen and report that it could not be refreshed.
+        state = HistoryState(
+          bills: state.bills,
+          receiptByBillId: state.receiptByBillId,
+          failure: failure,
+        );
+        return;
+    }
 
     if (me == null) {
       state = const HistoryState(
@@ -84,8 +96,9 @@ class HistoryController extends Notifier<HistoryState> {
 
     // A missing receipt number is a blank on one row. A missing bill list is
     // an empty screen, so only that one is reported as a failure.
-    final receiptByBillId = <String, String>{};
+    final receiptByBillId = <String, String>{...state.receiptByBillId};
     if (receiptsResult case Ok(:final value)) {
+      receiptByBillId.clear();
       for (final PaymentSummary receipt in value) {
         for (final SettledBill settled in receipt.bills) {
           receiptByBillId[settled.billId.value] = receipt.receiptNo;
@@ -97,7 +110,11 @@ class HistoryController extends Notifier<HistoryState> {
       case Ok(:final value):
         state = HistoryState(bills: value, receiptByBillId: receiptByBillId);
       case Err(:final failure):
-        state = HistoryState(failure: failure);
+        state = HistoryState(
+          bills: state.bills,
+          receiptByBillId: state.receiptByBillId,
+          failure: failure,
+        );
     }
   }
 }

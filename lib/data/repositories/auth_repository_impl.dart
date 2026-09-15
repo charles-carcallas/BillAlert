@@ -5,6 +5,7 @@ import '../../core/config/app_config.dart';
 import '../../core/errors/app_failure.dart';
 import '../../core/result/result.dart';
 import '../../domain/entities/app_user.dart';
+import '../../domain/entities/household_login.dart';
 import '../../domain/entities/managed_account.dart';
 import '../../domain/entities/staff_account.dart';
 import '../../domain/repositories/auth_repository.dart';
@@ -100,7 +101,7 @@ class AuthRepositoryImpl implements AuthRepository {
     if (session == null) {
       return const Ok<AppUser?>(null);
     }
-    return _loadProfile(session.user.id);
+    return _loadProfileWithOfflineFallback(session.user.id);
   }
 
   @override
@@ -108,7 +109,7 @@ class AuthRepositoryImpl implements AuthRepository {
       _client.auth.onAuthStateChange.asyncMap((AuthState state) async {
         final session = state.session;
         if (session == null) return null;
-        final result = await _loadProfile(session.user.id);
+        final result = await _loadProfileWithOfflineFallback(session.user.id);
         return switch (result) {
           Ok(:final value) => value,
           Err() => null,
@@ -215,6 +216,7 @@ class AuthRepositoryImpl implements AuthRepository {
           lastName: lastName,
           role: role,
           contactNumber: contactNumber,
+          temporaryPassword: temporaryPassword,
         ),
       );
     } catch (error, stackTrace) {
@@ -313,6 +315,106 @@ class AuthRepositoryImpl implements AuthRepository {
     }
   }
 
+  @override
+  Future<Result<List<HouseholdWithoutLogin>>> householdsWithoutLogin(
+    AreaId areaId,
+  ) async {
+    try {
+      // Under the Admin's own row-level security, which already confines
+      // households to their area. Inactive households are left out: the
+      // server would refuse them a sign-in anyway.
+      final rows = await _client
+          .from('consumers')
+          .select('id, consumer_no, first_name, last_name, purok')
+          .eq('area_id', areaId.value)
+          .eq('account_status', 'active')
+          .isFilter('profile_id', null)
+          .order('last_name');
+
+      return Ok<List<HouseholdWithoutLogin>>(<HouseholdWithoutLogin>[
+        for (final Map<String, dynamic> row in rows)
+          HouseholdWithoutLogin(
+            id: ConsumerId(row['id'] as String),
+            consumerNo: ConsumerNumber(row['consumer_no'] as String),
+            firstName: row['first_name'] as String,
+            lastName: row['last_name'] as String,
+            purok: row['purok'] as String?,
+          ),
+      ]);
+    } catch (error, stackTrace) {
+      return Err<List<HouseholdWithoutLogin>>(
+        FailureMapper.from(error, stackTrace),
+      );
+    }
+  }
+
+  @override
+  Future<Result<CreatedHouseholdLogin>> createHouseholdLogin({
+    required HouseholdWithoutLogin household,
+    required String username,
+    required String temporaryPassword,
+  }) async {
+    try {
+      // As with createStaffAccount: the Admin's JWT goes with the request, and
+      // the server checks that the household is in their area and has no
+      // sign-in. The household's name is read from its record there, not
+      // sent from here.
+      final response = await _client.functions.invoke(
+        'create-household-login',
+        body: <String, dynamic>{
+          'consumer_id': household.id.value,
+          'username': username,
+          'temporary_password': temporaryPassword,
+        },
+      );
+
+      final value = response.data;
+      if (value is! Map) {
+        return const Err<CreatedHouseholdLogin>(
+          ServerFailure(
+            'The server did not confirm the household sign-in. Please check '
+            'the household list before trying again.',
+          ),
+        );
+      }
+
+      if (value['ok'] != true) {
+        final message = value['message'] is String
+            ? value['message'] as String
+            : 'The household sign-in could not be created. Please try again.';
+        return Err<CreatedHouseholdLogin>(switch (value['kind']) {
+          'validation' => ValidationFailure(message),
+          'permission' => PermissionFailure(message),
+          'conflict' => ConflictFailure(message),
+          _ => ServerFailure(message),
+        });
+      }
+
+      final id = value['id'];
+      if (id is! String || id.isEmpty) {
+        return const Err<CreatedHouseholdLogin>(
+          ServerFailure(
+            'The server did not confirm the household sign-in. Please check '
+            'the household list before trying again.',
+          ),
+        );
+      }
+
+      return Ok<CreatedHouseholdLogin>(
+        CreatedHouseholdLogin(
+          id: ProfileId(id),
+          username: value['username'] is String
+              ? value['username'] as String
+              : username,
+          household: household,
+          temporaryPassword: temporaryPassword,
+        ),
+      );
+    } catch (error, stackTrace) {
+      return Err<CreatedHouseholdLogin>(FailureMapper.from(error, stackTrace));
+    }
+  }
+
   Future<Result<AppUser?>> _loadProfile(String userId) async {
     try {
       final row = await _client
@@ -338,6 +440,47 @@ class AuthRepositoryImpl implements AuthRepository {
     }
   }
 
+  /// Loads the authoritative profile when possible, but keeps an existing
+  /// authenticated session usable offline. The fallback is accepted only
+  /// for a network failure and only when the encrypted cache belongs to the
+  /// exact profile id in Supabase's persisted session.
+  Future<Result<AppUser?>> _loadProfileWithOfflineFallback(
+    String userId,
+  ) async {
+    final remote = await _loadProfile(userId);
+    if (remote case Ok(:final value)) {
+      if (value != null) await _claimCacheFor(value);
+      return remote;
+    }
+    if (remote case Err(failure: NetworkFailure())) {
+      final cached = await _cachedProfileFor(userId);
+      if (cached != null) return Ok<AppUser?>(cached);
+    }
+    return remote;
+  }
+
+  Future<AppUser?> _cachedProfileFor(String userId) async {
+    final row = await _db.select(_db.cacheOwner).getSingleOrNull();
+    if (row == null || row.profileId != userId) return null;
+    if (row.username == null ||
+        row.firstName == null ||
+        row.lastName == null ||
+        row.mustChangePassword == null) {
+      return null;
+    }
+
+    return ProfileDto.fromJson(<String, dynamic>{
+      'id': row.profileId,
+      'username': row.username,
+      'first_name': row.firstName,
+      'last_name': row.lastName,
+      'role': row.role,
+      'area_id': row.areaId,
+      'must_change_password': row.mustChangePassword,
+      'account_status': 'active',
+    });
+  }
+
   /// SYS-05: records who this cache belongs to, and empties it first if the
   /// previous owner was somebody else. Two staff sharing one phone must not
   /// be able to see each other's area.
@@ -352,6 +495,10 @@ class AuthRepositoryImpl implements AuthRepository {
           CacheOwnerCompanion.insert(
             id: const Value<int>(1),
             profileId: user.id.value,
+            username: Value<String?>(user.username),
+            firstName: Value<String?>(user.firstName),
+            lastName: Value<String?>(user.lastName),
+            mustChangePassword: Value<bool?>(user.mustChangePassword),
             role: user.roleCode,
             areaId: Value<String?>(user.areaId?.value),
             cachedAt: DateTime.now().toUtc().toIso8601String(),

@@ -75,19 +75,24 @@ class CurrentBillController extends Notifier<CurrentBillState> {
 
   Future<void> _load() async {
     state = state.copyWith(isLoading: true, failure: null);
-    
+
     // Which household is this? A consumer signs in with a `profiles` row, but
     // bills hang off a `consumers` row and the two have different ids. This
     // used to pass the profile id straight in, which matched nothing once the
     // repository started filtering on consumer_id - the screen went silently
     // empty for a consumer who did have a bill.
-    final consumerResult =
-        await ref.read(consumerRepositoryProvider).signedInConsumer();
+    final consumerResult = await ref
+        .read(consumerRepositoryProvider)
+        .signedInConsumer();
 
-    final ConsumerId? consumerId = switch (consumerResult) {
-      Ok(:final value) => value?.id,
-      Err() => null,
-    };
+    final ConsumerId? consumerId;
+    switch (consumerResult) {
+      case Ok(:final value):
+        consumerId = value?.id;
+      case Err(:final failure):
+        state = state.copyWith(isLoading: false, failure: failure);
+        return;
+    }
 
     if (consumerId == null) {
       state = state.copyWith(
@@ -108,10 +113,7 @@ class CurrentBillController extends Notifier<CurrentBillState> {
       case Ok(:final value):
         currentBill = value;
       case Err(:final failure):
-        state = state.copyWith(
-          isLoading: false,
-          failure: failure,
-        );
+        state = state.copyWith(isLoading: false, failure: failure);
         return;
     }
 
@@ -121,14 +123,11 @@ class CurrentBillController extends Notifier<CurrentBillState> {
       case Ok(:final value):
         history = value;
       case Err(:final failure):
-        state = state.copyWith(
-          isLoading: false,
-          failure: failure,
-        );
+        state = state.copyWith(isLoading: false, failure: failure);
         return;
     }
 
-    state = state.copyWith(
+    state = CurrentBillState(
       isLoading: false,
       currentBill: currentBill,
       history: history,
@@ -141,5 +140,5 @@ class CurrentBillController extends Notifier<CurrentBillState> {
 // coach:anchor(providers)
 final currentBillControllerProvider =
     NotifierProvider<CurrentBillController, CurrentBillState>(
-  CurrentBillController.new,
-);
+      CurrentBillController.new,
+    );

@@ -6,7 +6,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
-/// The v1 -> v2 upgrade, run against a real v1 database file.
+/// The v1 -> current upgrade, run against a real v1 database file.
 ///
 /// The claim this file exists to check is not "the migration runs" but "the
 /// migration does not throw away unsynced field work". A meter reader can
@@ -169,8 +169,10 @@ void main() {
     addTearDown(db.close);
 
     final rows = await db
-        .customSelect('select client_uuid, status, attempts, last_error, '
-            'captured_at, payload_json from outbox order by captured_at')
+        .customSelect(
+          'select client_uuid, status, attempts, last_error, '
+          'captured_at, payload_json from outbox order by captured_at',
+        )
         .get();
 
     expect(rows, hasLength(2), reason: 'unsynced field work was discarded');
@@ -190,38 +192,55 @@ void main() {
     expect(rows[1].read<String>('last_error'), 'No connection.');
   });
 
-  test('the cascade does not empty outbox_reading_keys during the rebuild',
-      () async {
-    createVersion1WithQueuedWork();
+  test(
+    'the cascade does not empty outbox_reading_keys during the rebuild',
+    () async {
+      createVersion1WithQueuedWork();
 
-    final db = await openAndUpgrade();
-    addTearDown(db.close);
+      final db = await openAndUpgrade();
+      addTearDown(db.close);
 
-    // outbox_reading_keys cascades from outbox. Dropping the old outbox table
-    // with foreign keys armed would take these rows with it, and FR-23 would
-    // stop catching duplicates for the rest of the round.
-    final keys = await db
-        .customSelect('select consumer_id, cycle_label from outbox_reading_keys '
-            'order by consumer_id')
-        .get();
+      // outbox_reading_keys cascades from outbox. Dropping the old outbox table
+      // with foreign keys armed would take these rows with it, and FR-23 would
+      // stop catching duplicates for the rest of the round.
+      final keys = await db
+          .customSelect(
+            'select consumer_id, cycle_label from outbox_reading_keys '
+            'order by consumer_id',
+          )
+          .get();
 
-    expect(keys, hasLength(2));
-    expect(keys[0].read<String>('consumer_id'), 'consumer-1');
-    expect(keys[0].read<String>('cycle_label'), '2026-09');
-  });
+      expect(keys, hasLength(2));
+      expect(keys[0].read<String>('consumer_id'), 'consumer-1');
+      expect(keys[0].read<String>('cycle_label'), '2026-09');
+    },
+  );
 
-  test('the cache owner survives, so the user is not silently logged out',
-      () async {
-    createVersion1WithQueuedWork();
+  test(
+    'the cache owner survives, so the user is not silently logged out',
+    () async {
+      createVersion1WithQueuedWork();
 
-    final db = await openAndUpgrade();
-    addTearDown(db.close);
+      final db = await openAndUpgrade();
+      addTearDown(db.close);
 
-    final owner =
-        await db.customSelect('select * from cache_owner').getSingle();
-    expect(owner.read<String>('profile_id'), 'profile-ledesman');
-    expect(owner.read<String>('role'), 'meter_reader');
-  });
+      final owner = await db
+          .customSelect('select * from cache_owner')
+          .getSingle();
+      expect(owner.read<String>('profile_id'), 'profile-ledesman');
+      expect(owner.read<String>('role'), 'meter_reader');
+      expect(
+        owner.data,
+        containsPair('username', null),
+        reason:
+            'An upgrade must not invent identity data. The next successful '
+            'online profile load populates the offline-unlock fields.',
+      );
+      expect(owner.data, containsPair('first_name', null));
+      expect(owner.data, containsPair('last_name', null));
+      expect(owner.data, containsPair('must_change_password', null));
+    },
+  );
 
   test('the new constraints and indexes are in place afterwards', () async {
     createVersion1WithQueuedWork();
@@ -269,8 +288,7 @@ void main() {
     // alterTable disarms them to rebuild the table. If it left them off, the
     // ON DELETE CASCADE that keeps outbox_reading_keys tidy would be dead for
     // the rest of the session.
-    final pragma =
-        await db.customSelect('pragma foreign_keys').getSingle();
+    final pragma = await db.customSelect('pragma foreign_keys').getSingle();
     expect(pragma.read<bool>('foreign_keys'), isTrue);
   });
 
@@ -288,6 +306,30 @@ void main() {
         "'2026-09-13T04:00:00.000Z')",
       ),
       throwsA(isA<SqliteException>()),
+    );
+  });
+
+  test('an upgraded cache can hold what an opened alert needs', () async {
+    createVersion1WithQueuedWork();
+
+    final db = await openAndUpgrade();
+    addTearDown(db.close);
+
+    // Schema v5: an alert keeps the bill or notice it is about and its
+    // delivery details, so it can be opened offline.
+    final columns = await db
+        .customSelect(
+          "select name from pragma_table_info('cached_notifications')",
+        )
+        .get();
+    expect(
+      columns.map((QueryRow r) => r.read<String>('name')),
+      containsAll(<String>[
+        'bill_id',
+        'disconnection_id',
+        'failed_reason',
+        'sent_at',
+      ]),
     );
   });
 }

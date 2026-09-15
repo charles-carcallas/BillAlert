@@ -22,14 +22,20 @@ void main() {
 
   late FakeAlertFeed feed;
   late FakePhoneNotifier phone;
+  late FakeUrgentAlertsSetting urgentAlerts;
 
   setUp(() {
     feed = FakeAlertFeed();
     phone = FakePhoneNotifier();
+    urgentAlerts = FakeUrgentAlertsSetting();
   });
 
-  RefreshPhoneAlerts refresh() =>
-      RefreshPhoneAlerts(feed: feed, phone: phone, clock: StoppedClock(now));
+  RefreshPhoneAlerts refresh() => RefreshPhoneAlerts(
+    feed: feed,
+    phone: phone,
+    clock: StoppedClock(now),
+    urgentAlerts: urgentAlerts,
+  );
 
   Bill bill(
     String id, {
@@ -60,6 +66,8 @@ void main() {
       // No bill on this notice, so tapping it opens the Inbox at it.
       expect(phone.shown.single.payload, 'notice:n-1');
       expect(feed.markedShown.single.value, 'n-1');
+      // Only the due-date reminder is urgent.
+      expect(phone.shown.single.urgent, isFalse);
     });
 
     test('a notice about a bill opens that bill when tapped', () async {
@@ -131,6 +139,25 @@ void main() {
 
       expect(phone.scheduled.values.single.atUtc, DateTime.utc(2026, 9, 27));
       expect(phone.scheduled.values.single.notice.title, 'Bill due tomorrow');
+    });
+
+    test('are urgent while the household keeps urgent alerts on', () async {
+      feed.unpaid = <Bill>[bill('b-1')];
+
+      await refresh()();
+
+      expect(phone.scheduled.values.single.notice.urgent, isTrue);
+    });
+
+    test('become ordinary notifications once urgent alerts are off', () async {
+      feed.unpaid = <Bill>[bill('b-1')];
+      await refresh()();
+
+      // Turned off in Profile: the waiting reminder is scheduled again, plain.
+      urgentAlerts.on = false;
+      await refresh()();
+
+      expect(phone.scheduled.values.single.notice.urgent, isFalse);
     });
 
     test('are not sent late once their moment has passed', () async {

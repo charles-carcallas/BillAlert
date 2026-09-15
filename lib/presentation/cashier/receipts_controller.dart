@@ -82,19 +82,21 @@ class ReceiptsController extends Notifier<ReceiptsState> {
     // the list for, so it falls back to an empty day.
     final CollectionSummary today = switch (summaryResult) {
       Ok(:final value) => value,
-      Err() => CollectionSummary.empty,
+      Err() => state.today,
     };
 
     switch (listResult) {
       case Ok(:final value):
         state = ReceiptsState(today: today, receipts: value);
       case Err(:final failure):
-        state = ReceiptsState(today: today, failure: failure);
+        state = ReceiptsState(
+          today: today,
+          receipts: state.receipts,
+          failure: failure,
+        );
     }
   }
 }
 
 final receiptsControllerProvider =
-    NotifierProvider<ReceiptsController, ReceiptsState>(
-  ReceiptsController.new,
-);
+    NotifierProvider<ReceiptsController, ReceiptsState>(ReceiptsController.new);

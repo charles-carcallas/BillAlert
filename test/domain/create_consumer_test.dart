@@ -25,12 +25,14 @@ void main() {
     String lastName = 'Caberte',
     String contactNumber = '0917 555 0142',
     String purok = 'Purok 4',
+    String meterSerialNo = 'BIEC-08399',
   }) => createConsumer(
     consumerNo: consumerNo,
     firstName: firstName,
     lastName: lastName,
     contactNumber: contactNumber,
     purok: purok,
+    meterSerialNo: meterSerialNo,
     areaId: area3,
     createdBy: admin,
   );
@@ -69,10 +71,24 @@ void main() {
     },
   );
 
+  test('the meter number is kept, in one spelling', () async {
+    await create(meterSerialNo: ' biec-08399 ');
+
+    expect(consumers.createdMeterSerialNo, 'BIEC-08399');
+  });
+
+  test('a household without a meter number can still be created', () async {
+    final result = await create(meterSerialNo: '');
+
+    expect(result, isA<Ok<Consumer>>());
+    expect(consumers.createdMeterSerialNo, isNull);
+  });
+
   test('blank optional fields become absent', () async {
-    await create(contactNumber: '  ', purok: '  ');
+    await create(contactNumber: '  ', purok: '  ', meterSerialNo: '  ');
 
     expect(consumers.createdContactNumber, isNull);
     expect(consumers.createdPurok, isNull);
+    expect(consumers.createdMeterSerialNo, isNull);
   });
 }

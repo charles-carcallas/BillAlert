@@ -6,6 +6,7 @@ import 'package:billalert/data/sync/sync_service.dart';
 import 'package:billalert/domain/entities/app_user.dart';
 import 'package:billalert/domain/entities/bill.dart';
 import 'package:billalert/domain/entities/consumer.dart';
+import 'package:billalert/domain/entities/household_login.dart';
 import 'package:billalert/domain/entities/managed_account.dart';
 import 'package:billalert/domain/entities/staff_account.dart';
 import 'package:billalert/domain/outbox/outbox_entry.dart';
@@ -150,6 +151,11 @@ final class FakeConsumerRepository implements ConsumerRepository {
 
   FakeConsumerRepository(this.households);
 
+  String? createdMeterSerialNo;
+
+  /// Returned by [create] instead of a household when set.
+  AppFailure? createFailure;
+
   @override
   Future<Result<Consumer>> create({
     required ConsumerNumber consumerNo,
@@ -159,7 +165,10 @@ final class FakeConsumerRepository implements ConsumerRepository {
     required ProfileId createdBy,
     String? contactNumber,
     String? purok,
+    String? meterSerialNo,
   }) async {
+    final AppFailure? failure = createFailure;
+    if (failure != null) return Err<Consumer>(failure);
     createCount++;
     createdConsumerNo = consumerNo;
     createdFirstName = firstName;
@@ -167,6 +176,7 @@ final class FakeConsumerRepository implements ConsumerRepository {
     createdContactNumber = contactNumber;
     createdAreaId = areaId;
     createdPurok = purok;
+    createdMeterSerialNo = meterSerialNo;
     this.createdBy = createdBy;
 
     return Ok<Consumer>(
@@ -176,6 +186,7 @@ final class FakeConsumerRepository implements ConsumerRepository {
         firstName: firstName,
         lastName: lastName,
         contactNumber: contactNumber,
+        meterSerialNo: meterSerialNo,
         areaId: areaId,
         purok: purok,
         accountStatus: AccountStatus.active,
@@ -321,6 +332,8 @@ final class FakeAuthRepository implements AuthRepository {
   Future<Result<void>> changePassword({required String newPassword}) async =>
       const Ok<void>(null);
 
+  String? createdStaffPassword;
+
   @override
   Future<Result<CreatedStaffAccount>> createStaffAccount({
     required String username,
@@ -334,6 +347,7 @@ final class FakeAuthRepository implements AuthRepository {
     createdStaffUsername = username;
     createdStaffContactNumber = contactNumber;
     createdStaffRole = role;
+    createdStaffPassword = temporaryPassword;
     final failure = nextCreateStaffFailure;
     if (failure != null) return Err<CreatedStaffAccount>(failure);
     return Ok<CreatedStaffAccount>(
@@ -344,6 +358,7 @@ final class FakeAuthRepository implements AuthRepository {
         lastName: lastName,
         role: role,
         contactNumber: contactNumber,
+        temporaryPassword: temporaryPassword,
       ),
     );
   }
@@ -375,6 +390,49 @@ final class FakeAuthRepository implements AuthRepository {
     resetTemporaryPassword = temporaryPassword;
     final AppFailure? failure = nextResetFailure;
     return failure == null ? const Ok<void>(null) : Err<void>(failure);
+  }
+
+  /// What [householdsWithoutLogin] returns, unless [withoutLoginFailure] is
+  /// set.
+  List<HouseholdWithoutLogin> withoutLogin = <HouseholdWithoutLogin>[];
+  AppFailure? withoutLoginFailure;
+
+  int createLoginCalls = 0;
+  HouseholdWithoutLogin? createdLoginHousehold;
+  String? createdLoginUsername;
+  String? createdLoginPassword;
+  AppFailure? nextCreateLoginFailure;
+
+  @override
+  Future<Result<List<HouseholdWithoutLogin>>> householdsWithoutLogin(
+    AreaId areaId,
+  ) async {
+    final AppFailure? failure = withoutLoginFailure;
+    return failure == null
+        ? Ok<List<HouseholdWithoutLogin>>(withoutLogin)
+        : Err<List<HouseholdWithoutLogin>>(failure);
+  }
+
+  @override
+  Future<Result<CreatedHouseholdLogin>> createHouseholdLogin({
+    required HouseholdWithoutLogin household,
+    required String username,
+    required String temporaryPassword,
+  }) async {
+    createLoginCalls++;
+    createdLoginHousehold = household;
+    createdLoginUsername = username;
+    createdLoginPassword = temporaryPassword;
+    final AppFailure? failure = nextCreateLoginFailure;
+    if (failure != null) return Err<CreatedHouseholdLogin>(failure);
+    return Ok<CreatedHouseholdLogin>(
+      CreatedHouseholdLogin(
+        id: const ProfileId('household-login-created'),
+        username: username,
+        household: household,
+        temporaryPassword: temporaryPassword,
+      ),
+    );
   }
 
   void dispose() {
@@ -485,10 +543,19 @@ final class FakeBillRepository implements BillRepository {
 final class FakeSyncService extends SyncService {
   FakeSyncService() : super(FakeOutboxRepository(), const _NoopOutboxGateway());
 
+  final StreamController<SyncReport> _fakeReports =
+      StreamController<SyncReport>.broadcast();
+
+  int startCalls = 0;
   int syncCalls = 0;
 
   @override
-  void start() {}
+  Stream<SyncReport> get reports => _fakeReports.stream;
+
+  void emitReport(SyncReport report) => _fakeReports.add(report);
+
+  @override
+  void start() => startCalls++;
 
   @override
   Future<void> stop() async {}
@@ -497,6 +564,12 @@ final class FakeSyncService extends SyncService {
   Future<Result<SyncReport>> syncNow() async {
     syncCalls++;
     return const Ok<SyncReport>(SyncReport.nothingToDo);
+  }
+
+  @override
+  Future<void> dispose() async {
+    await _fakeReports.close();
+    await super.dispose();
   }
 }
 

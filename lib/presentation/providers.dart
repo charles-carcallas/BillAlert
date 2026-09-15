@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 
 import '../data/local/app_database.dart';
 import '../data/notifications/android_phone_notifier.dart';
+import '../data/notifications/secure_urgent_alerts_setting.dart';
 import '../data/notifications/supabase_alert_feed.dart';
 import '../data/notifications/workmanager_background_alerts.dart';
 import '../data/repositories/auth_repository_impl.dart';
@@ -42,6 +43,7 @@ import '../domain/usecases/consumer/refresh_phone_alerts.dart';
 import '../domain/usecases/reader/load_area_roster.dart';
 import '../domain/usecases/reader/record_meter_reading.dart';
 import '../domain/value_objects/ids.dart';
+import '../domain/value_objects/temporary_password.dart';
 
 /// Where the app is wired together.
 ///
@@ -95,6 +97,17 @@ final notificationPermissionProvider = Provider<NotificationPermission>(
   (Ref ref) => ref.watch(_androidPhoneNotifierProvider),
 );
 
+/// Whether an urgent reminder fills this phone's screen, and asking Android
+/// to allow it.
+final fullScreenAlertsProvider = Provider<FullScreenAlerts>(
+  (Ref ref) => ref.watch(_androidPhoneNotifierProvider),
+);
+
+/// Whether due-date reminders are urgent on this phone. On unless turned off.
+final urgentAlertsSettingProvider = Provider<UrgentAlertsSetting>(
+  (Ref ref) => const SecureUrgentAlertsSetting(),
+);
+
 /// The household's queued notices and unpaid bills, read straight from
 /// Supabase, so the same code runs in the background isolate.
 final alertFeedProvider = Provider<AlertFeed>(
@@ -112,6 +125,7 @@ final refreshPhoneAlertsProvider = Provider<RefreshPhoneAlerts>(
     feed: ref.watch(alertFeedProvider),
     phone: ref.watch(phoneNotifierProvider),
     clock: ref.watch(phClockProvider),
+    urgentAlerts: ref.watch(urgentAlertsSettingProvider),
   ),
 );
 
@@ -131,6 +145,13 @@ final clientUuidFactoryProvider = Provider<ClientUuidFactory>((Ref ref) {
   const uuid = Uuid();
   return () => ClientUuid(uuid.v4());
 });
+
+/// Makes the temporary password an Area President hands over: "BillAlert"
+/// and four secure-random digits. Injected so a test can hand out a known
+/// one and look for it on screen.
+final temporaryPasswordFactoryProvider = Provider<TemporaryPasswordFactory>(
+  (Ref ref) => TemporaryPassword.generate,
+);
 
 // ---------------------------------------------------------------------------
 // Repositories — declared as the abstract type on purpose
@@ -195,7 +216,7 @@ final syncServiceProvider = Provider<SyncService>((Ref ref) {
     ref.watch(outboxRepositoryProvider),
     ref.watch(outboxGatewayProvider),
   );
-  ref.onDispose(service.stop);
+  ref.onDispose(service.dispose);
   return service;
 });
 
@@ -248,9 +269,8 @@ final issueDisconnectionNoticeProvider = Provider<IssueDisconnectionNotice>(
 /// Closing a served notice. Online only, unlike everything else the Admin
 /// does — see [RecordNoticeOutcome] for why it is not queued.
 final recordNoticeOutcomeProvider = Provider<RecordNoticeOutcome>(
-  (Ref ref) => RecordNoticeOutcome(
-    notices: ref.watch(noticeRepositoryProvider),
-  ),
+  (Ref ref) =>
+      RecordNoticeOutcome(notices: ref.watch(noticeRepositoryProvider)),
 );
 
 final postBillAmountProvider = Provider<PostBillAmount>(

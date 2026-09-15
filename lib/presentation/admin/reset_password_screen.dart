@@ -3,23 +3,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/errors/app_failure.dart';
 import '../../domain/entities/managed_account.dart';
-import '../../domain/usecases/admin/reset_account_password.dart';
 import '../common/failure_banner.dart';
 import '../common/final_confirmation_dialog.dart';
 import 'account_form_widgets.dart';
 import 'reset_password_controller.dart';
+import 'temporary_password_card.dart';
 
 /// Admin › Accounts › Reset a forgotten password.
 ///
 /// "Forgot password?" on the sign-in screen sends people to their Area
 /// President. This is what the Area President does next: choose the account,
-/// set a temporary password, and hand it over in person. GEN-04 then makes the
-/// person replace it at their next sign-in, so the Area President never knows
-/// the password that stays.
+/// confirm, and hand over the temporary password BillAlert makes. GEN-04 then
+/// makes the person replace it at their next sign-in, so the Area President
+/// never knows the password that stays.
 ///
-/// Two steps on one screen, like serving a notice: find the account, then set
-/// the password. The password step ends in a final confirmation, because the
-/// person's current password stops working the moment it is confirmed.
+/// Two steps on one screen, like serving a notice: find the account, then
+/// reset it. The reset ends in a final confirmation, because the person's
+/// current password stops working the moment it is confirmed.
 class AdminResetPasswordScreen extends ConsumerStatefulWidget {
   const AdminResetPasswordScreen({super.key});
 
@@ -30,19 +30,8 @@ class AdminResetPasswordScreen extends ConsumerStatefulWidget {
 
 class _AdminResetPasswordScreenState
     extends ConsumerState<AdminResetPasswordScreen> {
-  final TextEditingController _temporary = TextEditingController();
-  final TextEditingController _confirm = TextEditingController();
-
   ManagedAccount? _selected;
   String _query = '';
-  bool _obscure = true;
-
-  @override
-  void dispose() {
-    _temporary.dispose();
-    _confirm.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,13 +39,15 @@ class _AdminResetPasswordScreenState
       adminResetPasswordControllerProvider,
     );
     final ManagedAccount? done = state.resetFor;
+    final String? temporaryPassword = state.temporaryPassword;
     final ManagedAccount? selected = _selected;
 
-    if (done != null) {
+    if (done != null && temporaryPassword != null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Password reset')),
         body: _ResetDone(
           account: done,
+          temporaryPassword: temporaryPassword,
           onResetAnother: _backToList,
           onDone: () => Navigator.of(context).maybePop(),
         ),
@@ -64,7 +55,7 @@ class _AdminResetPasswordScreenState
     }
 
     return PopScope(
-      // On the password step, back returns to the list instead of leaving.
+      // On the reset step, back returns to the list instead of leaving.
       canPop: selected == null,
       onPopInvokedWithResult: (bool didPop, Object? _) {
         if (!didPop) _backToList();
@@ -72,7 +63,7 @@ class _AdminResetPasswordScreenState
       child: Scaffold(
         appBar: AppBar(
           title: Text(
-            selected == null ? 'Reset a password' : 'Set a temporary password',
+            selected == null ? 'Reset a password' : 'Reset this password',
           ),
           leading: selected == null
               ? null
@@ -200,50 +191,13 @@ class _AdminResetPasswordScreenState
         FailureBanner(failure: state.failure!),
         const SizedBox(height: 20),
       ],
-      AccountFormField(
-        label: 'Temporary password',
-        child: TextField(
-          controller: _temporary,
-          enabled: !state.isSubmitting,
-          obscureText: _obscure,
-          autocorrect: false,
-          enableSuggestions: false,
-          textInputAction: TextInputAction.next,
-          decoration: InputDecoration(
-            hintText:
-                'At least ${ResetAccountPassword.minimumLength} characters',
-            suffixIcon: IconButton(
-              tooltip: _obscure ? 'Show password' : 'Hide password',
-              onPressed: state.isSubmitting
-                  ? null
-                  : () => setState(() => _obscure = !_obscure),
-              icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
-            ),
-          ),
-        ),
-      ),
-      const SizedBox(height: 16),
-      AccountFormField(
-        label: 'Confirm temporary password',
-        child: TextField(
-          controller: _confirm,
-          enabled: !state.isSubmitting,
-          obscureText: _obscure,
-          autocorrect: false,
-          enableSuggestions: false,
-          textInputAction: TextInputAction.done,
-          decoration: const InputDecoration(
-            hintText: 'Type the temporary password again',
-          ),
-        ),
-      ),
-      const SizedBox(height: 16),
       AccountFormNote(
-        icon: Icons.lock_reset_outlined,
-        title: 'Secure handoff',
+        icon: Icons.password_outlined,
+        title: 'A new temporary password',
         message:
-            'Give the temporary password to ${account.firstName} in person. '
-            'BillAlert will ask them to choose a new one when they sign in.',
+            'BillAlert makes one, like BillAlert4829, and shows it once after '
+            'the reset. ${account.firstName} must choose their own at the '
+            'next sign-in.',
       ),
       const SizedBox(height: 16),
       SizedBox(
@@ -268,27 +222,14 @@ class _AdminResetPasswordScreenState
   }
 
   void _backToList() {
-    _temporary.clear();
-    _confirm.clear();
     ref.read(adminResetPasswordControllerProvider.notifier).clear();
-    setState(() {
-      _selected = null;
-      _obscure = true;
-    });
+    setState(() => _selected = null);
   }
 
   Future<void> _submit(ManagedAccount account) async {
     final AdminResetPasswordController controller = ref.read(
       adminResetPasswordControllerProvider.notifier,
     );
-
-    // Obvious mistakes go straight to the use case's own messages, without a
-    // confirmation for a reset that could not happen.
-    if (_temporary.text.length < ResetAccountPassword.minimumLength ||
-        _temporary.text != _confirm.text) {
-      await _reset(controller, account);
-      return;
-    }
 
     final bool confirmed = await showFinalConfirmation(
       context,
@@ -305,23 +246,14 @@ class _AdminResetPasswordScreenState
       ],
       warning:
           'Their current password stops working as soon as you confirm, and '
-          'they must choose a new one the next time they sign in. The '
-          'temporary password is not shown here; hand it over in person.',
+          'they must choose a new one the next time they sign in. A temporary '
+          'password is made and shown on the next screen.',
       confirmLabel: 'Reset password',
     );
 
     if (!mounted || !confirmed) return;
-    await _reset(controller, account);
+    await controller.reset(account: account);
   }
-
-  Future<void> _reset(
-    AdminResetPasswordController controller,
-    ManagedAccount account,
-  ) => controller.reset(
-    account: account,
-    temporaryPassword: _temporary.text,
-    confirmPassword: _confirm.text,
-  );
 }
 
 IconData _iconFor(ManagedAccountKind kind) => switch (kind) {
@@ -436,11 +368,13 @@ class _Empty extends StatelessWidget {
 
 class _ResetDone extends StatelessWidget {
   final ManagedAccount account;
+  final String temporaryPassword;
   final VoidCallback onResetAnother;
   final VoidCallback onDone;
 
   const _ResetDone({
     required this.account,
+    required this.temporaryPassword,
     required this.onResetAnother,
     required this.onDone,
   });
@@ -448,13 +382,15 @@ class _ResetDone extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final TextTheme text = Theme.of(context).textTheme;
+    // Scrolls, rather than pushing the buttons down with a Spacer, so the
+    // password card fits on a small phone.
     return SafeArea(
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 400),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 352),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
@@ -466,7 +402,7 @@ class _ResetDone extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Temporary password set for ${account.fullName}',
+                  'New temporary password for ${account.fullName}',
                   style: text.titleLarge,
                   textAlign: TextAlign.center,
                 ),
@@ -476,14 +412,24 @@ class _ResetDone extends StatelessWidget {
                   style: text.bodyMedium,
                   textAlign: TextAlign.center,
                 ),
+                const SizedBox(height: 20),
+                // A household's username is not readable by staff, so only
+                // staff accounts show one. The reference above is theirs.
+                TemporaryPasswordCard(
+                  username: account.kind == ManagedAccountKind.consumer
+                      ? null
+                      : account.reference,
+                  temporaryPassword: temporaryPassword,
+                ),
                 const SizedBox(height: 16),
                 Text(
-                  'Give them the temporary password in person. BillAlert '
-                  'will ask them to choose a new password when they sign in.',
+                  'Give it to ${account.firstName} in person or send it from '
+                  'your phone. It is not shown again, and BillAlert will ask '
+                  'them to choose a new password when they sign in.',
                   style: text.bodySmall,
                   textAlign: TextAlign.center,
                 ),
-                const Spacer(),
+                const SizedBox(height: 32),
                 OutlinedButton(
                   onPressed: onResetAnother,
                   child: const Text('Reset another'),

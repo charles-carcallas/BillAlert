@@ -38,10 +38,14 @@ final class AdminResetPasswordState {
   /// Set once a reset has succeeded, so the screen can say who it was for.
   final ManagedAccount? resetFor;
 
+  /// The new temporary password, set with [resetFor], to be shown once.
+  final String? temporaryPassword;
+
   const AdminResetPasswordState({
     this.isSubmitting = false,
     this.failure,
     this.resetFor,
+    this.temporaryPassword,
   });
 }
 
@@ -50,11 +54,7 @@ class AdminResetPasswordController extends Notifier<AdminResetPasswordState> {
   @override
   AdminResetPasswordState build() => const AdminResetPasswordState();
 
-  Future<void> reset({
-    required ManagedAccount account,
-    required String temporaryPassword,
-    required String confirmPassword,
-  }) async {
+  Future<void> reset({required ManagedAccount account}) async {
     if (state.isSubmitting) return;
 
     final AppUser? user = await ref.read(authControllerProvider.future);
@@ -67,12 +67,13 @@ class AdminResetPasswordController extends Notifier<AdminResetPasswordState> {
 
     final result = await ref.read(resetAccountPasswordUseCaseProvider)(
       account: account,
-      temporaryPassword: temporaryPassword,
-      confirmPassword: confirmPassword,
     );
 
     state = switch (result) {
-      Ok() => AdminResetPasswordState(resetFor: account),
+      Ok(:final value) => AdminResetPasswordState(
+        resetFor: account,
+        temporaryPassword: value,
+      ),
       Err(:final failure) => AdminResetPasswordState(failure: failure),
     };
   }
@@ -84,11 +85,14 @@ class AdminResetPasswordController extends Notifier<AdminResetPasswordState> {
 /// Kept beside the controller, like the staff-creation use case, so the
 /// shared provider composition stays unchanged.
 final resetAccountPasswordUseCaseProvider = Provider<ResetAccountPassword>(
-  (Ref ref) => ResetAccountPassword(auth: ref.watch(authRepositoryProvider)),
+  (Ref ref) => ResetAccountPassword(
+    auth: ref.watch(authRepositoryProvider),
+    newTemporaryPassword: ref.watch(temporaryPasswordFactoryProvider),
+  ),
 );
 
 /// autoDispose, so leaving the screen after a reset does not reopen it on
-/// the success message next time.
+/// the success message — or its password — next time.
 final adminResetPasswordControllerProvider =
     NotifierProvider.autoDispose<
       AdminResetPasswordController,

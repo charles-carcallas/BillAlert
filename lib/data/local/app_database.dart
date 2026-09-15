@@ -34,7 +34,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 5;
 
   /// v1 -> v2: the CHECK constraints and the five indexes that the retired
   /// `local_cache_schema.sql` had and this port had lost.
@@ -64,20 +64,72 @@ class AppDatabase extends _$AppDatabase {
   /// only from the four values in OutboxStatus.
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        onCreate: (Migrator m) => m.createAll(),
-        onUpgrade: (Migrator m, int from, int to) async {
-          if (from < 2) {
-            await m.alterTable(TableMigration(cacheOwner));
-            await m.alterTable(TableMigration(outboxRows));
+    onCreate: (Migrator m) => m.createAll(),
+    onUpgrade: (Migrator m, int from, int to) async {
+      if (from < 2) {
+        // alterTable uses the current (v3) table definition. Add the v3
+        // identity columns to a v1 table first so its copy step has real
+        // source columns instead of trying to select columns that do not
+        // exist yet.
+        await m.addColumn(cacheOwner, cacheOwner.username);
+        await m.addColumn(cacheOwner, cacheOwner.firstName);
+        await m.addColumn(cacheOwner, cacheOwner.lastName);
+        await m.addColumn(cacheOwner, cacheOwner.mustChangePassword);
 
-            await m.createIndex(idxCachedConsumersName);
-            await m.createIndex(idxCachedConsumersArea);
-            await m.createIndex(idxCachedBillsConsumer);
-            await m.createIndex(idxCachedNotifUnread);
-            await m.createIndex(idxOutboxPending);
-          }
-        },
-      );
+        await m.alterTable(TableMigration(cacheOwner));
+        await m.alterTable(TableMigration(outboxRows));
+
+        await m.createIndex(idxCachedConsumersName);
+        await m.createIndex(idxCachedConsumersArea);
+        await m.createIndex(idxCachedBillsConsumer);
+        await m.createIndex(idxCachedNotifUnread);
+        await m.createIndex(idxOutboxPending);
+      }
+      if (from >= 2 && from < 3) {
+        // An existing Supabase session must be usable without signal.
+        // These are nullable so an upgrade never invents identity data;
+        // the next successful online profile load fills them in.
+        await m.addColumn(cacheOwner, cacheOwner.username);
+        await m.addColumn(cacheOwner, cacheOwner.firstName);
+        await m.addColumn(cacheOwner, cacheOwner.lastName);
+        await m.addColumn(cacheOwner, cacheOwner.mustChangePassword);
+      }
+      if (from < 4) {
+        // The first payment/notification cache tables were only skeletal and
+        // were never populated. Add the facts required to reconstruct the
+        // Consumer History, receipt and Inbox screens after a process kill.
+        // All are nullable so an upgrade preserves any legacy cache rows
+        // without inventing receipt or ownership data.
+        await m.addColumn(cachedPayments, cachedPayments.consumerId);
+        await m.addColumn(cachedPayments, cachedPayments.billNo);
+        await m.addColumn(cachedPayments, cachedPayments.cycleLabel);
+        await m.addColumn(cachedPayments, cachedPayments.consumerName);
+        await m.addColumn(cachedPayments, cachedPayments.verificationCode);
+        await m.addColumn(
+          cachedPayments,
+          cachedPayments.transactionTotalCentavos,
+        );
+        await m.addColumn(cachedPayments, cachedPayments.cashTenderedCentavos);
+        await m.addColumn(cachedPayments, cachedPayments.changeDueCentavos);
+        await m.addColumn(cachedNotifications, cachedNotifications.consumerId);
+      }
+      if (from < 5) {
+        // An Inbox alert opens onto its bill or notice and its delivery
+        // details, so the cache keeps those too. Nullable: rows cached before
+        // v5 gain them on the next successful online read.
+        await m.addColumn(cachedNotifications, cachedNotifications.billId);
+        await m.addColumn(
+          cachedNotifications,
+          cachedNotifications.disconnectionId,
+        );
+        await m.addColumn(
+          cachedNotifications,
+          cachedNotifications.failedReason,
+        );
+        await m.addColumn(cachedNotifications, cachedNotifications.sentAt);
+      }
+    },
+  );
 
   /// GEN-06: what signing out destroys.
   ///

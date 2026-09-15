@@ -1,5 +1,7 @@
+import 'package:drift/drift.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/errors/app_failure.dart';
 import '../../core/result/result.dart';
 import '../../domain/repositories/payment_repository.dart';
 import '../../domain/value_objects/ids.dart';
@@ -13,11 +15,13 @@ import '../supabase/failure_mapper.dart';
 /// it goes through the outbox and then through `fn_record_payment`, which
 /// settles every bill of a handover in one transaction.
 class PaymentRepositoryImpl implements PaymentRepository {
-  // ignore: unused_field
   final AppDatabase _db;
   final SupabaseClient _client;
 
   const PaymentRepositoryImpl(this._db, this._client);
+
+  static String _consumerCacheKey(ConsumerId id) =>
+      'consumer_payments:${id.value}';
 
   /// CON-03. Every receipt this consumer has been given, newest first.
   ///
@@ -40,9 +44,24 @@ class PaymentRepositoryImpl implements PaymentRepository {
           .eq('consumer_id', consumerId.value)
           .order('paid_at', ascending: false);
 
+      await _replaceConsumerCache(consumerId, rows);
+      await _markConsumerPaymentsRefreshed(consumerId);
       return Ok<List<PaymentSummary>>(_groupIntoReceipts(rows));
     } catch (error, stackTrace) {
-      return Err<List<PaymentSummary>>(FailureMapper.from(error, stackTrace));
+      final failure = FailureMapper.from(error, stackTrace);
+      if (failure is NetworkFailure) {
+        final cached = await _cachedHistoryFor(consumerId);
+        switch (cached) {
+          case Err(:final failure):
+            return Err<List<PaymentSummary>>(failure);
+          case Ok(:final value):
+            if (value.isNotEmpty ||
+                await _hasConsumerPaymentsCache(consumerId)) {
+              return Ok<List<PaymentSummary>>(value);
+            }
+        }
+      }
+      return Err<List<PaymentSummary>>(failure);
     }
   }
 
@@ -112,7 +131,9 @@ class PaymentRepositoryImpl implements PaymentRepository {
 
   /// Collapses the per-bill rows of `v_payment_history` into one summary per
   /// receipt, keeping the order the rows arrived in (newest first).
-  static List<PaymentSummary> _groupIntoReceipts(List<Map<String, dynamic>> rows) {
+  static List<PaymentSummary> _groupIntoReceipts(
+    List<Map<String, dynamic>> rows,
+  ) {
     // A LinkedHashMap by insertion order, which is what a plain Dart Map is.
     // That is what preserves "newest first" without a second sort.
     final byReceipt = <String, List<Map<String, dynamic>>>{};
@@ -136,12 +157,14 @@ class PaymentRepositoryImpl implements PaymentRepository {
         cashTendered: _moneyOrNull(first['cash_tendered']),
         changeDue: _moneyOrNull(first['change_due']),
         bills: entry.value
-            .map((Map<String, dynamic> row) => SettledBill(
-                  billId: BillId(row['bill_id'] as String),
-                  billNo: BillNumber(row['bill_no'] as String),
-                  cycleLabel: row['cycle_label'] as String? ?? '',
-                  amountPaid: _money(row['amount_paid']),
-                ))
+            .map(
+              (Map<String, dynamic> row) => SettledBill(
+                billId: BillId(row['bill_id'] as String),
+                billNo: BillNumber(row['bill_no'] as String),
+                cycleLabel: row['cycle_label'] as String? ?? '',
+                amountPaid: _money(row['amount_paid']),
+              ),
+            )
             .toList(),
       );
     }).toList();
@@ -152,9 +175,143 @@ class PaymentRepositoryImpl implements PaymentRepository {
   /// PostgREST sends numerics as JSON numbers, and going through
   /// `Money.tryParse` on the string keeps the value away from `double` even
   /// so - the same rule that applies at every other boundary in this app.
-  static Money _money(Object? value) =>
-      value == null ? Money.zero : Money.tryParse(value.toString()) ?? Money.zero;
+  static Money _money(Object? value) => value == null
+      ? Money.zero
+      : Money.tryParse(value.toString()) ?? Money.zero;
 
   static Money? _moneyOrNull(Object? value) =>
       value == null ? null : Money.tryParse(value.toString());
+
+  Future<void> _replaceConsumerCache(
+    ConsumerId consumerId,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    await _db.transaction(() async {
+      await (_db.delete(
+        _db.cachedPayments,
+      )..where((table) => table.consumerId.equals(consumerId.value))).go();
+
+      for (final row in rows) {
+        final amountPaid = _money(row['amount_paid']);
+        final transactionTotal = _money(row['transaction_total']);
+        final cashTendered = _moneyOrNull(row['cash_tendered']);
+        final changeDue = _moneyOrNull(row['change_due']);
+        await _db
+            .into(_db.cachedPayments)
+            .insertOnConflictUpdate(
+              CachedPaymentsCompanion.insert(
+                id: row['payment_id'] as String,
+                consumerId: Value<String?>(row['consumer_id'] as String),
+                billId: Value<String?>(row['bill_id'] as String),
+                billNo: Value<String?>(row['bill_no'] as String),
+                cycleLabel: Value<String?>(row['cycle_label'] as String),
+                receiptNo: row['receipt_no'] as String,
+                consumerName: Value<String?>(
+                  row['consumer_name'] as String? ?? '',
+                ),
+                verificationCode: Value<String?>(
+                  row['verification_code'] as String? ?? '',
+                ),
+                amountPaidCentavos: amountPaid.centavos,
+                transactionTotalCentavos: Value<int?>(
+                  transactionTotal.centavos,
+                ),
+                cashTenderedCentavos: Value<int?>(cashTendered?.centavos),
+                changeDueCentavos: Value<int?>(changeDue?.centavos),
+                paidAt: row['paid_at'] as String,
+              ),
+            );
+      }
+    });
+  }
+
+  Future<Result<List<PaymentSummary>>> _cachedHistoryFor(
+    ConsumerId consumerId,
+  ) async {
+    try {
+      final query = _db.select(_db.cachedPayments)
+        ..where((table) => table.consumerId.equals(consumerId.value))
+        ..orderBy(<OrderingTerm Function($CachedPaymentsTable)>[
+          (table) => OrderingTerm.desc(table.paidAt),
+        ]);
+      final rows = await query.get();
+
+      // Rows created by the old, unused cache shape cannot reconstruct an
+      // honest receipt. Skip them rather than inventing missing facts.
+      final complete = rows.where(
+        (row) =>
+            row.consumerId != null &&
+            row.billId != null &&
+            row.billNo != null &&
+            row.cycleLabel != null &&
+            row.consumerName != null &&
+            row.verificationCode != null &&
+            row.transactionTotalCentavos != null,
+      );
+      final byReceipt = <String, List<CachedPaymentRow>>{};
+      for (final row in complete) {
+        byReceipt
+            .putIfAbsent(row.receiptNo, () => <CachedPaymentRow>[])
+            .add(row);
+      }
+
+      return Ok<List<PaymentSummary>>(
+        byReceipt.entries.map((entry) {
+          final first = entry.value.first;
+          return PaymentSummary(
+            receiptNo: entry.key,
+            consumerId: ConsumerId(first.consumerId!),
+            consumerName: first.consumerName!,
+            verificationCode: first.verificationCode!,
+            paidAt: DateTime.parse(first.paidAt),
+            totalCollected: Money.fromCentavos(first.transactionTotalCentavos!),
+            cashTendered: first.cashTenderedCentavos == null
+                ? null
+                : Money.fromCentavos(first.cashTenderedCentavos!),
+            changeDue: first.changeDueCentavos == null
+                ? null
+                : Money.fromCentavos(first.changeDueCentavos!),
+            bills: entry.value
+                .map(
+                  (row) => SettledBill(
+                    billId: BillId(row.billId!),
+                    billNo: BillNumber(row.billNo!),
+                    cycleLabel: row.cycleLabel!,
+                    amountPaid: Money.fromCentavos(row.amountPaidCentavos),
+                  ),
+                )
+                .toList(),
+          );
+        }).toList(),
+      );
+    } catch (error) {
+      return Err<List<PaymentSummary>>(
+        ServerFailure(
+          'Could not read the receipts saved on this phone.',
+          error.toString(),
+        ),
+      );
+    }
+  }
+
+  Future<void> _markConsumerPaymentsRefreshed(ConsumerId consumerId) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+    await _db
+        .into(_db.syncMeta)
+        .insertOnConflictUpdate(
+          SyncMetaCompanion.insert(
+            tableName_: _consumerCacheKey(consumerId),
+            lastRefreshedAt: Value<String?>(now),
+            lastAttemptAt: Value<String?>(now),
+            lastError: const Value<String?>(null),
+          ),
+        );
+  }
+
+  Future<bool> _hasConsumerPaymentsCache(ConsumerId consumerId) async {
+    final query = _db.select(
+      _db.syncMeta,
+    )..where((table) => table.tableName_.equals(_consumerCacheKey(consumerId)));
+    return await query.getSingleOrNull() != null;
+  }
 }

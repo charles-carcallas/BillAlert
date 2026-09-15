@@ -1,4 +1,5 @@
 import 'package:billalert/core/errors/app_failure.dart';
+import 'package:billalert/data/sync/sync_service.dart';
 import 'package:billalert/domain/entities/app_user.dart';
 import 'package:billalert/domain/entities/bill.dart';
 import 'package:billalert/domain/outbox/outbox_operation.dart';
@@ -189,7 +190,7 @@ void main() {
     await tester.tap(find.text('OK'));
     await tester.pumpAndSettle();
 
-    final Finder postRounded = find.text('Post · ₱500.00 (rounded up)');
+    final Finder postRounded = find.text('Review · ₱500.00 (rounded up)');
     await tester.ensureVisible(postRounded);
     await tester.pumpAndSettle();
     await tester.tap(postRounded);
@@ -213,10 +214,59 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(outbox.enqueued, hasLength(1));
+    expect(find.byType(BottomSheet), findsNothing);
     expect(
       (outbox.enqueued.single as PostAmountOperation).amount,
       Money.of(500),
     );
+  });
+
+  testWidgets('amount popup protects a draft on back and can discard it', (
+    tester,
+  ) async {
+    final container = harness();
+    await loaded(container);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: PostBillAmountScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Bienvenido Sarigumba'));
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(find.textContaining('August 2026 ·'), findsOneWidget);
+    await tester.enterText(find.byType(TextField).last, '499.41');
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Discard entered amount?'), findsOneWidget);
+    await tester.tap(find.text('Keep editing'));
+    await tester.pumpAndSettle();
+    expect(find.text('499.41'), findsOneWidget);
+    expect(outbox.enqueued, isEmpty);
+    await tester.ensureVisible(find.byTooltip('Close amount form'));
+    await tester.tap(find.byTooltip('Close amount form'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Discard'));
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(outbox.enqueued, isEmpty);
+    expect(find.text('Bienvenido Sarigumba'), findsOneWidget);
+  });
+
+  test('an offline refresh keeps the last visible queue', () async {
+    final container = harness();
+    final controller = await loaded(container);
+    bills.awaitingFailure = const NetworkFailure();
+
+    await controller.refresh();
+
+    expect(
+      stateOf(container).queue.single.consumerName,
+      'Bienvenido Sarigumba',
+    );
+    expect(stateOf(container).failure, isA<NetworkFailure>());
   });
 
   test('an amount with centavos is always rounded up in the outbox', () async {
@@ -393,5 +443,57 @@ void main() {
     expect(bills.awaitingCalls, greaterThan(callsBefore));
     expect(stateOf(container).queue, isEmpty);
     expect(stateOf(container).postedMessage, contains('Bienvenido Sarigumba'));
+  });
+
+  test('a queued offline post is described as waiting, not posted', () async {
+    final container = harness();
+    final controller = await loaded(container);
+
+    await controller.post(
+      entry: sarigumba(),
+      amountText: '658.30',
+      dueDate: const PhDate(2026, 9, 25),
+    );
+
+    expect(
+      stateOf(container).queue,
+      isEmpty,
+      reason: 'a locally queued bill must not remain actionable',
+    );
+    expect(stateOf(container).postedMessage, contains('waiting to sync'));
+  });
+
+  test('a server queue reload hides a bill already queued on-device', () async {
+    final container = harness();
+    final controller = await loaded(container);
+
+    await outbox.enqueue(
+      PostAmountOperation(
+        clientUuid: const ClientUuid('already-queued'),
+        capturedAt: DateTime.utc(2026, 9, 9),
+        billId: sarigumba().bill.id,
+        amount: const Money.fromCentavos(65900),
+        dueDate: const PhDate(2026, 9, 25),
+        billLabel: sarigumba().bill.billNo.value,
+      ),
+    );
+
+    await controller.refresh();
+
+    expect(stateOf(container).queue, isEmpty);
+  });
+
+  test('a successful background sync refreshes the visible queue', () async {
+    final container = harness();
+    await loaded(container);
+    final int callsBefore = bills.awaitingCalls;
+    bills.queue = <AwaitingAmountEntry>[];
+
+    sync.emitReport(const SyncReport(attempted: 1, succeeded: 1, failed: 0));
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(bills.awaitingCalls, greaterThan(callsBefore));
+    expect(stateOf(container).queue, isEmpty);
   });
 }

@@ -24,6 +24,15 @@ void main() {
 
     expect(find.text('Consumer number'), findsOneWidget);
     expect(find.text('Role'), findsNothing);
+    // MTR-04: a household added earlier gets its sign-in from here. It sits
+    // below the form, so the lazily built list is scrolled to it first.
+    final Finder giveSignIn = find.text('Give an existing household a sign-in');
+    await tester.scrollUntilVisible(
+      giveSignIn,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(giveSignIn, findsOneWidget);
 
     await tester.tap(find.text('Staff account'));
     await tester.pumpAndSettle();

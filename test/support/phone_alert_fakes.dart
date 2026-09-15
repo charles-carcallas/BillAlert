@@ -120,3 +120,45 @@ final class FakeBackgroundAlerts implements BackgroundAlerts {
     stops++;
   }
 }
+
+/// Urgent due-date alerts, on or off, held in memory. On, like the real one.
+final class FakeUrgentAlertsSetting implements UrgentAlertsSetting {
+  bool on;
+
+  FakeUrgentAlertsSetting({this.on = true});
+
+  @override
+  Future<bool> isOn() async => on;
+
+  @override
+  Future<void> turnOn() async {
+    on = true;
+  }
+
+  @override
+  Future<void> turnOff() async {
+    on = false;
+  }
+}
+
+/// Android's full-screen alert, without Android.
+final class FakeFullScreenAlerts implements FullScreenAlerts {
+  /// Android 14 and later fill the screen; older phones pop up.
+  final bool androidFourteen;
+
+  /// What the household does on Android's "Allow full-screen" page.
+  final bool grants;
+
+  int requests = 0;
+
+  FakeFullScreenAlerts({this.androidFourteen = false, this.grants = true});
+
+  @override
+  Future<bool> fillsScreen() async => androidFourteen;
+
+  @override
+  Future<bool> allow() async {
+    requests++;
+    return grants;
+  }
+}

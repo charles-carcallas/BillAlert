@@ -98,7 +98,7 @@ void main() {
     expect(find.text('Welcome back, Ledesman'), findsOneWidget);
   });
 
-  testWidgets('"Sign in with a different account" signs the session out', (
+  testWidgets('"Use username and password" signs the session out', (
     WidgetTester tester,
   ) async {
     final auth = _RecordingAuthController(signedInUser: reader);
@@ -106,7 +106,7 @@ void main() {
     await tester.pumpWidget(screen(auth: auth, phone: FakeDeviceUnlock()));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Sign in with a different account'));
+    await tester.tap(find.text('Use username and password'));
     await tester.pumpAndSettle();
 
     expect(auth.signOutCalls, 1);

@@ -52,6 +52,14 @@ class AuthController extends AsyncNotifier<AppUser?> {
       await ref
           .read(appLockControllerProvider.notifier)
           .lockIfTurnedOnFor(user);
+
+      // A restored session needs the same reconnect listener as a fresh
+      // password sign-in. Without this, force-killing the app while offline
+      // and reopening it left the durable outbox stranded even after signal
+      // returned.
+      final sync = ref.read(syncServiceProvider);
+      sync.start();
+      unawaited(sync.syncNow());
     }
     _ready = true;
 
@@ -143,5 +151,6 @@ class AuthController extends AsyncNotifier<AppUser?> {
   }
 }
 
-final authControllerProvider =
-    AsyncNotifierProvider<AuthController, AppUser?>(AuthController.new);
+final authControllerProvider = AsyncNotifierProvider<AuthController, AppUser?>(
+  AuthController.new,
+);

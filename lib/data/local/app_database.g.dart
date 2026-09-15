@@ -1427,10 +1427,41 @@ class $CachedPaymentsTable extends CachedPayments
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _consumerIdMeta = const VerificationMeta(
+    'consumerId',
+  );
+  @override
+  late final GeneratedColumn<String> consumerId = GeneratedColumn<String>(
+    'consumer_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _billIdMeta = const VerificationMeta('billId');
   @override
   late final GeneratedColumn<String> billId = GeneratedColumn<String>(
     'bill_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _billNoMeta = const VerificationMeta('billNo');
+  @override
+  late final GeneratedColumn<String> billNo = GeneratedColumn<String>(
+    'bill_no',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _cycleLabelMeta = const VerificationMeta(
+    'cycleLabel',
+  );
+  @override
+  late final GeneratedColumn<String> cycleLabel = GeneratedColumn<String>(
+    'cycle_label',
     aliasedName,
     true,
     type: DriftSqlType.string,
@@ -1447,6 +1478,28 @@ class $CachedPaymentsTable extends CachedPayments
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _consumerNameMeta = const VerificationMeta(
+    'consumerName',
+  );
+  @override
+  late final GeneratedColumn<String> consumerName = GeneratedColumn<String>(
+    'consumer_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _verificationCodeMeta = const VerificationMeta(
+    'verificationCode',
+  );
+  @override
+  late final GeneratedColumn<String> verificationCode = GeneratedColumn<String>(
+    'verification_code',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _amountPaidCentavosMeta =
       const VerificationMeta('amountPaidCentavos');
   @override
@@ -1456,6 +1509,38 @@ class $CachedPaymentsTable extends CachedPayments
     false,
     type: DriftSqlType.int,
     requiredDuringInsert: true,
+  );
+  static const VerificationMeta _transactionTotalCentavosMeta =
+      const VerificationMeta('transactionTotalCentavos');
+  @override
+  late final GeneratedColumn<int> transactionTotalCentavos =
+      GeneratedColumn<int>(
+        'transaction_total_centavos',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _cashTenderedCentavosMeta =
+      const VerificationMeta('cashTenderedCentavos');
+  @override
+  late final GeneratedColumn<int> cashTenderedCentavos = GeneratedColumn<int>(
+    'cash_tendered_centavos',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _changeDueCentavosMeta = const VerificationMeta(
+    'changeDueCentavos',
+  );
+  @override
+  late final GeneratedColumn<int> changeDueCentavos = GeneratedColumn<int>(
+    'change_due_centavos',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _paidAtMeta = const VerificationMeta('paidAt');
   @override
@@ -1469,9 +1554,17 @@ class $CachedPaymentsTable extends CachedPayments
   @override
   List<GeneratedColumn> get $columns => [
     id,
+    consumerId,
     billId,
+    billNo,
+    cycleLabel,
     receiptNo,
+    consumerName,
+    verificationCode,
     amountPaidCentavos,
+    transactionTotalCentavos,
+    cashTenderedCentavos,
+    changeDueCentavos,
     paidAt,
   ];
   @override
@@ -1491,10 +1584,28 @@ class $CachedPaymentsTable extends CachedPayments
     } else if (isInserting) {
       context.missing(_idMeta);
     }
+    if (data.containsKey('consumer_id')) {
+      context.handle(
+        _consumerIdMeta,
+        consumerId.isAcceptableOrUnknown(data['consumer_id']!, _consumerIdMeta),
+      );
+    }
     if (data.containsKey('bill_id')) {
       context.handle(
         _billIdMeta,
         billId.isAcceptableOrUnknown(data['bill_id']!, _billIdMeta),
+      );
+    }
+    if (data.containsKey('bill_no')) {
+      context.handle(
+        _billNoMeta,
+        billNo.isAcceptableOrUnknown(data['bill_no']!, _billNoMeta),
+      );
+    }
+    if (data.containsKey('cycle_label')) {
+      context.handle(
+        _cycleLabelMeta,
+        cycleLabel.isAcceptableOrUnknown(data['cycle_label']!, _cycleLabelMeta),
       );
     }
     if (data.containsKey('receipt_no')) {
@@ -1504,6 +1615,24 @@ class $CachedPaymentsTable extends CachedPayments
       );
     } else if (isInserting) {
       context.missing(_receiptNoMeta);
+    }
+    if (data.containsKey('consumer_name')) {
+      context.handle(
+        _consumerNameMeta,
+        consumerName.isAcceptableOrUnknown(
+          data['consumer_name']!,
+          _consumerNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('verification_code')) {
+      context.handle(
+        _verificationCodeMeta,
+        verificationCode.isAcceptableOrUnknown(
+          data['verification_code']!,
+          _verificationCodeMeta,
+        ),
+      );
     }
     if (data.containsKey('amount_paid_centavos')) {
       context.handle(
@@ -1515,6 +1644,33 @@ class $CachedPaymentsTable extends CachedPayments
       );
     } else if (isInserting) {
       context.missing(_amountPaidCentavosMeta);
+    }
+    if (data.containsKey('transaction_total_centavos')) {
+      context.handle(
+        _transactionTotalCentavosMeta,
+        transactionTotalCentavos.isAcceptableOrUnknown(
+          data['transaction_total_centavos']!,
+          _transactionTotalCentavosMeta,
+        ),
+      );
+    }
+    if (data.containsKey('cash_tendered_centavos')) {
+      context.handle(
+        _cashTenderedCentavosMeta,
+        cashTenderedCentavos.isAcceptableOrUnknown(
+          data['cash_tendered_centavos']!,
+          _cashTenderedCentavosMeta,
+        ),
+      );
+    }
+    if (data.containsKey('change_due_centavos')) {
+      context.handle(
+        _changeDueCentavosMeta,
+        changeDueCentavos.isAcceptableOrUnknown(
+          data['change_due_centavos']!,
+          _changeDueCentavosMeta,
+        ),
+      );
     }
     if (data.containsKey('paid_at')) {
       context.handle(
@@ -1537,18 +1693,50 @@ class $CachedPaymentsTable extends CachedPayments
         DriftSqlType.string,
         data['${effectivePrefix}id'],
       )!,
+      consumerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}consumer_id'],
+      ),
       billId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}bill_id'],
+      ),
+      billNo: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}bill_no'],
+      ),
+      cycleLabel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}cycle_label'],
       ),
       receiptNo: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}receipt_no'],
       )!,
+      consumerName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}consumer_name'],
+      ),
+      verificationCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}verification_code'],
+      ),
       amountPaidCentavos: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}amount_paid_centavos'],
       )!,
+      transactionTotalCentavos: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}transaction_total_centavos'],
+      ),
+      cashTenderedCentavos: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}cash_tendered_centavos'],
+      ),
+      changeDueCentavos: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}change_due_centavos'],
+      ),
       paidAt: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}paid_at'],
@@ -1565,26 +1753,71 @@ class $CachedPaymentsTable extends CachedPayments
 class CachedPaymentRow extends DataClass
     implements Insertable<CachedPaymentRow> {
   final String id;
+
+  /// Nullable only for databases upgraded from the original unused cache
+  /// shape. Every row written by the current app carries the household id.
+  final String? consumerId;
   final String? billId;
+  final String? billNo;
+  final String? cycleLabel;
   final String receiptNo;
+  final String? consumerName;
+  final String? verificationCode;
   final int amountPaidCentavos;
+  final int? transactionTotalCentavos;
+  final int? cashTenderedCentavos;
+  final int? changeDueCentavos;
   final String paidAt;
   const CachedPaymentRow({
     required this.id,
+    this.consumerId,
     this.billId,
+    this.billNo,
+    this.cycleLabel,
     required this.receiptNo,
+    this.consumerName,
+    this.verificationCode,
     required this.amountPaidCentavos,
+    this.transactionTotalCentavos,
+    this.cashTenderedCentavos,
+    this.changeDueCentavos,
     required this.paidAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
+    if (!nullToAbsent || consumerId != null) {
+      map['consumer_id'] = Variable<String>(consumerId);
+    }
     if (!nullToAbsent || billId != null) {
       map['bill_id'] = Variable<String>(billId);
     }
+    if (!nullToAbsent || billNo != null) {
+      map['bill_no'] = Variable<String>(billNo);
+    }
+    if (!nullToAbsent || cycleLabel != null) {
+      map['cycle_label'] = Variable<String>(cycleLabel);
+    }
     map['receipt_no'] = Variable<String>(receiptNo);
+    if (!nullToAbsent || consumerName != null) {
+      map['consumer_name'] = Variable<String>(consumerName);
+    }
+    if (!nullToAbsent || verificationCode != null) {
+      map['verification_code'] = Variable<String>(verificationCode);
+    }
     map['amount_paid_centavos'] = Variable<int>(amountPaidCentavos);
+    if (!nullToAbsent || transactionTotalCentavos != null) {
+      map['transaction_total_centavos'] = Variable<int>(
+        transactionTotalCentavos,
+      );
+    }
+    if (!nullToAbsent || cashTenderedCentavos != null) {
+      map['cash_tendered_centavos'] = Variable<int>(cashTenderedCentavos);
+    }
+    if (!nullToAbsent || changeDueCentavos != null) {
+      map['change_due_centavos'] = Variable<int>(changeDueCentavos);
+    }
     map['paid_at'] = Variable<String>(paidAt);
     return map;
   }
@@ -1592,11 +1825,35 @@ class CachedPaymentRow extends DataClass
   CachedPaymentsCompanion toCompanion(bool nullToAbsent) {
     return CachedPaymentsCompanion(
       id: Value(id),
+      consumerId: consumerId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(consumerId),
       billId: billId == null && nullToAbsent
           ? const Value.absent()
           : Value(billId),
+      billNo: billNo == null && nullToAbsent
+          ? const Value.absent()
+          : Value(billNo),
+      cycleLabel: cycleLabel == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cycleLabel),
       receiptNo: Value(receiptNo),
+      consumerName: consumerName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(consumerName),
+      verificationCode: verificationCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(verificationCode),
       amountPaidCentavos: Value(amountPaidCentavos),
+      transactionTotalCentavos: transactionTotalCentavos == null && nullToAbsent
+          ? const Value.absent()
+          : Value(transactionTotalCentavos),
+      cashTenderedCentavos: cashTenderedCentavos == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cashTenderedCentavos),
+      changeDueCentavos: changeDueCentavos == null && nullToAbsent
+          ? const Value.absent()
+          : Value(changeDueCentavos),
       paidAt: Value(paidAt),
     );
   }
@@ -1608,9 +1865,21 @@ class CachedPaymentRow extends DataClass
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return CachedPaymentRow(
       id: serializer.fromJson<String>(json['id']),
+      consumerId: serializer.fromJson<String?>(json['consumerId']),
       billId: serializer.fromJson<String?>(json['billId']),
+      billNo: serializer.fromJson<String?>(json['billNo']),
+      cycleLabel: serializer.fromJson<String?>(json['cycleLabel']),
       receiptNo: serializer.fromJson<String>(json['receiptNo']),
+      consumerName: serializer.fromJson<String?>(json['consumerName']),
+      verificationCode: serializer.fromJson<String?>(json['verificationCode']),
       amountPaidCentavos: serializer.fromJson<int>(json['amountPaidCentavos']),
+      transactionTotalCentavos: serializer.fromJson<int?>(
+        json['transactionTotalCentavos'],
+      ),
+      cashTenderedCentavos: serializer.fromJson<int?>(
+        json['cashTenderedCentavos'],
+      ),
+      changeDueCentavos: serializer.fromJson<int?>(json['changeDueCentavos']),
       paidAt: serializer.fromJson<String>(json['paidAt']),
     );
   }
@@ -1619,34 +1888,90 @@ class CachedPaymentRow extends DataClass
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
+      'consumerId': serializer.toJson<String?>(consumerId),
       'billId': serializer.toJson<String?>(billId),
+      'billNo': serializer.toJson<String?>(billNo),
+      'cycleLabel': serializer.toJson<String?>(cycleLabel),
       'receiptNo': serializer.toJson<String>(receiptNo),
+      'consumerName': serializer.toJson<String?>(consumerName),
+      'verificationCode': serializer.toJson<String?>(verificationCode),
       'amountPaidCentavos': serializer.toJson<int>(amountPaidCentavos),
+      'transactionTotalCentavos': serializer.toJson<int?>(
+        transactionTotalCentavos,
+      ),
+      'cashTenderedCentavos': serializer.toJson<int?>(cashTenderedCentavos),
+      'changeDueCentavos': serializer.toJson<int?>(changeDueCentavos),
       'paidAt': serializer.toJson<String>(paidAt),
     };
   }
 
   CachedPaymentRow copyWith({
     String? id,
+    Value<String?> consumerId = const Value.absent(),
     Value<String?> billId = const Value.absent(),
+    Value<String?> billNo = const Value.absent(),
+    Value<String?> cycleLabel = const Value.absent(),
     String? receiptNo,
+    Value<String?> consumerName = const Value.absent(),
+    Value<String?> verificationCode = const Value.absent(),
     int? amountPaidCentavos,
+    Value<int?> transactionTotalCentavos = const Value.absent(),
+    Value<int?> cashTenderedCentavos = const Value.absent(),
+    Value<int?> changeDueCentavos = const Value.absent(),
     String? paidAt,
   }) => CachedPaymentRow(
     id: id ?? this.id,
+    consumerId: consumerId.present ? consumerId.value : this.consumerId,
     billId: billId.present ? billId.value : this.billId,
+    billNo: billNo.present ? billNo.value : this.billNo,
+    cycleLabel: cycleLabel.present ? cycleLabel.value : this.cycleLabel,
     receiptNo: receiptNo ?? this.receiptNo,
+    consumerName: consumerName.present ? consumerName.value : this.consumerName,
+    verificationCode: verificationCode.present
+        ? verificationCode.value
+        : this.verificationCode,
     amountPaidCentavos: amountPaidCentavos ?? this.amountPaidCentavos,
+    transactionTotalCentavos: transactionTotalCentavos.present
+        ? transactionTotalCentavos.value
+        : this.transactionTotalCentavos,
+    cashTenderedCentavos: cashTenderedCentavos.present
+        ? cashTenderedCentavos.value
+        : this.cashTenderedCentavos,
+    changeDueCentavos: changeDueCentavos.present
+        ? changeDueCentavos.value
+        : this.changeDueCentavos,
     paidAt: paidAt ?? this.paidAt,
   );
   CachedPaymentRow copyWithCompanion(CachedPaymentsCompanion data) {
     return CachedPaymentRow(
       id: data.id.present ? data.id.value : this.id,
+      consumerId: data.consumerId.present
+          ? data.consumerId.value
+          : this.consumerId,
       billId: data.billId.present ? data.billId.value : this.billId,
+      billNo: data.billNo.present ? data.billNo.value : this.billNo,
+      cycleLabel: data.cycleLabel.present
+          ? data.cycleLabel.value
+          : this.cycleLabel,
       receiptNo: data.receiptNo.present ? data.receiptNo.value : this.receiptNo,
+      consumerName: data.consumerName.present
+          ? data.consumerName.value
+          : this.consumerName,
+      verificationCode: data.verificationCode.present
+          ? data.verificationCode.value
+          : this.verificationCode,
       amountPaidCentavos: data.amountPaidCentavos.present
           ? data.amountPaidCentavos.value
           : this.amountPaidCentavos,
+      transactionTotalCentavos: data.transactionTotalCentavos.present
+          ? data.transactionTotalCentavos.value
+          : this.transactionTotalCentavos,
+      cashTenderedCentavos: data.cashTenderedCentavos.present
+          ? data.cashTenderedCentavos.value
+          : this.cashTenderedCentavos,
+      changeDueCentavos: data.changeDueCentavos.present
+          ? data.changeDueCentavos.value
+          : this.changeDueCentavos,
       paidAt: data.paidAt.present ? data.paidAt.value : this.paidAt,
     );
   }
@@ -1655,48 +1980,101 @@ class CachedPaymentRow extends DataClass
   String toString() {
     return (StringBuffer('CachedPaymentRow(')
           ..write('id: $id, ')
+          ..write('consumerId: $consumerId, ')
           ..write('billId: $billId, ')
+          ..write('billNo: $billNo, ')
+          ..write('cycleLabel: $cycleLabel, ')
           ..write('receiptNo: $receiptNo, ')
+          ..write('consumerName: $consumerName, ')
+          ..write('verificationCode: $verificationCode, ')
           ..write('amountPaidCentavos: $amountPaidCentavos, ')
+          ..write('transactionTotalCentavos: $transactionTotalCentavos, ')
+          ..write('cashTenderedCentavos: $cashTenderedCentavos, ')
+          ..write('changeDueCentavos: $changeDueCentavos, ')
           ..write('paidAt: $paidAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, billId, receiptNo, amountPaidCentavos, paidAt);
+  int get hashCode => Object.hash(
+    id,
+    consumerId,
+    billId,
+    billNo,
+    cycleLabel,
+    receiptNo,
+    consumerName,
+    verificationCode,
+    amountPaidCentavos,
+    transactionTotalCentavos,
+    cashTenderedCentavos,
+    changeDueCentavos,
+    paidAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is CachedPaymentRow &&
           other.id == this.id &&
+          other.consumerId == this.consumerId &&
           other.billId == this.billId &&
+          other.billNo == this.billNo &&
+          other.cycleLabel == this.cycleLabel &&
           other.receiptNo == this.receiptNo &&
+          other.consumerName == this.consumerName &&
+          other.verificationCode == this.verificationCode &&
           other.amountPaidCentavos == this.amountPaidCentavos &&
+          other.transactionTotalCentavos == this.transactionTotalCentavos &&
+          other.cashTenderedCentavos == this.cashTenderedCentavos &&
+          other.changeDueCentavos == this.changeDueCentavos &&
           other.paidAt == this.paidAt);
 }
 
 class CachedPaymentsCompanion extends UpdateCompanion<CachedPaymentRow> {
   final Value<String> id;
+  final Value<String?> consumerId;
   final Value<String?> billId;
+  final Value<String?> billNo;
+  final Value<String?> cycleLabel;
   final Value<String> receiptNo;
+  final Value<String?> consumerName;
+  final Value<String?> verificationCode;
   final Value<int> amountPaidCentavos;
+  final Value<int?> transactionTotalCentavos;
+  final Value<int?> cashTenderedCentavos;
+  final Value<int?> changeDueCentavos;
   final Value<String> paidAt;
   final Value<int> rowid;
   const CachedPaymentsCompanion({
     this.id = const Value.absent(),
+    this.consumerId = const Value.absent(),
     this.billId = const Value.absent(),
+    this.billNo = const Value.absent(),
+    this.cycleLabel = const Value.absent(),
     this.receiptNo = const Value.absent(),
+    this.consumerName = const Value.absent(),
+    this.verificationCode = const Value.absent(),
     this.amountPaidCentavos = const Value.absent(),
+    this.transactionTotalCentavos = const Value.absent(),
+    this.cashTenderedCentavos = const Value.absent(),
+    this.changeDueCentavos = const Value.absent(),
     this.paidAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   CachedPaymentsCompanion.insert({
     required String id,
+    this.consumerId = const Value.absent(),
     this.billId = const Value.absent(),
+    this.billNo = const Value.absent(),
+    this.cycleLabel = const Value.absent(),
     required String receiptNo,
+    this.consumerName = const Value.absent(),
+    this.verificationCode = const Value.absent(),
     required int amountPaidCentavos,
+    this.transactionTotalCentavos = const Value.absent(),
+    this.cashTenderedCentavos = const Value.absent(),
+    this.changeDueCentavos = const Value.absent(),
     required String paidAt,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -1705,18 +2083,36 @@ class CachedPaymentsCompanion extends UpdateCompanion<CachedPaymentRow> {
        paidAt = Value(paidAt);
   static Insertable<CachedPaymentRow> custom({
     Expression<String>? id,
+    Expression<String>? consumerId,
     Expression<String>? billId,
+    Expression<String>? billNo,
+    Expression<String>? cycleLabel,
     Expression<String>? receiptNo,
+    Expression<String>? consumerName,
+    Expression<String>? verificationCode,
     Expression<int>? amountPaidCentavos,
+    Expression<int>? transactionTotalCentavos,
+    Expression<int>? cashTenderedCentavos,
+    Expression<int>? changeDueCentavos,
     Expression<String>? paidAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (consumerId != null) 'consumer_id': consumerId,
       if (billId != null) 'bill_id': billId,
+      if (billNo != null) 'bill_no': billNo,
+      if (cycleLabel != null) 'cycle_label': cycleLabel,
       if (receiptNo != null) 'receipt_no': receiptNo,
+      if (consumerName != null) 'consumer_name': consumerName,
+      if (verificationCode != null) 'verification_code': verificationCode,
       if (amountPaidCentavos != null)
         'amount_paid_centavos': amountPaidCentavos,
+      if (transactionTotalCentavos != null)
+        'transaction_total_centavos': transactionTotalCentavos,
+      if (cashTenderedCentavos != null)
+        'cash_tendered_centavos': cashTenderedCentavos,
+      if (changeDueCentavos != null) 'change_due_centavos': changeDueCentavos,
       if (paidAt != null) 'paid_at': paidAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -1724,17 +2120,34 @@ class CachedPaymentsCompanion extends UpdateCompanion<CachedPaymentRow> {
 
   CachedPaymentsCompanion copyWith({
     Value<String>? id,
+    Value<String?>? consumerId,
     Value<String?>? billId,
+    Value<String?>? billNo,
+    Value<String?>? cycleLabel,
     Value<String>? receiptNo,
+    Value<String?>? consumerName,
+    Value<String?>? verificationCode,
     Value<int>? amountPaidCentavos,
+    Value<int?>? transactionTotalCentavos,
+    Value<int?>? cashTenderedCentavos,
+    Value<int?>? changeDueCentavos,
     Value<String>? paidAt,
     Value<int>? rowid,
   }) {
     return CachedPaymentsCompanion(
       id: id ?? this.id,
+      consumerId: consumerId ?? this.consumerId,
       billId: billId ?? this.billId,
+      billNo: billNo ?? this.billNo,
+      cycleLabel: cycleLabel ?? this.cycleLabel,
       receiptNo: receiptNo ?? this.receiptNo,
+      consumerName: consumerName ?? this.consumerName,
+      verificationCode: verificationCode ?? this.verificationCode,
       amountPaidCentavos: amountPaidCentavos ?? this.amountPaidCentavos,
+      transactionTotalCentavos:
+          transactionTotalCentavos ?? this.transactionTotalCentavos,
+      cashTenderedCentavos: cashTenderedCentavos ?? this.cashTenderedCentavos,
+      changeDueCentavos: changeDueCentavos ?? this.changeDueCentavos,
       paidAt: paidAt ?? this.paidAt,
       rowid: rowid ?? this.rowid,
     );
@@ -1746,14 +2159,40 @@ class CachedPaymentsCompanion extends UpdateCompanion<CachedPaymentRow> {
     if (id.present) {
       map['id'] = Variable<String>(id.value);
     }
+    if (consumerId.present) {
+      map['consumer_id'] = Variable<String>(consumerId.value);
+    }
     if (billId.present) {
       map['bill_id'] = Variable<String>(billId.value);
+    }
+    if (billNo.present) {
+      map['bill_no'] = Variable<String>(billNo.value);
+    }
+    if (cycleLabel.present) {
+      map['cycle_label'] = Variable<String>(cycleLabel.value);
     }
     if (receiptNo.present) {
       map['receipt_no'] = Variable<String>(receiptNo.value);
     }
+    if (consumerName.present) {
+      map['consumer_name'] = Variable<String>(consumerName.value);
+    }
+    if (verificationCode.present) {
+      map['verification_code'] = Variable<String>(verificationCode.value);
+    }
     if (amountPaidCentavos.present) {
       map['amount_paid_centavos'] = Variable<int>(amountPaidCentavos.value);
+    }
+    if (transactionTotalCentavos.present) {
+      map['transaction_total_centavos'] = Variable<int>(
+        transactionTotalCentavos.value,
+      );
+    }
+    if (cashTenderedCentavos.present) {
+      map['cash_tendered_centavos'] = Variable<int>(cashTenderedCentavos.value);
+    }
+    if (changeDueCentavos.present) {
+      map['change_due_centavos'] = Variable<int>(changeDueCentavos.value);
     }
     if (paidAt.present) {
       map['paid_at'] = Variable<String>(paidAt.value);
@@ -1768,9 +2207,17 @@ class CachedPaymentsCompanion extends UpdateCompanion<CachedPaymentRow> {
   String toString() {
     return (StringBuffer('CachedPaymentsCompanion(')
           ..write('id: $id, ')
+          ..write('consumerId: $consumerId, ')
           ..write('billId: $billId, ')
+          ..write('billNo: $billNo, ')
+          ..write('cycleLabel: $cycleLabel, ')
           ..write('receiptNo: $receiptNo, ')
+          ..write('consumerName: $consumerName, ')
+          ..write('verificationCode: $verificationCode, ')
           ..write('amountPaidCentavos: $amountPaidCentavos, ')
+          ..write('transactionTotalCentavos: $transactionTotalCentavos, ')
+          ..write('cashTenderedCentavos: $cashTenderedCentavos, ')
+          ..write('changeDueCentavos: $changeDueCentavos, ')
           ..write('paidAt: $paidAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -1792,6 +2239,17 @@ class $CachedNotificationsTable extends CachedNotifications
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
+  );
+  static const VerificationMeta _consumerIdMeta = const VerificationMeta(
+    'consumerId',
+  );
+  @override
+  late final GeneratedColumn<String> consumerId = GeneratedColumn<String>(
+    'consumer_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _notifTypeMeta = const VerificationMeta(
     'notifType',
@@ -1859,15 +2317,60 @@ class $CachedNotificationsTable extends CachedNotifications
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _billIdMeta = const VerificationMeta('billId');
+  @override
+  late final GeneratedColumn<String> billId = GeneratedColumn<String>(
+    'bill_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _disconnectionIdMeta = const VerificationMeta(
+    'disconnectionId',
+  );
+  @override
+  late final GeneratedColumn<String> disconnectionId = GeneratedColumn<String>(
+    'disconnection_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _failedReasonMeta = const VerificationMeta(
+    'failedReason',
+  );
+  @override
+  late final GeneratedColumn<String> failedReason = GeneratedColumn<String>(
+    'failed_reason',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sentAtMeta = const VerificationMeta('sentAt');
+  @override
+  late final GeneratedColumn<String> sentAt = GeneratedColumn<String>(
+    'sent_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
+    consumerId,
     notifType,
     channel,
     message,
     status,
     isRead,
     createdAt,
+    billId,
+    disconnectionId,
+    failedReason,
+    sentAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1885,6 +2388,12 @@ class $CachedNotificationsTable extends CachedNotifications
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
       context.missing(_idMeta);
+    }
+    if (data.containsKey('consumer_id')) {
+      context.handle(
+        _consumerIdMeta,
+        consumerId.isAcceptableOrUnknown(data['consumer_id']!, _consumerIdMeta),
+      );
     }
     if (data.containsKey('notif_type')) {
       context.handle(
@@ -1932,6 +2441,36 @@ class $CachedNotificationsTable extends CachedNotifications
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
+    if (data.containsKey('bill_id')) {
+      context.handle(
+        _billIdMeta,
+        billId.isAcceptableOrUnknown(data['bill_id']!, _billIdMeta),
+      );
+    }
+    if (data.containsKey('disconnection_id')) {
+      context.handle(
+        _disconnectionIdMeta,
+        disconnectionId.isAcceptableOrUnknown(
+          data['disconnection_id']!,
+          _disconnectionIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('failed_reason')) {
+      context.handle(
+        _failedReasonMeta,
+        failedReason.isAcceptableOrUnknown(
+          data['failed_reason']!,
+          _failedReasonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('sent_at')) {
+      context.handle(
+        _sentAtMeta,
+        sentAt.isAcceptableOrUnknown(data['sent_at']!, _sentAtMeta),
+      );
+    }
     return context;
   }
 
@@ -1945,6 +2484,10 @@ class $CachedNotificationsTable extends CachedNotifications
         DriftSqlType.string,
         data['${effectivePrefix}id'],
       )!,
+      consumerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}consumer_id'],
+      ),
       notifType: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}notif_type'],
@@ -1969,6 +2512,22 @@ class $CachedNotificationsTable extends CachedNotifications
         DriftSqlType.string,
         data['${effectivePrefix}created_at'],
       )!,
+      billId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}bill_id'],
+      ),
+      disconnectionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}disconnection_id'],
+      ),
+      failedReason: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}failed_reason'],
+      ),
+      sentAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sent_at'],
+      ),
     );
   }
 
@@ -1981,43 +2540,90 @@ class $CachedNotificationsTable extends CachedNotifications
 class CachedNotificationRow extends DataClass
     implements Insertable<CachedNotificationRow> {
   final String id;
+
+  /// Cache ownership is also enforced by cache_owner; this id makes each
+  /// repository query say explicitly which household it is serving.
+  final String? consumerId;
   final String notifType;
   final String channel;
   final String message;
   final String status;
   final bool isRead;
   final String createdAt;
+
+  /// The bill or disconnection notice an alert is about, and how far its
+  /// delivery got, so an alert opened with no signal still shows them.
+  /// Nullable: rows cached before schema v5 did not carry them.
+  final String? billId;
+  final String? disconnectionId;
+  final String? failedReason;
+  final String? sentAt;
   const CachedNotificationRow({
     required this.id,
+    this.consumerId,
     required this.notifType,
     required this.channel,
     required this.message,
     required this.status,
     required this.isRead,
     required this.createdAt,
+    this.billId,
+    this.disconnectionId,
+    this.failedReason,
+    this.sentAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
+    if (!nullToAbsent || consumerId != null) {
+      map['consumer_id'] = Variable<String>(consumerId);
+    }
     map['notif_type'] = Variable<String>(notifType);
     map['channel'] = Variable<String>(channel);
     map['message'] = Variable<String>(message);
     map['status'] = Variable<String>(status);
     map['is_read'] = Variable<bool>(isRead);
     map['created_at'] = Variable<String>(createdAt);
+    if (!nullToAbsent || billId != null) {
+      map['bill_id'] = Variable<String>(billId);
+    }
+    if (!nullToAbsent || disconnectionId != null) {
+      map['disconnection_id'] = Variable<String>(disconnectionId);
+    }
+    if (!nullToAbsent || failedReason != null) {
+      map['failed_reason'] = Variable<String>(failedReason);
+    }
+    if (!nullToAbsent || sentAt != null) {
+      map['sent_at'] = Variable<String>(sentAt);
+    }
     return map;
   }
 
   CachedNotificationsCompanion toCompanion(bool nullToAbsent) {
     return CachedNotificationsCompanion(
       id: Value(id),
+      consumerId: consumerId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(consumerId),
       notifType: Value(notifType),
       channel: Value(channel),
       message: Value(message),
       status: Value(status),
       isRead: Value(isRead),
       createdAt: Value(createdAt),
+      billId: billId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(billId),
+      disconnectionId: disconnectionId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(disconnectionId),
+      failedReason: failedReason == null && nullToAbsent
+          ? const Value.absent()
+          : Value(failedReason),
+      sentAt: sentAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sentAt),
     );
   }
 
@@ -2028,12 +2634,17 @@ class CachedNotificationRow extends DataClass
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return CachedNotificationRow(
       id: serializer.fromJson<String>(json['id']),
+      consumerId: serializer.fromJson<String?>(json['consumerId']),
       notifType: serializer.fromJson<String>(json['notifType']),
       channel: serializer.fromJson<String>(json['channel']),
       message: serializer.fromJson<String>(json['message']),
       status: serializer.fromJson<String>(json['status']),
       isRead: serializer.fromJson<bool>(json['isRead']),
       createdAt: serializer.fromJson<String>(json['createdAt']),
+      billId: serializer.fromJson<String?>(json['billId']),
+      disconnectionId: serializer.fromJson<String?>(json['disconnectionId']),
+      failedReason: serializer.fromJson<String?>(json['failedReason']),
+      sentAt: serializer.fromJson<String?>(json['sentAt']),
     );
   }
   @override
@@ -2041,41 +2652,69 @@ class CachedNotificationRow extends DataClass
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
+      'consumerId': serializer.toJson<String?>(consumerId),
       'notifType': serializer.toJson<String>(notifType),
       'channel': serializer.toJson<String>(channel),
       'message': serializer.toJson<String>(message),
       'status': serializer.toJson<String>(status),
       'isRead': serializer.toJson<bool>(isRead),
       'createdAt': serializer.toJson<String>(createdAt),
+      'billId': serializer.toJson<String?>(billId),
+      'disconnectionId': serializer.toJson<String?>(disconnectionId),
+      'failedReason': serializer.toJson<String?>(failedReason),
+      'sentAt': serializer.toJson<String?>(sentAt),
     };
   }
 
   CachedNotificationRow copyWith({
     String? id,
+    Value<String?> consumerId = const Value.absent(),
     String? notifType,
     String? channel,
     String? message,
     String? status,
     bool? isRead,
     String? createdAt,
+    Value<String?> billId = const Value.absent(),
+    Value<String?> disconnectionId = const Value.absent(),
+    Value<String?> failedReason = const Value.absent(),
+    Value<String?> sentAt = const Value.absent(),
   }) => CachedNotificationRow(
     id: id ?? this.id,
+    consumerId: consumerId.present ? consumerId.value : this.consumerId,
     notifType: notifType ?? this.notifType,
     channel: channel ?? this.channel,
     message: message ?? this.message,
     status: status ?? this.status,
     isRead: isRead ?? this.isRead,
     createdAt: createdAt ?? this.createdAt,
+    billId: billId.present ? billId.value : this.billId,
+    disconnectionId: disconnectionId.present
+        ? disconnectionId.value
+        : this.disconnectionId,
+    failedReason: failedReason.present ? failedReason.value : this.failedReason,
+    sentAt: sentAt.present ? sentAt.value : this.sentAt,
   );
   CachedNotificationRow copyWithCompanion(CachedNotificationsCompanion data) {
     return CachedNotificationRow(
       id: data.id.present ? data.id.value : this.id,
+      consumerId: data.consumerId.present
+          ? data.consumerId.value
+          : this.consumerId,
       notifType: data.notifType.present ? data.notifType.value : this.notifType,
       channel: data.channel.present ? data.channel.value : this.channel,
       message: data.message.present ? data.message.value : this.message,
       status: data.status.present ? data.status.value : this.status,
       isRead: data.isRead.present ? data.isRead.value : this.isRead,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      billId: data.billId.present ? data.billId.value : this.billId,
+      disconnectionId: data.disconnectionId.present
+          ? data.disconnectionId.value
+          : this.disconnectionId,
+      failedReason: data.failedReason.present
+          ? data.failedReason.value
+          : this.failedReason,
+      sentAt: data.sentAt.present ? data.sentAt.value : this.sentAt,
     );
   }
 
@@ -2083,60 +2722,97 @@ class CachedNotificationRow extends DataClass
   String toString() {
     return (StringBuffer('CachedNotificationRow(')
           ..write('id: $id, ')
+          ..write('consumerId: $consumerId, ')
           ..write('notifType: $notifType, ')
           ..write('channel: $channel, ')
           ..write('message: $message, ')
           ..write('status: $status, ')
           ..write('isRead: $isRead, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('billId: $billId, ')
+          ..write('disconnectionId: $disconnectionId, ')
+          ..write('failedReason: $failedReason, ')
+          ..write('sentAt: $sentAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, notifType, channel, message, status, isRead, createdAt);
+  int get hashCode => Object.hash(
+    id,
+    consumerId,
+    notifType,
+    channel,
+    message,
+    status,
+    isRead,
+    createdAt,
+    billId,
+    disconnectionId,
+    failedReason,
+    sentAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is CachedNotificationRow &&
           other.id == this.id &&
+          other.consumerId == this.consumerId &&
           other.notifType == this.notifType &&
           other.channel == this.channel &&
           other.message == this.message &&
           other.status == this.status &&
           other.isRead == this.isRead &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.billId == this.billId &&
+          other.disconnectionId == this.disconnectionId &&
+          other.failedReason == this.failedReason &&
+          other.sentAt == this.sentAt);
 }
 
 class CachedNotificationsCompanion
     extends UpdateCompanion<CachedNotificationRow> {
   final Value<String> id;
+  final Value<String?> consumerId;
   final Value<String> notifType;
   final Value<String> channel;
   final Value<String> message;
   final Value<String> status;
   final Value<bool> isRead;
   final Value<String> createdAt;
+  final Value<String?> billId;
+  final Value<String?> disconnectionId;
+  final Value<String?> failedReason;
+  final Value<String?> sentAt;
   final Value<int> rowid;
   const CachedNotificationsCompanion({
     this.id = const Value.absent(),
+    this.consumerId = const Value.absent(),
     this.notifType = const Value.absent(),
     this.channel = const Value.absent(),
     this.message = const Value.absent(),
     this.status = const Value.absent(),
     this.isRead = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.billId = const Value.absent(),
+    this.disconnectionId = const Value.absent(),
+    this.failedReason = const Value.absent(),
+    this.sentAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   CachedNotificationsCompanion.insert({
     required String id,
+    this.consumerId = const Value.absent(),
     required String notifType,
     required String channel,
     required String message,
     required String status,
     this.isRead = const Value.absent(),
     required String createdAt,
+    this.billId = const Value.absent(),
+    this.disconnectionId = const Value.absent(),
+    this.failedReason = const Value.absent(),
+    this.sentAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        notifType = Value(notifType),
@@ -2146,44 +2822,64 @@ class CachedNotificationsCompanion
        createdAt = Value(createdAt);
   static Insertable<CachedNotificationRow> custom({
     Expression<String>? id,
+    Expression<String>? consumerId,
     Expression<String>? notifType,
     Expression<String>? channel,
     Expression<String>? message,
     Expression<String>? status,
     Expression<bool>? isRead,
     Expression<String>? createdAt,
+    Expression<String>? billId,
+    Expression<String>? disconnectionId,
+    Expression<String>? failedReason,
+    Expression<String>? sentAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (consumerId != null) 'consumer_id': consumerId,
       if (notifType != null) 'notif_type': notifType,
       if (channel != null) 'channel': channel,
       if (message != null) 'message': message,
       if (status != null) 'status': status,
       if (isRead != null) 'is_read': isRead,
       if (createdAt != null) 'created_at': createdAt,
+      if (billId != null) 'bill_id': billId,
+      if (disconnectionId != null) 'disconnection_id': disconnectionId,
+      if (failedReason != null) 'failed_reason': failedReason,
+      if (sentAt != null) 'sent_at': sentAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
 
   CachedNotificationsCompanion copyWith({
     Value<String>? id,
+    Value<String?>? consumerId,
     Value<String>? notifType,
     Value<String>? channel,
     Value<String>? message,
     Value<String>? status,
     Value<bool>? isRead,
     Value<String>? createdAt,
+    Value<String?>? billId,
+    Value<String?>? disconnectionId,
+    Value<String?>? failedReason,
+    Value<String?>? sentAt,
     Value<int>? rowid,
   }) {
     return CachedNotificationsCompanion(
       id: id ?? this.id,
+      consumerId: consumerId ?? this.consumerId,
       notifType: notifType ?? this.notifType,
       channel: channel ?? this.channel,
       message: message ?? this.message,
       status: status ?? this.status,
       isRead: isRead ?? this.isRead,
       createdAt: createdAt ?? this.createdAt,
+      billId: billId ?? this.billId,
+      disconnectionId: disconnectionId ?? this.disconnectionId,
+      failedReason: failedReason ?? this.failedReason,
+      sentAt: sentAt ?? this.sentAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2193,6 +2889,9 @@ class CachedNotificationsCompanion
     final map = <String, Expression>{};
     if (id.present) {
       map['id'] = Variable<String>(id.value);
+    }
+    if (consumerId.present) {
+      map['consumer_id'] = Variable<String>(consumerId.value);
     }
     if (notifType.present) {
       map['notif_type'] = Variable<String>(notifType.value);
@@ -2212,6 +2911,18 @@ class CachedNotificationsCompanion
     if (createdAt.present) {
       map['created_at'] = Variable<String>(createdAt.value);
     }
+    if (billId.present) {
+      map['bill_id'] = Variable<String>(billId.value);
+    }
+    if (disconnectionId.present) {
+      map['disconnection_id'] = Variable<String>(disconnectionId.value);
+    }
+    if (failedReason.present) {
+      map['failed_reason'] = Variable<String>(failedReason.value);
+    }
+    if (sentAt.present) {
+      map['sent_at'] = Variable<String>(sentAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2222,12 +2933,17 @@ class CachedNotificationsCompanion
   String toString() {
     return (StringBuffer('CachedNotificationsCompanion(')
           ..write('id: $id, ')
+          ..write('consumerId: $consumerId, ')
           ..write('notifType: $notifType, ')
           ..write('channel: $channel, ')
           ..write('message: $message, ')
           ..write('status: $status, ')
           ..write('isRead: $isRead, ')
           ..write('createdAt: $createdAt, ')
+          ..write('billId: $billId, ')
+          ..write('disconnectionId: $disconnectionId, ')
+          ..write('failedReason: $failedReason, ')
+          ..write('sentAt: $sentAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2261,6 +2977,52 @@ class $CacheOwnerTable extends CacheOwner
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _usernameMeta = const VerificationMeta(
+    'username',
+  );
+  @override
+  late final GeneratedColumn<String> username = GeneratedColumn<String>(
+    'username',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _firstNameMeta = const VerificationMeta(
+    'firstName',
+  );
+  @override
+  late final GeneratedColumn<String> firstName = GeneratedColumn<String>(
+    'first_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lastNameMeta = const VerificationMeta(
+    'lastName',
+  );
+  @override
+  late final GeneratedColumn<String> lastName = GeneratedColumn<String>(
+    'last_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _mustChangePasswordMeta =
+      const VerificationMeta('mustChangePassword');
+  @override
+  late final GeneratedColumn<bool> mustChangePassword = GeneratedColumn<bool>(
+    'must_change_password',
+    aliasedName,
+    true,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("must_change_password" IN (0, 1))',
+    ),
+  );
   static const VerificationMeta _roleMeta = const VerificationMeta('role');
   @override
   late final GeneratedColumn<String> role = GeneratedColumn<String>(
@@ -2293,7 +3055,17 @@ class $CacheOwnerTable extends CacheOwner
     requiredDuringInsert: true,
   );
   @override
-  List<GeneratedColumn> get $columns => [id, profileId, role, areaId, cachedAt];
+  List<GeneratedColumn> get $columns => [
+    id,
+    profileId,
+    username,
+    firstName,
+    lastName,
+    mustChangePassword,
+    role,
+    areaId,
+    cachedAt,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -2316,6 +3088,33 @@ class $CacheOwnerTable extends CacheOwner
       );
     } else if (isInserting) {
       context.missing(_profileIdMeta);
+    }
+    if (data.containsKey('username')) {
+      context.handle(
+        _usernameMeta,
+        username.isAcceptableOrUnknown(data['username']!, _usernameMeta),
+      );
+    }
+    if (data.containsKey('first_name')) {
+      context.handle(
+        _firstNameMeta,
+        firstName.isAcceptableOrUnknown(data['first_name']!, _firstNameMeta),
+      );
+    }
+    if (data.containsKey('last_name')) {
+      context.handle(
+        _lastNameMeta,
+        lastName.isAcceptableOrUnknown(data['last_name']!, _lastNameMeta),
+      );
+    }
+    if (data.containsKey('must_change_password')) {
+      context.handle(
+        _mustChangePasswordMeta,
+        mustChangePassword.isAcceptableOrUnknown(
+          data['must_change_password']!,
+          _mustChangePasswordMeta,
+        ),
+      );
     }
     if (data.containsKey('role')) {
       context.handle(
@@ -2356,6 +3155,22 @@ class $CacheOwnerTable extends CacheOwner
         DriftSqlType.string,
         data['${effectivePrefix}profile_id'],
       )!,
+      username: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}username'],
+      ),
+      firstName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}first_name'],
+      ),
+      lastName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_name'],
+      ),
+      mustChangePassword: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}must_change_password'],
+      ),
       role: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}role'],
@@ -2382,12 +3197,25 @@ class CacheOwnerRow extends DataClass implements Insertable<CacheOwnerRow> {
   /// rather than leaving it to every caller to remember.
   final int id;
   final String profileId;
+
+  /// The remaining profile fields let an already authenticated person open
+  /// their encrypted cache when the phone has no signal. They are nullable
+  /// only for databases created before schema v3; a successful online
+  /// profile load fills all of them together.
+  final String? username;
+  final String? firstName;
+  final String? lastName;
+  final bool? mustChangePassword;
   final String role;
   final String? areaId;
   final String cachedAt;
   const CacheOwnerRow({
     required this.id,
     required this.profileId,
+    this.username,
+    this.firstName,
+    this.lastName,
+    this.mustChangePassword,
     required this.role,
     this.areaId,
     required this.cachedAt,
@@ -2397,6 +3225,18 @@ class CacheOwnerRow extends DataClass implements Insertable<CacheOwnerRow> {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
     map['profile_id'] = Variable<String>(profileId);
+    if (!nullToAbsent || username != null) {
+      map['username'] = Variable<String>(username);
+    }
+    if (!nullToAbsent || firstName != null) {
+      map['first_name'] = Variable<String>(firstName);
+    }
+    if (!nullToAbsent || lastName != null) {
+      map['last_name'] = Variable<String>(lastName);
+    }
+    if (!nullToAbsent || mustChangePassword != null) {
+      map['must_change_password'] = Variable<bool>(mustChangePassword);
+    }
     map['role'] = Variable<String>(role);
     if (!nullToAbsent || areaId != null) {
       map['area_id'] = Variable<String>(areaId);
@@ -2409,6 +3249,18 @@ class CacheOwnerRow extends DataClass implements Insertable<CacheOwnerRow> {
     return CacheOwnerCompanion(
       id: Value(id),
       profileId: Value(profileId),
+      username: username == null && nullToAbsent
+          ? const Value.absent()
+          : Value(username),
+      firstName: firstName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(firstName),
+      lastName: lastName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastName),
+      mustChangePassword: mustChangePassword == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mustChangePassword),
       role: Value(role),
       areaId: areaId == null && nullToAbsent
           ? const Value.absent()
@@ -2425,6 +3277,12 @@ class CacheOwnerRow extends DataClass implements Insertable<CacheOwnerRow> {
     return CacheOwnerRow(
       id: serializer.fromJson<int>(json['id']),
       profileId: serializer.fromJson<String>(json['profileId']),
+      username: serializer.fromJson<String?>(json['username']),
+      firstName: serializer.fromJson<String?>(json['firstName']),
+      lastName: serializer.fromJson<String?>(json['lastName']),
+      mustChangePassword: serializer.fromJson<bool?>(
+        json['mustChangePassword'],
+      ),
       role: serializer.fromJson<String>(json['role']),
       areaId: serializer.fromJson<String?>(json['areaId']),
       cachedAt: serializer.fromJson<String>(json['cachedAt']),
@@ -2436,6 +3294,10 @@ class CacheOwnerRow extends DataClass implements Insertable<CacheOwnerRow> {
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'profileId': serializer.toJson<String>(profileId),
+      'username': serializer.toJson<String?>(username),
+      'firstName': serializer.toJson<String?>(firstName),
+      'lastName': serializer.toJson<String?>(lastName),
+      'mustChangePassword': serializer.toJson<bool?>(mustChangePassword),
       'role': serializer.toJson<String>(role),
       'areaId': serializer.toJson<String?>(areaId),
       'cachedAt': serializer.toJson<String>(cachedAt),
@@ -2445,12 +3307,22 @@ class CacheOwnerRow extends DataClass implements Insertable<CacheOwnerRow> {
   CacheOwnerRow copyWith({
     int? id,
     String? profileId,
+    Value<String?> username = const Value.absent(),
+    Value<String?> firstName = const Value.absent(),
+    Value<String?> lastName = const Value.absent(),
+    Value<bool?> mustChangePassword = const Value.absent(),
     String? role,
     Value<String?> areaId = const Value.absent(),
     String? cachedAt,
   }) => CacheOwnerRow(
     id: id ?? this.id,
     profileId: profileId ?? this.profileId,
+    username: username.present ? username.value : this.username,
+    firstName: firstName.present ? firstName.value : this.firstName,
+    lastName: lastName.present ? lastName.value : this.lastName,
+    mustChangePassword: mustChangePassword.present
+        ? mustChangePassword.value
+        : this.mustChangePassword,
     role: role ?? this.role,
     areaId: areaId.present ? areaId.value : this.areaId,
     cachedAt: cachedAt ?? this.cachedAt,
@@ -2459,6 +3331,12 @@ class CacheOwnerRow extends DataClass implements Insertable<CacheOwnerRow> {
     return CacheOwnerRow(
       id: data.id.present ? data.id.value : this.id,
       profileId: data.profileId.present ? data.profileId.value : this.profileId,
+      username: data.username.present ? data.username.value : this.username,
+      firstName: data.firstName.present ? data.firstName.value : this.firstName,
+      lastName: data.lastName.present ? data.lastName.value : this.lastName,
+      mustChangePassword: data.mustChangePassword.present
+          ? data.mustChangePassword.value
+          : this.mustChangePassword,
       role: data.role.present ? data.role.value : this.role,
       areaId: data.areaId.present ? data.areaId.value : this.areaId,
       cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
@@ -2470,6 +3348,10 @@ class CacheOwnerRow extends DataClass implements Insertable<CacheOwnerRow> {
     return (StringBuffer('CacheOwnerRow(')
           ..write('id: $id, ')
           ..write('profileId: $profileId, ')
+          ..write('username: $username, ')
+          ..write('firstName: $firstName, ')
+          ..write('lastName: $lastName, ')
+          ..write('mustChangePassword: $mustChangePassword, ')
           ..write('role: $role, ')
           ..write('areaId: $areaId, ')
           ..write('cachedAt: $cachedAt')
@@ -2478,13 +3360,27 @@ class CacheOwnerRow extends DataClass implements Insertable<CacheOwnerRow> {
   }
 
   @override
-  int get hashCode => Object.hash(id, profileId, role, areaId, cachedAt);
+  int get hashCode => Object.hash(
+    id,
+    profileId,
+    username,
+    firstName,
+    lastName,
+    mustChangePassword,
+    role,
+    areaId,
+    cachedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is CacheOwnerRow &&
           other.id == this.id &&
           other.profileId == this.profileId &&
+          other.username == this.username &&
+          other.firstName == this.firstName &&
+          other.lastName == this.lastName &&
+          other.mustChangePassword == this.mustChangePassword &&
           other.role == this.role &&
           other.areaId == this.areaId &&
           other.cachedAt == this.cachedAt);
@@ -2493,12 +3389,20 @@ class CacheOwnerRow extends DataClass implements Insertable<CacheOwnerRow> {
 class CacheOwnerCompanion extends UpdateCompanion<CacheOwnerRow> {
   final Value<int> id;
   final Value<String> profileId;
+  final Value<String?> username;
+  final Value<String?> firstName;
+  final Value<String?> lastName;
+  final Value<bool?> mustChangePassword;
   final Value<String> role;
   final Value<String?> areaId;
   final Value<String> cachedAt;
   const CacheOwnerCompanion({
     this.id = const Value.absent(),
     this.profileId = const Value.absent(),
+    this.username = const Value.absent(),
+    this.firstName = const Value.absent(),
+    this.lastName = const Value.absent(),
+    this.mustChangePassword = const Value.absent(),
     this.role = const Value.absent(),
     this.areaId = const Value.absent(),
     this.cachedAt = const Value.absent(),
@@ -2506,6 +3410,10 @@ class CacheOwnerCompanion extends UpdateCompanion<CacheOwnerRow> {
   CacheOwnerCompanion.insert({
     this.id = const Value.absent(),
     required String profileId,
+    this.username = const Value.absent(),
+    this.firstName = const Value.absent(),
+    this.lastName = const Value.absent(),
+    this.mustChangePassword = const Value.absent(),
     required String role,
     this.areaId = const Value.absent(),
     required String cachedAt,
@@ -2515,6 +3423,10 @@ class CacheOwnerCompanion extends UpdateCompanion<CacheOwnerRow> {
   static Insertable<CacheOwnerRow> custom({
     Expression<int>? id,
     Expression<String>? profileId,
+    Expression<String>? username,
+    Expression<String>? firstName,
+    Expression<String>? lastName,
+    Expression<bool>? mustChangePassword,
     Expression<String>? role,
     Expression<String>? areaId,
     Expression<String>? cachedAt,
@@ -2522,6 +3434,11 @@ class CacheOwnerCompanion extends UpdateCompanion<CacheOwnerRow> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (profileId != null) 'profile_id': profileId,
+      if (username != null) 'username': username,
+      if (firstName != null) 'first_name': firstName,
+      if (lastName != null) 'last_name': lastName,
+      if (mustChangePassword != null)
+        'must_change_password': mustChangePassword,
       if (role != null) 'role': role,
       if (areaId != null) 'area_id': areaId,
       if (cachedAt != null) 'cached_at': cachedAt,
@@ -2531,6 +3448,10 @@ class CacheOwnerCompanion extends UpdateCompanion<CacheOwnerRow> {
   CacheOwnerCompanion copyWith({
     Value<int>? id,
     Value<String>? profileId,
+    Value<String?>? username,
+    Value<String?>? firstName,
+    Value<String?>? lastName,
+    Value<bool?>? mustChangePassword,
     Value<String>? role,
     Value<String?>? areaId,
     Value<String>? cachedAt,
@@ -2538,6 +3459,10 @@ class CacheOwnerCompanion extends UpdateCompanion<CacheOwnerRow> {
     return CacheOwnerCompanion(
       id: id ?? this.id,
       profileId: profileId ?? this.profileId,
+      username: username ?? this.username,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
+      mustChangePassword: mustChangePassword ?? this.mustChangePassword,
       role: role ?? this.role,
       areaId: areaId ?? this.areaId,
       cachedAt: cachedAt ?? this.cachedAt,
@@ -2552,6 +3477,18 @@ class CacheOwnerCompanion extends UpdateCompanion<CacheOwnerRow> {
     }
     if (profileId.present) {
       map['profile_id'] = Variable<String>(profileId.value);
+    }
+    if (username.present) {
+      map['username'] = Variable<String>(username.value);
+    }
+    if (firstName.present) {
+      map['first_name'] = Variable<String>(firstName.value);
+    }
+    if (lastName.present) {
+      map['last_name'] = Variable<String>(lastName.value);
+    }
+    if (mustChangePassword.present) {
+      map['must_change_password'] = Variable<bool>(mustChangePassword.value);
     }
     if (role.present) {
       map['role'] = Variable<String>(role.value);
@@ -2570,6 +3507,10 @@ class CacheOwnerCompanion extends UpdateCompanion<CacheOwnerRow> {
     return (StringBuffer('CacheOwnerCompanion(')
           ..write('id: $id, ')
           ..write('profileId: $profileId, ')
+          ..write('username: $username, ')
+          ..write('firstName: $firstName, ')
+          ..write('lastName: $lastName, ')
+          ..write('mustChangePassword: $mustChangePassword, ')
           ..write('role: $role, ')
           ..write('areaId: $areaId, ')
           ..write('cachedAt: $cachedAt')
@@ -4592,18 +5533,34 @@ typedef $$CachedBillsTableProcessedTableManager =
 typedef $$CachedPaymentsTableCreateCompanionBuilder =
     CachedPaymentsCompanion Function({
       required String id,
+      Value<String?> consumerId,
       Value<String?> billId,
+      Value<String?> billNo,
+      Value<String?> cycleLabel,
       required String receiptNo,
+      Value<String?> consumerName,
+      Value<String?> verificationCode,
       required int amountPaidCentavos,
+      Value<int?> transactionTotalCentavos,
+      Value<int?> cashTenderedCentavos,
+      Value<int?> changeDueCentavos,
       required String paidAt,
       Value<int> rowid,
     });
 typedef $$CachedPaymentsTableUpdateCompanionBuilder =
     CachedPaymentsCompanion Function({
       Value<String> id,
+      Value<String?> consumerId,
       Value<String?> billId,
+      Value<String?> billNo,
+      Value<String?> cycleLabel,
       Value<String> receiptNo,
+      Value<String?> consumerName,
+      Value<String?> verificationCode,
       Value<int> amountPaidCentavos,
+      Value<int?> transactionTotalCentavos,
+      Value<int?> cashTenderedCentavos,
+      Value<int?> changeDueCentavos,
       Value<String> paidAt,
       Value<int> rowid,
     });
@@ -4622,8 +5579,23 @@ class $$CachedPaymentsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get consumerId => $composableBuilder(
+    column: $table.consumerId,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get billId => $composableBuilder(
     column: $table.billId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get billNo => $composableBuilder(
+    column: $table.billNo,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get cycleLabel => $composableBuilder(
+    column: $table.cycleLabel,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4632,8 +5604,33 @@ class $$CachedPaymentsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get consumerName => $composableBuilder(
+    column: $table.consumerName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get verificationCode => $composableBuilder(
+    column: $table.verificationCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<int> get amountPaidCentavos => $composableBuilder(
     column: $table.amountPaidCentavos,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get transactionTotalCentavos => $composableBuilder(
+    column: $table.transactionTotalCentavos,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get cashTenderedCentavos => $composableBuilder(
+    column: $table.cashTenderedCentavos,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get changeDueCentavos => $composableBuilder(
+    column: $table.changeDueCentavos,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4657,8 +5654,23 @@ class $$CachedPaymentsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get consumerId => $composableBuilder(
+    column: $table.consumerId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get billId => $composableBuilder(
     column: $table.billId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get billNo => $composableBuilder(
+    column: $table.billNo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get cycleLabel => $composableBuilder(
+    column: $table.cycleLabel,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -4667,8 +5679,33 @@ class $$CachedPaymentsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get consumerName => $composableBuilder(
+    column: $table.consumerName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get verificationCode => $composableBuilder(
+    column: $table.verificationCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get amountPaidCentavos => $composableBuilder(
     column: $table.amountPaidCentavos,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get transactionTotalCentavos => $composableBuilder(
+    column: $table.transactionTotalCentavos,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get cashTenderedCentavos => $composableBuilder(
+    column: $table.cashTenderedCentavos,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get changeDueCentavos => $composableBuilder(
+    column: $table.changeDueCentavos,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -4690,14 +5727,52 @@ class $$CachedPaymentsTableAnnotationComposer
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
+  GeneratedColumn<String> get consumerId => $composableBuilder(
+    column: $table.consumerId,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get billId =>
       $composableBuilder(column: $table.billId, builder: (column) => column);
+
+  GeneratedColumn<String> get billNo =>
+      $composableBuilder(column: $table.billNo, builder: (column) => column);
+
+  GeneratedColumn<String> get cycleLabel => $composableBuilder(
+    column: $table.cycleLabel,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get receiptNo =>
       $composableBuilder(column: $table.receiptNo, builder: (column) => column);
 
+  GeneratedColumn<String> get consumerName => $composableBuilder(
+    column: $table.consumerName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get verificationCode => $composableBuilder(
+    column: $table.verificationCode,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<int> get amountPaidCentavos => $composableBuilder(
     column: $table.amountPaidCentavos,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get transactionTotalCentavos => $composableBuilder(
+    column: $table.transactionTotalCentavos,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get cashTenderedCentavos => $composableBuilder(
+    column: $table.cashTenderedCentavos,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get changeDueCentavos => $composableBuilder(
+    column: $table.changeDueCentavos,
     builder: (column) => column,
   );
 
@@ -4743,32 +5818,64 @@ class $$CachedPaymentsTableTableManager
           updateCompanionCallback:
               ({
                 Value<String> id = const Value.absent(),
+                Value<String?> consumerId = const Value.absent(),
                 Value<String?> billId = const Value.absent(),
+                Value<String?> billNo = const Value.absent(),
+                Value<String?> cycleLabel = const Value.absent(),
                 Value<String> receiptNo = const Value.absent(),
+                Value<String?> consumerName = const Value.absent(),
+                Value<String?> verificationCode = const Value.absent(),
                 Value<int> amountPaidCentavos = const Value.absent(),
+                Value<int?> transactionTotalCentavos = const Value.absent(),
+                Value<int?> cashTenderedCentavos = const Value.absent(),
+                Value<int?> changeDueCentavos = const Value.absent(),
                 Value<String> paidAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CachedPaymentsCompanion(
                 id: id,
+                consumerId: consumerId,
                 billId: billId,
+                billNo: billNo,
+                cycleLabel: cycleLabel,
                 receiptNo: receiptNo,
+                consumerName: consumerName,
+                verificationCode: verificationCode,
                 amountPaidCentavos: amountPaidCentavos,
+                transactionTotalCentavos: transactionTotalCentavos,
+                cashTenderedCentavos: cashTenderedCentavos,
+                changeDueCentavos: changeDueCentavos,
                 paidAt: paidAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
               ({
                 required String id,
+                Value<String?> consumerId = const Value.absent(),
                 Value<String?> billId = const Value.absent(),
+                Value<String?> billNo = const Value.absent(),
+                Value<String?> cycleLabel = const Value.absent(),
                 required String receiptNo,
+                Value<String?> consumerName = const Value.absent(),
+                Value<String?> verificationCode = const Value.absent(),
                 required int amountPaidCentavos,
+                Value<int?> transactionTotalCentavos = const Value.absent(),
+                Value<int?> cashTenderedCentavos = const Value.absent(),
+                Value<int?> changeDueCentavos = const Value.absent(),
                 required String paidAt,
                 Value<int> rowid = const Value.absent(),
               }) => CachedPaymentsCompanion.insert(
                 id: id,
+                consumerId: consumerId,
                 billId: billId,
+                billNo: billNo,
+                cycleLabel: cycleLabel,
                 receiptNo: receiptNo,
+                consumerName: consumerName,
+                verificationCode: verificationCode,
                 amountPaidCentavos: amountPaidCentavos,
+                transactionTotalCentavos: transactionTotalCentavos,
+                cashTenderedCentavos: cashTenderedCentavos,
+                changeDueCentavos: changeDueCentavos,
                 paidAt: paidAt,
                 rowid: rowid,
               ),
@@ -4809,23 +5916,33 @@ typedef $$CachedPaymentsTableProcessedTableManager =
 typedef $$CachedNotificationsTableCreateCompanionBuilder =
     CachedNotificationsCompanion Function({
       required String id,
+      Value<String?> consumerId,
       required String notifType,
       required String channel,
       required String message,
       required String status,
       Value<bool> isRead,
       required String createdAt,
+      Value<String?> billId,
+      Value<String?> disconnectionId,
+      Value<String?> failedReason,
+      Value<String?> sentAt,
       Value<int> rowid,
     });
 typedef $$CachedNotificationsTableUpdateCompanionBuilder =
     CachedNotificationsCompanion Function({
       Value<String> id,
+      Value<String?> consumerId,
       Value<String> notifType,
       Value<String> channel,
       Value<String> message,
       Value<String> status,
       Value<bool> isRead,
       Value<String> createdAt,
+      Value<String?> billId,
+      Value<String?> disconnectionId,
+      Value<String?> failedReason,
+      Value<String?> sentAt,
       Value<int> rowid,
     });
 
@@ -4840,6 +5957,11 @@ class $$CachedNotificationsTableFilterComposer
   });
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get consumerId => $composableBuilder(
+    column: $table.consumerId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4872,6 +5994,26 @@ class $$CachedNotificationsTableFilterComposer
     column: $table.createdAt,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<String> get billId => $composableBuilder(
+    column: $table.billId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get disconnectionId => $composableBuilder(
+    column: $table.disconnectionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get failedReason => $composableBuilder(
+    column: $table.failedReason,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sentAt => $composableBuilder(
+    column: $table.sentAt,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$CachedNotificationsTableOrderingComposer
@@ -4885,6 +6027,11 @@ class $$CachedNotificationsTableOrderingComposer
   });
   ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get consumerId => $composableBuilder(
+    column: $table.consumerId,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -4917,6 +6064,26 @@ class $$CachedNotificationsTableOrderingComposer
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get billId => $composableBuilder(
+    column: $table.billId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get disconnectionId => $composableBuilder(
+    column: $table.disconnectionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get failedReason => $composableBuilder(
+    column: $table.failedReason,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sentAt => $composableBuilder(
+    column: $table.sentAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$CachedNotificationsTableAnnotationComposer
@@ -4930,6 +6097,11 @@ class $$CachedNotificationsTableAnnotationComposer
   });
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get consumerId => $composableBuilder(
+    column: $table.consumerId,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get notifType =>
       $composableBuilder(column: $table.notifType, builder: (column) => column);
@@ -4948,6 +6120,22 @@ class $$CachedNotificationsTableAnnotationComposer
 
   GeneratedColumn<String> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get billId =>
+      $composableBuilder(column: $table.billId, builder: (column) => column);
+
+  GeneratedColumn<String> get disconnectionId => $composableBuilder(
+    column: $table.disconnectionId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get failedReason => $composableBuilder(
+    column: $table.failedReason,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sentAt =>
+      $composableBuilder(column: $table.sentAt, builder: (column) => column);
 }
 
 class $$CachedNotificationsTableTableManager
@@ -4994,41 +6182,61 @@ class $$CachedNotificationsTableTableManager
           updateCompanionCallback:
               ({
                 Value<String> id = const Value.absent(),
+                Value<String?> consumerId = const Value.absent(),
                 Value<String> notifType = const Value.absent(),
                 Value<String> channel = const Value.absent(),
                 Value<String> message = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<bool> isRead = const Value.absent(),
                 Value<String> createdAt = const Value.absent(),
+                Value<String?> billId = const Value.absent(),
+                Value<String?> disconnectionId = const Value.absent(),
+                Value<String?> failedReason = const Value.absent(),
+                Value<String?> sentAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CachedNotificationsCompanion(
                 id: id,
+                consumerId: consumerId,
                 notifType: notifType,
                 channel: channel,
                 message: message,
                 status: status,
                 isRead: isRead,
                 createdAt: createdAt,
+                billId: billId,
+                disconnectionId: disconnectionId,
+                failedReason: failedReason,
+                sentAt: sentAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
               ({
                 required String id,
+                Value<String?> consumerId = const Value.absent(),
                 required String notifType,
                 required String channel,
                 required String message,
                 required String status,
                 Value<bool> isRead = const Value.absent(),
                 required String createdAt,
+                Value<String?> billId = const Value.absent(),
+                Value<String?> disconnectionId = const Value.absent(),
+                Value<String?> failedReason = const Value.absent(),
+                Value<String?> sentAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CachedNotificationsCompanion.insert(
                 id: id,
+                consumerId: consumerId,
                 notifType: notifType,
                 channel: channel,
                 message: message,
                 status: status,
                 isRead: isRead,
                 createdAt: createdAt,
+                billId: billId,
+                disconnectionId: disconnectionId,
+                failedReason: failedReason,
+                sentAt: sentAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -5075,6 +6283,10 @@ typedef $$CacheOwnerTableCreateCompanionBuilder =
     CacheOwnerCompanion Function({
       Value<int> id,
       required String profileId,
+      Value<String?> username,
+      Value<String?> firstName,
+      Value<String?> lastName,
+      Value<bool?> mustChangePassword,
       required String role,
       Value<String?> areaId,
       required String cachedAt,
@@ -5083,6 +6295,10 @@ typedef $$CacheOwnerTableUpdateCompanionBuilder =
     CacheOwnerCompanion Function({
       Value<int> id,
       Value<String> profileId,
+      Value<String?> username,
+      Value<String?> firstName,
+      Value<String?> lastName,
+      Value<bool?> mustChangePassword,
       Value<String> role,
       Value<String?> areaId,
       Value<String> cachedAt,
@@ -5104,6 +6320,26 @@ class $$CacheOwnerTableFilterComposer
 
   ColumnFilters<String> get profileId => $composableBuilder(
     column: $table.profileId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get username => $composableBuilder(
+    column: $table.username,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get firstName => $composableBuilder(
+    column: $table.firstName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastName => $composableBuilder(
+    column: $table.lastName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get mustChangePassword => $composableBuilder(
+    column: $table.mustChangePassword,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5142,6 +6378,26 @@ class $$CacheOwnerTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get username => $composableBuilder(
+    column: $table.username,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get firstName => $composableBuilder(
+    column: $table.firstName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastName => $composableBuilder(
+    column: $table.lastName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get mustChangePassword => $composableBuilder(
+    column: $table.mustChangePassword,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get role => $composableBuilder(
     column: $table.role,
     builder: (column) => ColumnOrderings(column),
@@ -5172,6 +6428,20 @@ class $$CacheOwnerTableAnnotationComposer
 
   GeneratedColumn<String> get profileId =>
       $composableBuilder(column: $table.profileId, builder: (column) => column);
+
+  GeneratedColumn<String> get username =>
+      $composableBuilder(column: $table.username, builder: (column) => column);
+
+  GeneratedColumn<String> get firstName =>
+      $composableBuilder(column: $table.firstName, builder: (column) => column);
+
+  GeneratedColumn<String> get lastName =>
+      $composableBuilder(column: $table.lastName, builder: (column) => column);
+
+  GeneratedColumn<bool> get mustChangePassword => $composableBuilder(
+    column: $table.mustChangePassword,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get role =>
       $composableBuilder(column: $table.role, builder: (column) => column);
@@ -5216,12 +6486,20 @@ class $$CacheOwnerTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 Value<String> profileId = const Value.absent(),
+                Value<String?> username = const Value.absent(),
+                Value<String?> firstName = const Value.absent(),
+                Value<String?> lastName = const Value.absent(),
+                Value<bool?> mustChangePassword = const Value.absent(),
                 Value<String> role = const Value.absent(),
                 Value<String?> areaId = const Value.absent(),
                 Value<String> cachedAt = const Value.absent(),
               }) => CacheOwnerCompanion(
                 id: id,
                 profileId: profileId,
+                username: username,
+                firstName: firstName,
+                lastName: lastName,
+                mustChangePassword: mustChangePassword,
                 role: role,
                 areaId: areaId,
                 cachedAt: cachedAt,
@@ -5230,12 +6508,20 @@ class $$CacheOwnerTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 required String profileId,
+                Value<String?> username = const Value.absent(),
+                Value<String?> firstName = const Value.absent(),
+                Value<String?> lastName = const Value.absent(),
+                Value<bool?> mustChangePassword = const Value.absent(),
                 required String role,
                 Value<String?> areaId = const Value.absent(),
                 required String cachedAt,
               }) => CacheOwnerCompanion.insert(
                 id: id,
                 profileId: profileId,
+                username: username,
+                firstName: firstName,
+                lastName: lastName,
+                mustChangePassword: mustChangePassword,
                 role: role,
                 areaId: areaId,
                 cachedAt: cachedAt,

@@ -20,8 +20,11 @@ final class SyncReport {
     required this.failed,
   });
 
-  static const SyncReport nothingToDo =
-      SyncReport(attempted: 0, succeeded: 0, failed: 0);
+  static const SyncReport nothingToDo = SyncReport(
+    attempted: 0,
+    succeeded: 0,
+    failed: 0,
+  );
 
   bool get didAnything => attempted > 0;
 }
@@ -39,6 +42,12 @@ class SyncService {
   final Connectivity _connectivity;
 
   StreamSubscription<List<ConnectivityResult>>? _subscription;
+  final StreamController<SyncReport> _reports =
+      StreamController<SyncReport>.broadcast();
+
+  /// Completed drain reports. Screens that show server-backed work queues
+  /// use this to refresh after a reconnect finishes syncing the outbox.
+  Stream<SyncReport> get reports => _reports.stream;
 
   /// True while a drain is running, so a connectivity change in the middle of
   /// one does not start a second pass over the same rows.
@@ -46,16 +55,14 @@ class SyncService {
 
   /// Positional rather than named because a named parameter cannot be
   /// private, and these two fields should not be public.
-  SyncService(
-    this._outbox,
-    this._gateway, {
-    Connectivity? connectivity,
-  }) : _connectivity = connectivity ?? Connectivity();
+  SyncService(this._outbox, this._gateway, {Connectivity? connectivity})
+    : _connectivity = connectivity ?? Connectivity();
 
   /// Starts watching the connection. Call once, after sign-in.
   void start() {
-    _subscription ??= _connectivity.onConnectivityChanged
-        .listen((List<ConnectivityResult> status) {
+    _subscription ??= _connectivity.onConnectivityChanged.listen((
+      List<ConnectivityResult> status,
+    ) {
       if (_hasConnection(status)) {
         unawaited(syncNow());
       }
@@ -81,10 +88,17 @@ class SyncService {
 
     _isDraining = true;
     try {
-      return await _drain();
+      final result = await _drain();
+      if (result case Ok(:final value)) _reports.add(value);
+      return result;
     } finally {
       _isDraining = false;
     }
+  }
+
+  Future<void> dispose() async {
+    await stop();
+    await _reports.close();
   }
 
   Future<Result<SyncReport>> _drain() async {
@@ -122,11 +136,13 @@ class SyncService {
               entry.operation.clientUuid,
               failure.message,
             );
-            return Ok<SyncReport>(SyncReport(
-              attempted: succeeded + failed + 1,
-              succeeded: succeeded,
-              failed: failed + 1,
-            ));
+            return Ok<SyncReport>(
+              SyncReport(
+                attempted: succeeded + failed + 1,
+                succeeded: succeeded,
+                failed: failed + 1,
+              ),
+            );
           }
           // The server refused it for a reason the user has to see — a
           // duplicate, an inactive account. The item stays in the queue with
@@ -136,11 +152,9 @@ class SyncService {
       }
     }
 
-    return Ok<SyncReport>(SyncReport(
-      attempted: queue.length,
-      succeeded: succeeded,
-      failed: failed,
-    ));
+    return Ok<SyncReport>(
+      SyncReport(attempted: queue.length, succeeded: succeeded, failed: failed),
+    );
   }
 
   static bool _hasConnection(List<ConnectivityResult> status) =>

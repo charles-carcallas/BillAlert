@@ -14,7 +14,7 @@ enum StaffRole {
   const StaffRole(this.code, this.label);
 }
 
-/// The non-secret details returned after a staff sign-in is provisioned.
+/// What comes back once a staff sign-in is provisioned.
 final class CreatedStaffAccount {
   final ProfileId id;
   final String username;
@@ -23,6 +23,10 @@ final class CreatedStaffAccount {
   final StaffRole role;
   final String? contactNumber;
 
+  /// Shown once, on the confirmation, to be handed over. Never stored: the
+  /// staff member must replace it at first sign-in.
+  final String temporaryPassword;
+
   const CreatedStaffAccount({
     required this.id,
     required this.username,
@@ -30,6 +34,7 @@ final class CreatedStaffAccount {
     required this.lastName,
     required this.role,
     required this.contactNumber,
+    required this.temporaryPassword,
   });
 
   String get fullName => '$firstName $lastName';

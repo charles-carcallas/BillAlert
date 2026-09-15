@@ -21,6 +21,15 @@
     -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
 
+    <!--
+      Urgent due-date alerts fill the screen on Android 14 and later. Android
+      reserves that for alarm and calling apps unless the household allows it,
+      which Profile asks for when the switch is turned on. The activity is NOT
+      marked showWhenLocked here: MainActivity turns that on only for the
+      alert that woke the phone, and asks for the phone's unlock straight away.
+    -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
+
     <application
         android:label="billalert"
         android:name="${applicationName}"

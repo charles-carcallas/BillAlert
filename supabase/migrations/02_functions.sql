@@ -379,6 +379,10 @@ end $$;
 -- The alert goes by PUSH, not SMS. Objective 3 reserves SMS for overdue
 -- and disconnection notices, because SMS costs money per message and a
 -- bill-ready alert is the highest-volume message the system sends.
+--
+-- Superseded by 14_bill_sms.sql, which redefines this function: every
+-- household now gets the bill by text as well, so a keypad phone is not
+-- left out.
 -- =====================================================================
 create or replace function fn_post_bill_amount(
   p_bill_id    uuid,

@@ -35,6 +35,7 @@ class ConsumerRepositoryImpl implements ConsumerRepository {
     required ProfileId createdBy,
     String? contactNumber,
     String? purok,
+    String? meterSerialNo,
   }) async {
     try {
       final row = await _client
@@ -48,6 +49,7 @@ class ConsumerRepositoryImpl implements ConsumerRepository {
             'contact_number': contactNumber,
             'area_id': areaId.value,
             'purok': purok,
+            'meter_serial_no': meterSerialNo,
             'created_by': createdBy.value,
           })
           .select(
@@ -58,6 +60,30 @@ class ConsumerRepositoryImpl implements ConsumerRepository {
 
       return Ok<Consumer>(_fromSupabaseRow(row));
     } on PostgrestException catch (error, stackTrace) {
+      if (error.code == '23505' &&
+          error.message.contains('uq_consumers_meter_serial')) {
+        // One meter belongs to one household (uq_consumers_meter_serial).
+        return Err<Consumer>(
+          ConflictFailure(
+            'That meter number is already assigned to another household. '
+            'Check the number on the meter, or leave it blank for now.',
+            error.toString(),
+          ),
+        );
+      }
+      if (error.code == '23505' &&
+          error.message.contains('uq_consumers_contact_number')) {
+        // Migration 10 made an SMS number belong to one household. Without
+        // this, a number already in use was reported as a clash of consumer
+        // numbers, sending the Area President to check the wrong field.
+        return Err<Consumer>(
+          ConflictFailure(
+            'That mobile number is already used by another household. Check '
+            'the number, or leave it blank for now.',
+            error.toString(),
+          ),
+        );
+      }
       if (error.code == '23505') {
         return Err<Consumer>(
           ConflictFailure(
@@ -128,9 +154,40 @@ class ConsumerRepositoryImpl implements ConsumerRepository {
 
       if (rows.length != 1) return const Ok<Consumer?>(null);
 
-      return Ok<Consumer?>(_fromSupabaseRow(rows.first));
+      final row = rows.first;
+      await _db
+          .into(_db.cachedConsumers)
+          .insertOnConflictUpdate(
+            ConsumerDto.toCacheRow(
+              json: row,
+              previousReading: Kwh.zero,
+              previousReadingDate: null,
+              lastReadCycle: null,
+            ),
+          );
+
+      return Ok<Consumer?>(_fromSupabaseRow(row));
     } catch (error, stackTrace) {
-      return Err<Consumer?>(FailureMapper.from(error, stackTrace));
+      final failure = FailureMapper.from(error, stackTrace);
+      if (failure is NetworkFailure) {
+        try {
+          final owner = await _db.select(_db.cacheOwner).getSingleOrNull();
+          if (owner?.role == 'consumer') {
+            final rows = await _db.select(_db.cachedConsumers).get();
+            if (rows.length == 1) {
+              return Ok<Consumer?>(ConsumerDto.fromCacheRow(rows.single));
+            }
+          }
+        } catch (cacheError) {
+          return Err<Consumer?>(
+            ServerFailure(
+              'Could not read the household saved on this phone.',
+              cacheError.toString(),
+            ),
+          );
+        }
+      }
+      return Err<Consumer?>(failure);
     }
   }
 
@@ -149,6 +206,9 @@ class ConsumerRepositoryImpl implements ConsumerRepository {
           ),
         );
       }
+      await (_db.update(
+        _db.cachedConsumers,
+      )).write(CachedConsumersCompanion(contactNumber: Value<String?>(value)));
       return Ok<String>(value);
     } catch (error, stackTrace) {
       final failure = FailureMapper.from(error, stackTrace);

@@ -110,11 +110,17 @@ final class PhoneNotice {
   final String body;
   final String payload;
 
+  /// Made hard to miss: full screen on Android 14 and later, a loud pop-up on
+  /// older phones. Only due-date reminders are, and only while the household
+  /// keeps urgent alerts on — see [UrgentAlertsSetting].
+  final bool urgent;
+
   const PhoneNotice({
     required this.id,
     required this.title,
     required this.body,
     required this.payload,
+    this.urgent = false,
   });
 }
 
@@ -153,6 +159,34 @@ abstract class NotificationPermission {
 
   /// Opens BillAlert's notification settings, for a household that said no.
   Future<void> openSettings();
+}
+
+/// Whether due-date reminders are urgent on this phone.
+///
+/// On unless the household turns it off in Profile. Kept on the phone rather
+/// than the server: how loudly a phone alerts is that phone's business.
+abstract class UrgentAlertsSetting {
+  Future<bool> isOn();
+
+  Future<void> turnOn();
+
+  Future<void> turnOff();
+}
+
+/// What an urgent reminder looks like on this phone.
+///
+/// The request was an emergency alert. In the Philippines those are cell
+/// broadcasts the NDRRMC sends through the telcos (Republic Act 10639), and an
+/// app cannot send one. The nearest an app comes is Android's full-screen
+/// alert, which Android 14 and later reserve for alarm and calling apps unless
+/// the household allows it. Android 13 and older get a loud pop-up instead.
+abstract class FullScreenAlerts {
+  /// True on Android 14 and later, where an urgent reminder fills the screen.
+  Future<bool> fillsScreen();
+
+  /// Asks Android to let BillAlert fill the screen, opening its settings page
+  /// when that is needed. True once allowed, and on phones that need nothing.
+  Future<bool> allow();
 }
 
 /// The check that runs while the app is closed.

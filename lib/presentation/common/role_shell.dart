@@ -5,8 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../domain/entities/app_user.dart';
 import '../auth/auth_controller.dart';
 import '../auth/fingerprint_offer.dart';
+import '../consumer/inbox_controller.dart';
 import '../consumer/phone_alerts_gate.dart';
-import '../theme.dart';
 
 /// The bottom navigation every signed-in role sits inside.
 ///
@@ -36,6 +36,11 @@ class RoleShell extends ConsumerWidget {
     final List<AppTab> tabs = user.permittedTabs;
     final String location = GoRouterState.of(context).matchedLocation;
     final int selected = _indexFor(tabs, location);
+    final int unread = user is ConsumerUser
+        ? ref.watch(
+            inboxControllerProvider.select((state) => state.unreadCount),
+          )
+        : 0;
 
     return Scaffold(
       // Each panel brings its own Scaffold and AppBar, so this one supplies
@@ -52,12 +57,16 @@ class RoleShell extends ConsumerWidget {
       // it around the label, so the selected tab read as a highlighted glyph
       // with some ordinary text underneath it.
       bottomNavigationBar: Material(
-        color: AppTheme.surfaceWhite,
+        color: Theme.of(context).colorScheme.surfaceContainerLowest,
         child: SafeArea(
           top: false,
           child: DecoratedBox(
-            decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: AppTheme.outlineVariant)),
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
+              ),
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -68,6 +77,7 @@ class RoleShell extends ConsumerWidget {
                       child: RoleTab(
                         tab: tabs[i],
                         selected: i == selected,
+                        unreadCount: tabs[i].icon == NavIcon.inbox ? unread : 0,
                         onTap: () {
                           final String route = tabs[i].route;
                           // `go`, not `push`: tapping a tab replaces where
@@ -115,49 +125,41 @@ class RoleShell extends ConsumerWidget {
   /// Both come from one `switch` with no default, so a new [NavIcon] makes
   /// the compiler name this line — and there is no way to add the outlined
   /// glyph and forget the filled one.
-  static ({IconData outlined, IconData filled}) _glyphsFor(NavIcon icon) =>
-      switch (icon) {
-        NavIcon.readings => (
-            outlined: Icons.speed_outlined,
-            filled: Icons.speed,
-          ),
-        NavIcon.consumers => (
-            outlined: Icons.people_outline,
-            filled: Icons.people,
-          ),
-        NavIcon.amounts => (
-            outlined: Icons.request_quote_outlined,
-            filled: Icons.request_quote,
-          ),
-        NavIcon.disconnections => (
-            outlined: Icons.power_off_outlined,
-            filled: Icons.power_off,
-          ),
-        NavIcon.accounts => (
-            outlined: Icons.person_add_alt,
-            filled: Icons.person_add,
-          ),
-        NavIcon.receipts => (
-            outlined: Icons.receipt_long_outlined,
-            filled: Icons.receipt_long,
-          ),
-        NavIcon.bill => (
-            outlined: Icons.description_outlined,
-            filled: Icons.description,
-          ),
-        NavIcon.history => (
-            outlined: Icons.history_outlined,
-            filled: Icons.history,
-          ),
-        NavIcon.inbox => (
-            outlined: Icons.notifications_outlined,
-            filled: Icons.notifications,
-          ),
-        NavIcon.profile => (
-            outlined: Icons.person_outline,
-            filled: Icons.person,
-          ),
-      };
+  static ({IconData outlined, IconData filled}) _glyphsFor(
+    NavIcon icon,
+  ) => switch (icon) {
+    NavIcon.readings => (outlined: Icons.speed_outlined, filled: Icons.speed),
+    NavIcon.consumers => (outlined: Icons.people_outline, filled: Icons.people),
+    NavIcon.amounts => (
+      outlined: Icons.request_quote_outlined,
+      filled: Icons.request_quote,
+    ),
+    NavIcon.disconnections => (
+      outlined: Icons.power_off_outlined,
+      filled: Icons.power_off,
+    ),
+    NavIcon.accounts => (
+      outlined: Icons.person_add_alt,
+      filled: Icons.person_add,
+    ),
+    NavIcon.receipts => (
+      outlined: Icons.receipt_long_outlined,
+      filled: Icons.receipt_long,
+    ),
+    NavIcon.bill => (
+      outlined: Icons.description_outlined,
+      filled: Icons.description,
+    ),
+    NavIcon.history => (
+      outlined: Icons.history_outlined,
+      filled: Icons.history,
+    ),
+    NavIcon.inbox => (
+      outlined: Icons.notifications_outlined,
+      filled: Icons.notifications,
+    ),
+    NavIcon.profile => (outlined: Icons.person_outline, filled: Icons.person),
+  };
 }
 
 /// One tab in the bottom bar.
@@ -172,28 +174,34 @@ class RoleTab extends StatelessWidget {
   final AppTab tab;
   final bool selected;
   final VoidCallback onTap;
+  final int unreadCount;
 
   const RoleTab({
     required this.tab,
     required this.selected,
     required this.onTap,
+    this.unreadCount = 0,
     super.key,
   });
 
   @override
   Widget build(BuildContext context) {
     final ColorScheme colours = Theme.of(context).colorScheme;
-    final ({IconData outlined, IconData filled}) glyphs =
-        RoleShell._glyphsFor(tab.icon);
+    final ({IconData outlined, IconData filled}) glyphs = RoleShell._glyphsFor(
+      tab.icon,
+    );
 
     // Three signals, never colour alone: the filled shape, the brand colour,
     // and a filled glyph. A meter reader reads this at midday on a bright
     // screen, and colour blindness is not unusual.
-    final Color foreground = selected ? colours.primary : AppTheme.textSecondary;
+    final Color foreground = selected
+        ? colours.primary
+        : colours.onSurfaceVariant;
 
     return Semantics(
       button: true,
       selected: selected,
+      label: unreadCount > 0 ? '$unreadCount unread notifications' : null,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
@@ -210,10 +218,17 @@ class RoleTab extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Icon(
-                selected ? glyphs.filled : glyphs.outlined,
-                size: 22,
-                color: foreground,
+              Badge.count(
+                alignment: Alignment.topRight,
+                count: unreadCount,
+                isLabelVisible: unreadCount > 0,
+                backgroundColor: colours.error,
+                textColor: colours.onError,
+                child: Icon(
+                  selected ? glyphs.filled : glyphs.outlined,
+                  size: 22,
+                  color: foreground,
+                ),
               ),
               const SizedBox(height: 4),
               Text(

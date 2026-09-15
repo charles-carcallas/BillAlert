@@ -44,12 +44,15 @@ void main() {
     setting = FakeFingerprintSetting();
   });
 
-  ProviderContainer containerWith({FakeAuthRepository? auth}) {
+  ProviderContainer containerWith({
+    FakeAuthRepository? auth,
+    FakeSyncService? sync,
+  }) {
     final container = ProviderContainer(
       overrides: [
         deviceUnlockProvider.overrideWithValue(phone),
         fingerprintSettingProvider.overrideWithValue(setting),
-        syncServiceProvider.overrideWithValue(FakeSyncService()),
+        syncServiceProvider.overrideWithValue(sync ?? FakeSyncService()),
         // Signing out now clears the notification tray and stops the
         // background check; neither has a phone behind it in a test.
         backgroundAlertsProvider.overrideWithValue(FakeBackgroundAlerts()),
@@ -105,6 +108,20 @@ void main() {
 
       expect(restored, same(reader));
       expect(container.read(appLockControllerProvider).locked, isTrue);
+    });
+
+    test('starts reconnect sync for a restored session', () async {
+      final sync = FakeSyncService();
+      final container = containerWith(
+        auth: FakeAuthRepository(user: reader),
+        sync: sync,
+      );
+
+      await container.read(authControllerProvider.future);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(sync.startCalls, 1);
+      expect(sync.syncCalls, 1);
     });
   });
 

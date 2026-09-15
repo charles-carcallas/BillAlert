@@ -181,13 +181,17 @@ class _HouseholdTile extends StatelessWidget {
     final ColorScheme colours = Theme.of(context).colorScheme;
     final TextTheme text = Theme.of(context).textTheme;
     final bool overdue = household.overdueCount > 0;
-    final Color accent = overdue ? const Color(0xFFB85C00) : colours.primary;
+    final Color accent = overdue ? colours.tertiary : colours.primary;
 
     return Material(
-      color: overdue ? const Color(0xFFFFF8EE) : colours.surfaceContainerLowest,
+      color: overdue
+          ? colours.tertiaryContainer.withValues(alpha: 0.25)
+          : colours.surfaceContainerLowest,
       shape: RoundedRectangleBorder(
         side: BorderSide(
-          color: overdue ? const Color(0xFFF0C58E) : colours.outlineVariant,
+          color: overdue
+              ? colours.tertiary.withValues(alpha: 0.4)
+              : colours.outlineVariant,
         ),
         borderRadius: BorderRadius.circular(14),
       ),
@@ -247,13 +251,13 @@ class _HouseholdTile extends StatelessWidget {
                                 vertical: 3,
                               ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFFFE6C6),
+                                color: colours.tertiaryContainer,
                                 borderRadius: BorderRadius.circular(999),
                               ),
                               child: Text(
                                 '${household.overdueCount} overdue',
                                 style: text.labelSmall?.copyWith(
-                                  color: accent,
+                                  color: colours.onTertiaryContainer,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),

@@ -81,7 +81,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
   }
 
-  /// Somebody else's phone, or a person who would rather type a password:
+  /// Somebody else using the phone, or the same person choosing a password:
   /// sign the locked session out and show the ordinary form. Readings still
   /// waiting to sync survive this — signing out keeps the outbox.
   Future<void> _useDifferentAccount() async {
@@ -333,7 +333,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     const SizedBox(height: 12),
     TextButton(
       onPressed: _isSubmitting ? null : _useDifferentAccount,
-      child: const Text('Sign in with a different account'),
+      child: const Text('Use username and password'),
     ),
   ];
 }

@@ -31,8 +31,6 @@ class AdminNewStaffController extends Notifier<AdminNewStaffState> {
     required String lastName,
     required String contactNumber,
     required StaffRole role,
-    required String temporaryPassword,
-    required String confirmPassword,
   }) async {
     if (state.isSubmitting) return;
 
@@ -55,8 +53,6 @@ class AdminNewStaffController extends Notifier<AdminNewStaffState> {
       lastName: lastName,
       contactNumber: contactNumber,
       role: role,
-      temporaryPassword: temporaryPassword,
-      confirmPassword: confirmPassword,
     );
 
     state = switch (result) {
@@ -71,7 +67,10 @@ class AdminNewStaffController extends Notifier<AdminNewStaffState> {
 /// Kept beside the controller so the shared provider composition remains
 /// unchanged. The use case still depends only on the domain repository.
 final createStaffAccountUseCaseProvider = Provider<CreateStaffAccount>(
-  (Ref ref) => CreateStaffAccount(auth: ref.watch(authRepositoryProvider)),
+  (Ref ref) => CreateStaffAccount(
+    auth: ref.watch(authRepositoryProvider),
+    newTemporaryPassword: ref.watch(temporaryPasswordFactoryProvider),
+  ),
 );
 
 final adminNewStaffControllerProvider =

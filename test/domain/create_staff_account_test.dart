@@ -12,7 +12,10 @@ void main() {
 
   setUp(() {
     auth = FakeAuthRepository();
-    createStaff = CreateStaffAccount(auth: auth);
+    createStaff = CreateStaffAccount(
+      auth: auth,
+      newTemporaryPassword: () => 'BillAlert0042',
+    );
   });
 
   Future<Result<CreatedStaffAccount>> create({
@@ -21,16 +24,12 @@ void main() {
     String lastName = 'Balistoy',
     String contactNumber = '0918 555 0233',
     StaffRole role = StaffRole.meterReader,
-    String password = 'Temporary#42',
-    String confirm = 'Temporary#42',
   }) => createStaff(
     username: username,
     firstName: firstName,
     lastName: lastName,
     contactNumber: contactNumber,
     role: role,
-    temporaryPassword: password,
-    confirmPassword: confirm,
   );
 
   test(
@@ -45,6 +44,16 @@ void main() {
     },
   );
 
+  test('makes the temporary password itself and returns it once', () async {
+    final result = await create();
+
+    expect(auth.createdStaffPassword, 'BillAlert0042');
+    expect(
+      (result as Ok<CreatedStaffAccount>).value.temporaryPassword,
+      'BillAlert0042',
+    );
+  });
+
   test('rejects a malformed username before calling the repository', () async {
     final result = await create(username: '42 invalid');
 
@@ -58,21 +67,6 @@ void main() {
   test('requires both names', () async {
     expect((await create(firstName: '')), isA<Err<CreatedStaffAccount>>());
     expect((await create(lastName: '')), isA<Err<CreatedStaffAccount>>());
-    expect(auth.createStaffCalls, 0);
-  });
-
-  test('requires an eight-character matching temporary password', () async {
-    final short = await create(password: 'short', confirm: 'short');
-    final mismatch = await create(confirm: 'Different#42');
-
-    expect(
-      (short as Err<CreatedStaffAccount>).failure,
-      isA<ValidationFailure>(),
-    );
-    expect(
-      (mismatch as Err<CreatedStaffAccount>).failure,
-      isA<ValidationFailure>(),
-    );
     expect(auth.createStaffCalls, 0);
   });
 

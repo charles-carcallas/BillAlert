@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../domain/entities/app_user.dart';
+import '../domain/entities/household_login.dart';
 import 'admin/accounts_screen.dart';
 import 'admin/disconnections_screen.dart';
+import 'admin/household_login_screen.dart';
 import 'admin/new_consumer_screen.dart';
 import 'admin/notice_document_screen.dart';
 import 'admin/post_bill_amount_screen.dart';
@@ -56,6 +58,11 @@ class Routes {
   /// Resetting a forgotten password. A task outside the shell, like creating
   /// an account: it ends in a confirmation and a Done that pops.
   static const String resetAccountPassword = '/admin/accounts/reset';
+
+  /// MTR-04: giving a household a sign-in. A task outside the shell, like
+  /// resetting a password. New Consumer opens it with the household it just
+  /// created as `extra`, which skips the list; without one it starts there.
+  static const String householdLogin = '/admin/accounts/household-login';
 
   /// One served notice, as a document, with the outcome recorded from it.
   ///
@@ -148,6 +155,14 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: Routes.resetAccountPassword,
         builder: (_, _) => const AdminResetPasswordScreen(),
+      ),
+      GoRoute(
+        path: Routes.householdLogin,
+        builder: (_, GoRouterState state) => AdminHouseholdLoginScreen(
+          household: state.extra is HouseholdWithoutLogin
+              ? state.extra! as HouseholdWithoutLogin
+              : null,
+        ),
       ),
       GoRoute(
         path: Routes.noticeDocument,

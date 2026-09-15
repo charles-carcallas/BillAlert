@@ -1,7 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/errors/app_failure.dart';
 import '../../core/result/result.dart';
+import '../../data/sync/sync_service.dart';
+import '../../domain/outbox/outbox_entry.dart';
+import '../../domain/outbox/outbox_operation.dart';
 import '../../domain/repositories/bill_repository.dart';
 import '../../domain/value_objects/ids.dart';
 import '../../domain/value_objects/money.dart';
@@ -72,6 +77,12 @@ class PostBillAmountController extends Notifier<PostBillAmountState> {
 
   @override
   PostBillAmountState build() {
+    final subscription = ref.read(syncServiceProvider).reports.listen((
+      SyncReport report,
+    ) {
+      if (report.succeeded > 0) unawaited(_load());
+    });
+    ref.onDispose(subscription.cancel);
     Future<void>.microtask(_load);
     return const PostBillAmountState(isLoading: true);
   }
@@ -109,9 +120,17 @@ class PostBillAmountController extends Notifier<PostBillAmountState> {
 
     switch (await ref.read(billRepositoryProvider).awaitingAmount(areaId)) {
       case Ok(:final value):
-        state = PostBillAmountState(queue: value);
+        final locallyQueued = await _locallyQueuedPostBillIds();
+        state = PostBillAmountState(
+          queue: value
+              .where((entry) => !locallyQueued.contains(entry.bill.id.value))
+              .toList(growable: false),
+        );
       case Err(:final failure):
-        state = PostBillAmountState(failure: failure);
+        // A failed refresh must not turn a useful on-screen queue into an
+        // empty one. Keep the last successful data and show the failure over
+        // it so the Admin knows it may be stale.
+        state = state.copyWith(isLoading: false, failure: failure);
     }
   }
 
@@ -168,11 +187,40 @@ class PostBillAmountController extends Notifier<PostBillAmountState> {
         // the Admin is at a desk and is watching the list to see it go.
         await ref.read(syncServiceProvider).syncNow();
         await _load();
+        final locallyQueued = await _locallyQueuedPostBillIds();
+        final bool stillWaiting = locallyQueued.contains(entry.bill.id.value);
         state = state.copyWith(
-          queue: state.queue,
-          postedMessage:
-              '${roundedAmount.format()} posted for ${entry.consumerName}.',
+          // The server still returns this unpriced bill while offline, but it
+          // is no longer actionable: its amount is already safely queued on
+          // this device. Profile remains the source of truth for sync status.
+          queue: stillWaiting
+              ? state.queue
+                    .where((queued) => queued.bill.id != entry.bill.id)
+                    .toList(growable: false)
+              : state.queue,
+          postedMessage: stillWaiting
+              ? '${roundedAmount.format()} saved for ${entry.consumerName} '
+                    'and waiting to sync.'
+              : '${roundedAmount.format()} posted for ${entry.consumerName}.',
         );
+    }
+  }
+
+  /// Bill ids that already have a durable post-amount operation on-device.
+  ///
+  /// Use `all`, not only pending: a server-rejected operation must remain
+  /// non-actionable too, otherwise the Admin can accidentally queue a second
+  /// amount while the first one is shown as failed in Profile.
+  Future<Set<String>> _locallyQueuedPostBillIds() async {
+    switch (await ref.read(outboxRepositoryProvider).all()) {
+      case Ok(:final value):
+        return value
+            .map((OutboxEntry entry) => entry.operation)
+            .whereType<PostAmountOperation>()
+            .map((PostAmountOperation operation) => operation.billId.value)
+            .toSet();
+      case Err():
+        return const <String>{};
     }
   }
 

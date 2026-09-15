@@ -2,15 +2,23 @@ import '../../../core/errors/app_failure.dart';
 import '../../../core/result/result.dart';
 import '../../entities/staff_account.dart';
 import '../../repositories/auth_repository.dart';
+import '../../value_objects/temporary_password.dart';
 
 /// FR-31 — provisions a Meter Reader or Cashier in the Admin's own area.
 ///
 /// The repository implementation calls a server-owned operation. No
 /// service-role credential or synthetic email address crosses this layer.
+///
+/// The temporary password is made here, never typed, and comes back once on
+/// the created account to be handed over.
 final class CreateStaffAccount {
   final AuthRepository auth;
+  final TemporaryPasswordFactory newTemporaryPassword;
 
-  const CreateStaffAccount({required this.auth});
+  const CreateStaffAccount({
+    required this.auth,
+    required this.newTemporaryPassword,
+  });
 
   Future<Result<CreatedStaffAccount>> call({
     required String username,
@@ -18,8 +26,6 @@ final class CreateStaffAccount {
     required String lastName,
     required String contactNumber,
     required StaffRole role,
-    required String temporaryPassword,
-    required String confirmPassword,
   }) {
     final cleanUsername = username.trim().toLowerCase();
     final cleanFirstName = firstName.trim();
@@ -49,22 +55,6 @@ final class CreateStaffAccount {
         ),
       );
     }
-    if (temporaryPassword.length < 8) {
-      return Future<Result<CreatedStaffAccount>>.value(
-        const Err<CreatedStaffAccount>(
-          ValidationFailure(
-            'The temporary password must be at least 8 characters.',
-          ),
-        ),
-      );
-    }
-    if (temporaryPassword != confirmPassword) {
-      return Future<Result<CreatedStaffAccount>>.value(
-        const Err<CreatedStaffAccount>(
-          ValidationFailure('The temporary passwords do not match.'),
-        ),
-      );
-    }
 
     return auth.createStaffAccount(
       username: cleanUsername,
@@ -72,7 +62,7 @@ final class CreateStaffAccount {
       lastName: cleanLastName,
       contactNumber: contactNumber.trim().isEmpty ? null : contactNumber,
       role: role,
-      temporaryPassword: temporaryPassword,
+      temporaryPassword: newTemporaryPassword(),
     );
   }
 }

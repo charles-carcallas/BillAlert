@@ -1,20 +1,24 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/repositories/notification_repository.dart';
 import '../../domain/value_objects/ids.dart';
-import '../../domain/value_objects/ph_date.dart';
 import '../common/failure_banner.dart';
 import 'consumer_app_bar.dart';
 import 'inbox_controller.dart';
 import 'inbox_focus.dart';
+import 'notification_details_sheet.dart';
+import 'notification_labels.dart';
 import 'phone_notifications_banner.dart';
 
 /// CON-05 — Consumer › Inbox.
 ///
 /// Every alert this household has been sent: the bill-ready notice when the
 /// Admin posts an amount, reminders before a due date, overdue warnings and
-/// disconnection notices.
+/// disconnection notices. Tapping one opens it, with the bill or notice it is
+/// about.
 ///
 /// The app never writes one of these. They are queued server-side by the same
 /// transaction that priced the bill or served the notice, which is why one
@@ -81,7 +85,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
       return switch (_filter) {
         _InboxFilter.all => true,
         _InboxFilter.unread => !alert.isRead,
-        _InboxFilter.urgent => _isUrgent(alert),
+        _InboxFilter.urgent => isUrgentNotification(alert.type),
       };
     }).toList();
 
@@ -218,7 +222,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                 for (final AppNotification alert in visibleAlerts)
                   _AlertTile(
                     alert: alert,
-                    onTap: () => controller.markRead(alert),
+                    onTap: () => _open(alert),
                     highlighted:
                         highlight != null && alert.id.value == highlight.value,
                   ),
@@ -229,8 +233,14 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     );
   }
 
-  static bool _isUrgent(AppNotification alert) =>
-      alert.type == 'overdue' || alert.type == 'disconnection';
+  /// Opening a notification is reading it, so an unread one is marked read
+  /// as its details open. A read one still opens.
+  void _open(AppNotification alert) {
+    if (!alert.isRead) {
+      unawaited(ref.read(inboxControllerProvider.notifier).markRead(alert));
+    }
+    unawaited(showNotificationDetails(context, alert: alert));
+  }
 }
 
 /// Why a tapped notification landed here, or that its notice is not here.
@@ -292,6 +302,8 @@ class _FilterChoice extends StatelessWidget {
 
 class _AlertTile extends StatelessWidget {
   final AppNotification alert;
+
+  /// Opens the notification's details.
   final VoidCallback onTap;
 
   /// The notice a tapped phone notification opened the Inbox at.
@@ -309,6 +321,7 @@ class _AlertTile extends StatelessWidget {
     final ColorScheme colours = Theme.of(context).colorScheme;
     final bool disconnection = alert.type == 'disconnection';
     final bool overdue = alert.type == 'overdue';
+    final String? urgency = notificationUrgency(alert.type);
     final Color foreground = disconnection ? Colors.white : colours.onSurface;
     final Color secondary = disconnection
         ? Colors.white.withValues(alpha: 0.78)
@@ -342,7 +355,7 @@ class _AlertTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
       ),
       child: InkWell(
-        onTap: alert.isRead ? null : onTap,
+        onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
           child: Column(
@@ -360,18 +373,20 @@ class _AlertTile extends StatelessWidget {
                       ),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(_iconFor(alert.type), size: 21, color: accent),
+                    child: Icon(
+                      notificationIcon(alert.type),
+                      size: 21,
+                      color: accent,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        if (disconnection || overdue) ...<Widget>[
+                        if (urgency != null) ...<Widget>[
                           Text(
-                            disconnection
-                                ? 'IMMEDIATE ACTION'
-                                : 'ACTION NEEDED',
+                            urgency,
                             style: text.labelSmall?.copyWith(
                               color: accent,
                               fontWeight: FontWeight.w700,
@@ -384,7 +399,7 @@ class _AlertTile extends StatelessWidget {
                           children: <Widget>[
                             Expanded(
                               child: Text(
-                                _titleFor(alert.type),
+                                notificationTitle(alert.type),
                                 style: text.titleSmall?.copyWith(
                                   color: foreground,
                                   fontWeight: alert.isRead
@@ -405,8 +420,12 @@ class _AlertTile extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 3),
+                        // The whole message is one tap away, so the list
+                        // keeps each alert to a readable preview.
                         Text(
                           alert.message,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
                           style: text.bodyMedium?.copyWith(color: secondary),
                         ),
                       ],
@@ -424,7 +443,7 @@ class _AlertTile extends StatelessWidget {
               Row(
                 children: <Widget>[
                   Text(
-                    _when(alert.createdAt),
+                    phDateTimeLabel(alert.createdAt),
                     style: text.bodySmall?.copyWith(color: secondary),
                   ),
                   const Spacer(),
@@ -443,6 +462,8 @@ class _AlertTile extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                  const SizedBox(width: 6),
+                  Icon(Icons.chevron_right, size: 18, color: secondary),
                 ],
               ),
             ],
@@ -450,48 +471,5 @@ class _AlertTile extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  /// The server's `notification_type` enum, in words a household would use.
-  static String _titleFor(String type) => switch (type) {
-    'bill_ready' => 'Your bill is ready',
-    'pre_due_reminder' => 'Payment reminder',
-    'overdue' => 'Bill is overdue',
-    'disconnection' => 'Disconnection notice served',
-    _ => 'Notice',
-  };
-
-  static IconData _iconFor(String type) => switch (type) {
-    'bill_ready' => Icons.description_outlined,
-    'pre_due_reminder' => Icons.schedule_outlined,
-    'overdue' => Icons.warning_amber_outlined,
-    'disconnection' => Icons.power_off_outlined,
-    _ => Icons.notifications_none,
-  };
-
-  /// The Philippine date it arrived. The instant is UTC, and an alert queued
-  /// at 7am in Tubod is the previous day in UTC.
-  static String _when(DateTime instant) {
-    final PhDate day = PhDate.at(instant);
-    final DateTime manila = instant.toUtc().add(PhDate.utcOffset);
-    final int hour24 = manila.hour;
-    final int hour = hour24 % 12 == 0 ? 12 : hour24 % 12;
-    final String minute = manila.minute.toString().padLeft(2, '0');
-    const List<String> months = <String>[
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return '${day.day} ${months[day.month - 1]} · '
-        '$hour:$minute ${hour24 < 12 ? 'AM' : 'PM'}';
   }
 }

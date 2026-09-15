@@ -6,6 +6,7 @@ import '../../core/errors/app_failure.dart';
 import '../../core/result/result.dart';
 import '../../domain/entities/app_user.dart';
 import '../../domain/entities/consumer.dart' as domain;
+import '../../domain/notifications/phone_alerts.dart';
 import '../../domain/outbox/outbox_entry.dart';
 import '../auth/app_lock_controller.dart';
 import '../auth/auth_controller.dart';
@@ -13,6 +14,7 @@ import '../consumer/consumer_app_bar.dart';
 import '../consumer/edit_contact_number_sheet.dart';
 import '../providers.dart';
 import '../router.dart';
+import 'appearance_setting.dart';
 import 'staff_app_bar.dart';
 
 /// Work the app is holding that has not reached the server yet.
@@ -57,6 +59,18 @@ final fingerprintStatusProvider = FutureProvider<({bool available, bool on})>((
   return (available: true, on: on);
 });
 
+/// Whether urgent due-date alerts are on for this phone, and whether they fill
+/// the screen here or pop up. Read here, so the switch shows the setting's own
+/// answer.
+final urgentAlertsStatusProvider =
+    FutureProvider<({bool on, bool fillsScreen})>((Ref ref) async {
+      final bool on = await ref.watch(urgentAlertsSettingProvider).isOn();
+      final bool fillsScreen = await ref
+          .watch(fullScreenAlertsProvider)
+          .fillsScreen();
+      return (on: on, fillsScreen: fillsScreen);
+    });
+
 /// The Profile tab, for all four roles.
 ///
 /// One screen, not four. Everything on it comes from the signed-in [AppUser]
@@ -64,8 +78,6 @@ final fingerprintStatusProvider = FutureProvider<({bool available, bool on})>((
 /// The Meter Reader's version and the Cashier's differ only in the words the
 /// user object already supplies.
 ///
-/// What is deliberately NOT here: the mockup's theme picker. It is not built,
-/// and a switch that does nothing is worse than an absent one.
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
@@ -93,12 +105,22 @@ class ProfileScreen extends ConsumerWidget {
           onRefresh: () async {
             ref.invalidate(pendingOutboxProvider);
             ref.invalidate(fingerprintStatusProvider);
-            if (user is ConsumerUser) ref.invalidate(profileConsumerProvider);
+            if (user is ConsumerUser) {
+              ref.invalidate(profileConsumerProvider);
+              ref.invalidate(urgentAlertsStatusProvider);
+            }
           },
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: <Widget>[
               _Identity(user: user, consumer: consumer?.value),
+              const SizedBox(height: 18),
+              const _SectionHeader(
+                icon: Icons.palette_outlined,
+                label: 'Appearance',
+              ),
+              const SizedBox(height: 6),
+              const _Panel(children: <Widget>[AppearanceSetting()]),
               if (user is ConsumerUser) ...<Widget>[
                 const SizedBox(height: 18),
                 const _SectionHeader(
@@ -114,6 +136,8 @@ class ProfileScreen extends ConsumerWidget {
                           'Bill ready, payment reminders, overdue alerts, and notices',
                       trailing: Icon(Icons.check_circle_outline),
                     ),
+                    Divider(),
+                    _UrgentAlertsRow(),
                   ],
                 ),
                 const SizedBox(height: 18),
@@ -671,5 +695,79 @@ class _FingerprintRow extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+/// Urgent due-date alerts, on or off, for this phone.
+///
+/// On Android 14 and later the reminder fills the screen, which Android makes
+/// the household allow once, so turning the switch on opens that page when it
+/// is needed. Older phones get a loud pop-up, which needs nothing allowed.
+class _UrgentAlertsRow extends ConsumerWidget {
+  const _UrgentAlertsRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = ref.watch(urgentAlertsStatusProvider);
+    final bool on = status.value?.on ?? true;
+    final bool fillsScreen = status.value?.fillsScreen ?? false;
+
+    final String subtitle = status.isLoading
+        ? 'Checking this phone…'
+        : fillsScreen
+        ? 'Before a bill is due, the reminder fills the screen'
+        : 'Before a bill is due, the reminder pops up with a loud sound';
+
+    return _SettingRow(
+      title: 'Urgent due-date alerts',
+      subtitle: subtitle,
+      trailing: Switch(
+        value: on,
+        onChanged: status.isLoading
+            ? null
+            : (bool turnOn) => _change(context, ref, turnOn, fillsScreen),
+      ),
+    );
+  }
+
+  Future<void> _change(
+    BuildContext context,
+    WidgetRef ref,
+    bool turnOn,
+    bool fillsScreen,
+  ) async {
+    final UrgentAlertsSetting setting = ref.read(urgentAlertsSettingProvider);
+    String message;
+    try {
+      if (turnOn) {
+        await setting.turnOn();
+        final bool allowed =
+            !fillsScreen || await ref.read(fullScreenAlertsProvider).allow();
+        message = allowed
+            ? 'Urgent due-date alerts are on.'
+            : 'Urgent due-date alerts are on. Allow full-screen alerts for '
+                  'BillAlert in Android settings, or the reminder pops up '
+                  'instead.';
+      } else {
+        await setting.turnOff();
+        message =
+            'Urgent due-date alerts are off. Reminders arrive as ordinary '
+            'notifications.';
+      }
+    } catch (_) {
+      message = 'That setting could not be saved on this phone. Try again.';
+    }
+    ref.invalidate(urgentAlertsStatusProvider);
+
+    // Reminders already waiting keep the style they were scheduled with until
+    // they are scheduled again, so do that now rather than at the next check.
+    try {
+      await ref.read(refreshPhoneAlertsProvider)();
+    } catch (_) {}
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }
