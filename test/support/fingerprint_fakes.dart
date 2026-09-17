@@ -2,6 +2,7 @@ import 'package:billalert/core/errors/app_failure.dart';
 import 'package:billalert/core/result/result.dart';
 import 'package:billalert/domain/security/device_unlock.dart';
 import 'package:billalert/domain/security/fingerprint_setting.dart';
+import 'package:billalert/domain/security/password_verifier.dart';
 import 'package:billalert/domain/value_objects/ids.dart';
 import 'package:billalert/presentation/auth/app_lock_controller.dart';
 
@@ -58,6 +59,25 @@ final class FakeFingerprintSetting implements FingerprintSetting {
 }
 
 /// An [AppLockController] that starts locked, for screens drawn mid-lock.
+/// Remembers passwords in memory, as if the server had accepted them.
+final class FakePasswordVerifier implements PasswordVerifier {
+  final Map<String, String> accepted = <String, String>{};
+
+  @override
+  Future<void> remember(ProfileId profile, String password) async =>
+      accepted[profile.value] = password;
+
+  @override
+  Future<bool?> matches(ProfileId profile, String password) async {
+    final String? saved = accepted[profile.value];
+    return saved == null ? null : saved == password;
+  }
+
+  @override
+  Future<void> forget(ProfileId profile) async =>
+      accepted.remove(profile.value);
+}
+
 class LockedAppLockController extends AppLockController {
   @override
   AppLockState build() => const AppLockState(locked: true);

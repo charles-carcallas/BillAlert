@@ -74,6 +74,72 @@ class AppLockController extends Notifier<AppLockState> {
     }
   }
 
+  /// Offline password tries allowed before the lock insists on the
+  /// fingerprint or on signal. The server rate-limits online tries itself.
+  static const int maxOfflinePasswordTries = 5;
+
+  int _offlinePasswordTries = 0;
+
+  /// "Use username and password" on the lock, for the SAME account.
+  ///
+  /// This used to sign the session out and show the ordinary form, which
+  /// with no signal left nobody able to get back in: signing out destroys the
+  /// session and the phone's saved data, and a fresh sign-in needs the server.
+  /// Now the session stays. With signal the server checks the password; with
+  /// none, it is checked against the last password the server accepted on
+  /// this phone. Returns null when the lock lifts.
+  Future<AppFailure?> unlockWithPassword(AppUser user, String password) async {
+    if (password.isEmpty) {
+      return const ValidationFailure('Enter your password.');
+    }
+
+    final result = await ref.read(signInProvider)(
+      username: user.username,
+      password: password,
+    );
+
+    switch (result) {
+      case Ok():
+        _offlinePasswordTries = 0;
+        await ref.read(passwordVerifierProvider).remember(user.id, password);
+        state = const AppLockState();
+        return null;
+      case Err(:final failure) when failure is! NetworkFailure:
+        return failure;
+      case Err():
+        break;
+    }
+
+    // No signal: check against this phone's copy of the server's last yes.
+    if (_offlinePasswordTries >= maxOfflinePasswordTries) {
+      return const AuthFailure(
+        'Too many tries without signal. Use your fingerprint, or connect to '
+        'the internet and try again.',
+      );
+    }
+    final bool? matches = await ref
+        .read(passwordVerifierProvider)
+        .matches(user.id, password);
+    switch (matches) {
+      case true:
+        _offlinePasswordTries = 0;
+        state = const AppLockState();
+        return null;
+      case false:
+        _offlinePasswordTries++;
+        return const AuthFailure(
+          'That password is incorrect. You are offline, so it was checked on '
+          'this phone.',
+        );
+      case null:
+        return const NetworkFailure(
+          'No connection, and this phone has not saved a password check for '
+          'your account yet. Use your fingerprint, or connect to the internet '
+          'and try again.',
+        );
+    }
+  }
+
   /// "Use fingerprint" in the offer.
   ///
   /// Confirms once before saving anything. That proves the sensor or PIN

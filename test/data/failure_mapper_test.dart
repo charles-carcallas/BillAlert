@@ -8,25 +8,42 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// signed-in user they had been signed out.
 void main() {
   group('changing a password', () {
-    test('the same password again is a validation problem, not a lost session',
-        () {
-      // Captured from the live project: PUT /auth/v1/user with the current
-      // password returns 422 same_password.
+    test('a session ended by a password reset says so', () {
+      // Found on a phone: an Area President reset the password, then the
+      // phone still signed in as that household tried to change it.
       final failure = FailureMapper.from(
         const AuthException(
-          'New password should be different from the old password.',
-          statusCode: '422',
-          code: 'same_password',
+          'Session from session_id claim in JWT does not exist',
+          statusCode: '403',
+          code: 'session_not_found',
         ),
       );
 
-      expect(failure, isA<ValidationFailure>());
-      expect(failure.message, contains('different'));
-      // The bug: this said "You have been signed out. Please sign in again."
-      // to somebody who was still signed in, on the one screen they could not
-      // leave. It sent them round a loop with no way through.
-      expect(failure.message, isNot(contains('signed out')));
+      expect(failure, isA<AuthFailure>());
+      expect(failure.message, contains('password was reset'));
     });
+
+    test(
+      'the same password again is a validation problem, not a lost session',
+      () {
+        // Captured from the live project: PUT /auth/v1/user with the current
+        // password returns 422 same_password.
+        final failure = FailureMapper.from(
+          const AuthException(
+            'New password should be different from the old password.',
+            statusCode: '422',
+            code: 'same_password',
+          ),
+        );
+
+        expect(failure, isA<ValidationFailure>());
+        expect(failure.message, contains('different'));
+        // The bug: this said "You have been signed out. Please sign in again."
+        // to somebody who was still signed in, on the one screen they could not
+        // leave. It sent them round a loop with no way through.
+        expect(failure.message, isNot(contains('signed out')));
+      },
+    );
 
     test('a password the server considers weak says so', () {
       final failure = FailureMapper.from(
@@ -44,8 +61,10 @@ void main() {
     test('an unnamed 422 is still not a lost session', () {
       // Whatever GoTrue adds next, a 422 is about what was typed.
       final failure = FailureMapper.from(
-        const AuthException('Something the app has not seen before.',
-            statusCode: '422'),
+        const AuthException(
+          'Something the app has not seen before.',
+          statusCode: '422',
+        ),
       );
 
       expect(failure.message, isNot(contains('signed out')));
@@ -65,11 +84,15 @@ void main() {
   group('signing in', () {
     test('wrong credentials are reported as wrong credentials', () {
       final byCode = FailureMapper.from(
-        const AuthException('Invalid login credentials',
-            statusCode: '400', code: 'invalid_credentials'),
+        const AuthException(
+          'Invalid login credentials',
+          statusCode: '400',
+          code: 'invalid_credentials',
+        ),
       );
-      final byProse =
-          FailureMapper.from(const AuthException('Invalid login credentials'));
+      final byProse = FailureMapper.from(
+        const AuthException('Invalid login credentials'),
+      );
 
       for (final AppFailure failure in <AppFailure>[byCode, byProse]) {
         expect(failure, isA<AuthFailure>());
@@ -88,20 +111,22 @@ void main() {
   });
 
   group('no signal', () {
-    test('a lost connection during sign-in is a network failure, not a server one',
-        () {
-      // gotrue catches the transport failure and rethrows it as an
-      // AuthException subclass, so the SocketException check never sees it.
-      // Before this was handled, a meter reader with no signal was told the
-      // server was broken - on an app built to work without signal.
-      final failure = FailureMapper.from(
-        AuthRetryableFetchException(message: 'Failed host lookup'),
-      );
+    test(
+      'a lost connection during sign-in is a network failure, not a server one',
+      () {
+        // gotrue catches the transport failure and rethrows it as an
+        // AuthException subclass, so the SocketException check never sees it.
+        // Before this was handled, a meter reader with no signal was told the
+        // server was broken - on an app built to work without signal.
+        final failure = FailureMapper.from(
+          AuthRetryableFetchException(message: 'Failed host lookup'),
+        );
 
-      expect(failure, isA<NetworkFailure>());
-      expect(failure.message, contains('No connection'));
-      expect(failure.message, isNot(contains('server')));
-    });
+        expect(failure, isA<NetworkFailure>());
+        expect(failure.message, contains('No connection'));
+        expect(failure.message, isNot(contains('server')));
+      },
+    );
   });
 
   group('a session that really has ended', () {
@@ -126,8 +151,12 @@ void main() {
   group('the technical cause is kept but never shown', () {
     test('the raw message goes to debugDetail, not to the screen', () {
       final failure = FailureMapper.from(
-        const AuthException('New password should be different from the old '
-            'password.', statusCode: '422', code: 'same_password'),
+        const AuthException(
+          'New password should be different from the old '
+          'password.',
+          statusCode: '422',
+          code: 'same_password',
+        ),
       );
 
       expect(failure.debugDetail, isNotNull);

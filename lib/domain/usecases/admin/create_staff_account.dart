@@ -20,6 +20,11 @@ final class CreateStaffAccount {
     required this.newTemporaryPassword,
   });
 
+  /// Offline nothing is created, and nothing is kept to try later.
+  static const String needsSignal =
+      'Creating a staff account needs signal. Nothing was created. Try again '
+      "when you're back online.";
+
   Future<Result<CreatedStaffAccount>> call({
     required String username,
     required String firstName,
@@ -56,13 +61,15 @@ final class CreateStaffAccount {
       );
     }
 
-    return auth.createStaffAccount(
-      username: cleanUsername,
-      firstName: cleanFirstName,
-      lastName: cleanLastName,
-      contactNumber: contactNumber.trim().isEmpty ? null : contactNumber,
-      role: role,
-      temporaryPassword: newTemporaryPassword(),
-    );
+    return auth
+        .createStaffAccount(
+          username: cleanUsername,
+          firstName: cleanFirstName,
+          lastName: cleanLastName,
+          contactNumber: contactNumber.trim().isEmpty ? null : contactNumber,
+          role: role,
+          temporaryPassword: newTemporaryPassword(),
+        )
+        .then((result) => result.ifOffline(needsSignal));
   }
 }

@@ -6,7 +6,9 @@ import '../../domain/repositories/bill_repository.dart';
 import '../../domain/value_objects/kwh.dart';
 import '../../domain/value_objects/money.dart';
 import '../../domain/value_objects/ph_date.dart';
+import '../common/expandable_bottom_sheet.dart';
 import '../common/failure_banner.dart';
+import '../common/local_sort_button.dart';
 import '../common/staff_app_bar.dart';
 import 'post_bill_amount_controller.dart';
 
@@ -28,8 +30,20 @@ class PostBillAmountScreen extends ConsumerStatefulWidget {
       _PostBillAmountScreenState();
 }
 
+enum _AmountSort { oldest, newest, nameAz, nameZa }
+
+/// What the list caption says for each order, so it always matches the sort
+/// button rather than claiming one fixed order.
+const Map<_AmountSort, String> _sortLabels = <_AmountSort, String>{
+  _AmountSort.oldest: 'Longest waiting first',
+  _AmountSort.newest: 'Newest readings first',
+  _AmountSort.nameAz: 'By name, A–Z',
+  _AmountSort.nameZa: 'By name, Z–A',
+};
+
 class _PostBillAmountScreenState extends ConsumerState<PostBillAmountScreen> {
   final TextEditingController _search = TextEditingController();
+  _AmountSort _sort = _AmountSort.oldest;
 
   @override
   void dispose() {
@@ -44,6 +58,7 @@ class _PostBillAmountScreenState extends ConsumerState<PostBillAmountScreen> {
     final List<AwaitingAmountEntry> visibleQueue = _matchingEntries(
       state.queue,
       _search.text,
+      _sort,
     );
 
     return Scaffold(
@@ -57,6 +72,69 @@ class _PostBillAmountScreenState extends ConsumerState<PostBillAmountScreen> {
               _Header(
                 count: state.queue.length,
                 cycleLabel: _cycleLabel(state),
+                controls: state.queue.isEmpty
+                    ? null
+                    : Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Expanded(
+                            child: TextField(
+                              key: const ValueKey<String>('amounts-search'),
+                              controller: _search,
+                              textInputAction: TextInputAction.search,
+                              autocorrect: false,
+                              decoration: InputDecoration(
+                                labelText: 'Search readings',
+                                hintText: 'Name, account, purok or bill number',
+                                prefixIcon: const Icon(Icons.search),
+                                suffixIcon: _search.text.isEmpty
+                                    ? null
+                                    : IconButton(
+                                        tooltip: 'Clear search',
+                                        onPressed: () {
+                                          _search.clear();
+                                          setState(() {});
+                                        },
+                                        icon: const Icon(Icons.close),
+                                      ),
+                              ),
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          SizedBox(
+                            width: 132,
+                            child: LocalSortButton<_AmountSort>(
+                              buttonKey: const ValueKey('amounts-sort'),
+                              value: _sort,
+                              options: const <LocalSortOption<_AmountSort>>[
+                                LocalSortOption(
+                                  value: _AmountSort.oldest,
+                                  label: 'Oldest',
+                                  icon: Icons.arrow_upward,
+                                ),
+                                LocalSortOption(
+                                  value: _AmountSort.newest,
+                                  label: 'Newest',
+                                  icon: Icons.arrow_downward,
+                                ),
+                                LocalSortOption(
+                                  value: _AmountSort.nameAz,
+                                  label: 'Name A–Z',
+                                  icon: Icons.sort_by_alpha,
+                                ),
+                                LocalSortOption(
+                                  value: _AmountSort.nameZa,
+                                  label: 'Name Z–A',
+                                  icon: Icons.sort_by_alpha,
+                                ),
+                              ],
+                              onChanged: (value) =>
+                                  setState(() => _sort = value),
+                            ),
+                          ),
+                        ],
+                      ),
               ),
 
               if (state.failure != null) ...<Widget>[
@@ -72,39 +150,17 @@ class _PostBillAmountScreenState extends ConsumerState<PostBillAmountScreen> {
                 _PostedNotice(message: state.postedMessage!),
               ],
 
-              const SizedBox(height: 16),
-
               if (state.queue.isNotEmpty) ...<Widget>[
-                TextField(
-                  key: const ValueKey<String>('amounts-search'),
-                  controller: _search,
-                  textInputAction: TextInputAction.search,
-                  autocorrect: false,
-                  decoration: InputDecoration(
-                    labelText: 'Search readings',
-                    hintText: 'Name, consumer number, purok or bill number',
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: _search.text.isEmpty
-                        ? null
-                        : IconButton(
-                            tooltip: 'Clear search',
-                            onPressed: () {
-                              _search.clear();
-                              setState(() {});
-                            },
-                            icon: const Icon(Icons.close),
-                          ),
-                  ),
-                  onChanged: (_) => setState(() {}),
-                ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 20),
                 _QueueCaption(
+                  sortLabel: _sortLabels[_sort]!,
                   showing: visibleQueue.length,
                   total: state.queue.length,
                   isFiltered: _search.text.trim().isNotEmpty,
                 ),
-                const SizedBox(height: 8),
-              ],
+                const SizedBox(height: 10),
+              ] else
+                const SizedBox(height: 16),
 
               if (state.isLoading && state.queue.isEmpty)
                 const Padding(
@@ -149,15 +205,14 @@ class _PostBillAmountScreenState extends ConsumerState<PostBillAmountScreen> {
 
   Future<void> _openAmount(AwaitingAmountEntry entry) async {
     ref.read(postBillAmountControllerProvider.notifier).dismissMessages();
-    await showModalBottomSheet<void>(
+    await showExpandableBottomSheet<void>(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
+      initialSize: 0.75,
       // Close/back goes through the draft guard; a drag or outside tap must
-      // never silently throw away a cooperative amount.
-      isDismissible: false,
-      enableDrag: false,
-      builder: (_) => _AmountSheet(entry: entry),
+      // never silently throw away a cooperative amount. Dragging only resizes.
+      dismissible: false,
+      builder: (_, ScrollController scrollController) =>
+          _AmountSheet(entry: entry, scrollController: scrollController),
     );
   }
 
@@ -166,21 +221,41 @@ class _PostBillAmountScreenState extends ConsumerState<PostBillAmountScreen> {
   static List<AwaitingAmountEntry> _matchingEntries(
     List<AwaitingAmountEntry> queue,
     String rawQuery,
+    _AmountSort sort,
   ) {
     final String query = rawQuery.trim().toLowerCase();
-    if (query.isEmpty) return queue;
+    final matching = queue.where((AwaitingAmountEntry entry) {
+      if (query.isEmpty) return true;
+      final String searchable = <String>[
+        entry.consumerName,
+        entry.consumerNo.value,
+        entry.purok ?? '',
+        entry.bill.billNo.value,
+      ].join(' ').toLowerCase();
+      return searchable.contains(query);
+    }).toList();
+    int byName(AwaitingAmountEntry a, AwaitingAmountEntry b) {
+      final result = a.consumerName.toLowerCase().compareTo(
+        b.consumerName.toLowerCase(),
+      );
+      return result != 0 ? result : a.bill.id.value.compareTo(b.bill.id.value);
+    }
 
-    return queue
-        .where((AwaitingAmountEntry entry) {
-          final String searchable = <String>[
-            entry.consumerName,
-            entry.consumerNo.value,
-            entry.purok ?? '',
-            entry.bill.billNo.value,
-          ].join(' ').toLowerCase();
-          return searchable.contains(query);
-        })
-        .toList(growable: false);
+    matching.sort(
+      (a, b) => switch (sort) {
+        _AmountSort.oldest =>
+          a.readingDate.compareTo(b.readingDate) != 0
+              ? a.readingDate.compareTo(b.readingDate)
+              : byName(a, b),
+        _AmountSort.newest =>
+          b.readingDate.compareTo(a.readingDate) != 0
+              ? b.readingDate.compareTo(a.readingDate)
+              : byName(a, b),
+        _AmountSort.nameAz => byName(a, b),
+        _AmountSort.nameZa => -byName(a, b),
+      },
+    );
+    return matching;
   }
 }
 
@@ -241,11 +316,16 @@ String _identity(AwaitingAmountEntry entry) {
   );
 }
 
+/// The cycle, how much is waiting, and the tools to find a household in it,
+/// as one panel. The search and sort sit inside it because they act on the
+/// count it shows; left outside, they floated between the panel and the list
+/// and belonged to neither.
 class _Header extends StatelessWidget {
   final int count;
   final String? cycleLabel;
+  final Widget? controls;
 
-  const _Header({required this.count, this.cycleLabel});
+  const _Header({required this.count, this.cycleLabel, this.controls});
 
   @override
   Widget build(BuildContext context) {
@@ -255,23 +335,46 @@ class _Header extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
       decoration: BoxDecoration(
-        color: colours.surfaceContainerLowest,
-        border: Border.all(color: colours.outlineVariant),
-        borderRadius: BorderRadius.circular(16),
+        color: colours.primary.withValues(alpha: 0.08),
+        border: Border.all(color: colours.primary.withValues(alpha: 0.18)),
+        borderRadius: BorderRadius.circular(24),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           if (cycleLabel != null) ...<Widget>[
-            Text(
-              cycleLabel!.toUpperCase(),
-              style: text.labelSmall?.copyWith(
-                color: colours.primary,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.2,
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: colours.surfaceContainerLowest,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Icon(
+                      Icons.calendar_month_outlined,
+                      size: 15,
+                      color: colours.primary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      cycleLabel!,
+                      style: text.labelMedium?.copyWith(
+                        color: colours.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 10),
           ],
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -280,8 +383,10 @@ class _Header extends StatelessWidget {
               Text(
                 '$count',
                 style: text.headlineMedium?.copyWith(
-                  fontSize: 32,
-                  height: 1.2,
+                  fontSize: 34,
+                  height: 1.15,
+                  fontWeight: FontWeight.w700,
+                  color: colours.primary,
                   fontFeatures: _tabularFigures,
                 ),
               ),
@@ -289,33 +394,55 @@ class _Header extends StatelessWidget {
               Expanded(
                 child: Text(
                   'reading${count == 1 ? '' : 's'} awaiting an amount',
-                  style: text.titleSmall?.copyWith(
+                  style: text.titleSmall,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Padding(
+                padding: const EdgeInsets.only(top: 1),
+                child: Icon(
+                  Icons.info_outline,
+                  size: 16,
+                  color: colours.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  "Copy the amount and due date from the cooperative's "
+                  'statement — BillAlert never calculates them. Posting '
+                  'alerts the household in the app and by text.',
+                  style: text.bodySmall?.copyWith(
                     color: colours.onSurfaceVariant,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            "Copy the amount and due date from the cooperative's statement — "
-            'BillAlert never calculates them. Posting alerts the household in '
-            'the app and by text.',
-            style: text.bodyMedium,
-          ),
+          if (controls != null) ...<Widget>[
+            const SizedBox(height: 14),
+            controls!,
+          ],
         ],
       ),
     );
   }
 }
 
-/// "Longest waiting first", and how many rows a search is showing.
+/// The order the list is in, and how many rows a search is showing.
 class _QueueCaption extends StatelessWidget {
+  final String sortLabel;
   final int showing;
   final int total;
   final bool isFiltered;
 
   const _QueueCaption({
+    required this.sortLabel,
     required this.showing,
     required this.total,
     required this.isFiltered,
@@ -323,16 +450,32 @@ class _QueueCaption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final TextStyle? style = Theme.of(context).textTheme.labelSmall?.copyWith(
-      fontWeight: FontWeight.w600,
-      letterSpacing: 0.8,
-    );
+    final TextTheme text = Theme.of(context).textTheme;
+    final ColorScheme colours = Theme.of(context).colorScheme;
 
-    return Row(
-      children: <Widget>[
-        Expanded(child: Text('LONGEST WAITING FIRST', style: style)),
-        if (isFiltered) Text('$showing of $total', style: style),
-      ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Text(
+              sortLabel,
+              style: text.titleSmall?.copyWith(
+                color: colours.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          if (isFiltered)
+            Text(
+              '$showing of $total',
+              style: text.labelMedium?.copyWith(
+                color: colours.onSurfaceVariant,
+                fontFeatures: _tabularFigures,
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -545,7 +688,9 @@ class _QueueCard extends StatelessWidget {
 class _AmountSheet extends ConsumerStatefulWidget {
   final AwaitingAmountEntry entry;
 
-  const _AmountSheet({required this.entry});
+  final ScrollController scrollController;
+
+  const _AmountSheet({required this.entry, required this.scrollController});
 
   @override
   ConsumerState<_AmountSheet> createState() => _AmountSheetState();
@@ -564,54 +709,50 @@ class _AmountSheetState extends ConsumerState<_AmountSheet> {
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _close();
       },
-      child: Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.viewInsetsOf(context).bottom,
-        ),
-        child: SafeArea(
-          top: false,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 12, 12, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: Text(
-                        'Post bill amount',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          controller: widget.scrollController,
+          padding: const EdgeInsets.fromLTRB(20, 0, 12, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      'Post bill amount',
+                      style: Theme.of(context).textTheme.titleLarge,
                     ),
-                    IconButton(
-                      tooltip: 'Close amount form',
-                      onPressed: _posting ? null : _close,
-                      icon: const Icon(Icons.close),
+                  ),
+                  IconButton(
+                    tooltip: 'Close amount form',
+                    onPressed: _posting ? null : _close,
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    if (failure != null) ...<Widget>[
+                      const SizedBox(height: 4),
+                      FailureBanner(failure: failure),
+                    ],
+                    const SizedBox(height: 8),
+                    _AmountForm(
+                      entry: widget.entry,
+                      isPosting: _posting,
+                      onDirtyChanged: (dirty) => _dirty = dirty,
+                      onPost: _post,
                     ),
                   ],
                 ),
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      if (failure != null) ...<Widget>[
-                        const SizedBox(height: 4),
-                        FailureBanner(failure: failure),
-                      ],
-                      const SizedBox(height: 8),
-                      _AmountForm(
-                        entry: widget.entry,
-                        isPosting: _posting,
-                        onDirtyChanged: (dirty) => _dirty = dirty,
-                        onPost: _post,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -761,6 +902,19 @@ class _AmountFormState extends State<_AmountForm> {
             setState(() {});
             _reportDirty();
           },
+        ),
+        const SizedBox(height: 6),
+        // Both notes about the amount sit under the box it is typed into,
+        // rather than one of them floating above the readings. The first
+        // names the mistake worth looking for: transcribing the
+        // cooperative's figure by hand is where a stray zero gets in, and
+        // the consumption above is the only thing on this screen that can
+        // give it away. BillAlert never derives pesos from kWh, so nothing
+        // here can check it — a person has to look.
+        Text(
+          'Compare the amount with the consumption above. An extra zero '
+          'will look too big.',
+          style: text.bodySmall,
         ),
         const SizedBox(height: 6),
         Text(
@@ -1105,12 +1259,6 @@ class _ReadingDetail extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Check the amount against this consumption — a wildly wrong '
-            'figure stands out.',
-            style: text.bodySmall,
           ),
         ],
       ),

@@ -86,7 +86,7 @@ void main() {
     of: find
         .ancestor(
           of: find.text('Urgent due-date alerts'),
-          matching: find.byType(Row),
+          matching: find.byType(InkWell),
         )
         .first,
     matching: find.byType(Switch),

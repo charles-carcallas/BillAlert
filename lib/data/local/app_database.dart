@@ -20,6 +20,7 @@ part 'app_database.g.dart';
     CachedBills,
     CachedPayments,
     CachedNotifications,
+    CachedQueries,
     CacheOwner,
     SyncMeta,
     OutboxRows,
@@ -34,7 +35,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 7;
 
   /// v1 -> v2: the CHECK constraints and the five indexes that the retired
   /// `local_cache_schema.sql` had and this port had lost.
@@ -128,6 +129,21 @@ class AppDatabase extends _$AppDatabase {
         );
         await m.addColumn(cachedNotifications, cachedNotifications.sentAt);
       }
+      if (from < 6) {
+        // Bill Details shows the two dial figures behind the consumption
+        // (FR-25), so the offline copy has to carry them too. Nullable: a
+        // row cached before v6 keeps its amounts and fills these in on the
+        // next successful online read.
+        await m.addColumn(cachedBills, cachedBills.previousReadingHundredths);
+        await m.addColumn(cachedBills, cachedBills.currentReadingHundredths);
+        await m.addColumn(cachedBills, cachedBills.readingDate);
+      }
+      if (from < 7) {
+        // Saved answers for the staff screens with no table of their own, so
+        // the Admin's and Cashier's lists still open without signal. A new,
+        // empty table: nothing existing is touched.
+        await m.createTable(cachedQueries);
+      }
     },
   );
 
@@ -142,6 +158,7 @@ class AppDatabase extends _$AppDatabase {
       await delete(cachedBills).go();
       await delete(cachedPayments).go();
       await delete(cachedNotifications).go();
+      await delete(cachedQueries).go();
       await delete(cacheOwner).go();
       await delete(syncMeta).go();
     });

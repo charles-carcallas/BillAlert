@@ -872,6 +872,39 @@ class $CachedBillsTable extends CachedBills
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _previousReadingHundredthsMeta =
+      const VerificationMeta('previousReadingHundredths');
+  @override
+  late final GeneratedColumn<int> previousReadingHundredths =
+      GeneratedColumn<int>(
+        'previous_reading_hundredths',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _currentReadingHundredthsMeta =
+      const VerificationMeta('currentReadingHundredths');
+  @override
+  late final GeneratedColumn<int> currentReadingHundredths =
+      GeneratedColumn<int>(
+        'current_reading_hundredths',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _readingDateMeta = const VerificationMeta(
+    'readingDate',
+  );
+  @override
+  late final GeneratedColumn<String> readingDate = GeneratedColumn<String>(
+    'reading_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _amountPaidCentavosMeta =
       const VerificationMeta('amountPaidCentavos');
   @override
@@ -922,6 +955,9 @@ class $CachedBillsTable extends CachedBills
     consumerId,
     cycleLabel,
     consumptionHundredths,
+    previousReadingHundredths,
+    currentReadingHundredths,
+    readingDate,
     amountPaidCentavos,
     totalAmountCentavos,
     dueDate,
@@ -978,6 +1014,33 @@ class $CachedBillsTable extends CachedBills
       );
     } else if (isInserting) {
       context.missing(_consumptionHundredthsMeta);
+    }
+    if (data.containsKey('previous_reading_hundredths')) {
+      context.handle(
+        _previousReadingHundredthsMeta,
+        previousReadingHundredths.isAcceptableOrUnknown(
+          data['previous_reading_hundredths']!,
+          _previousReadingHundredthsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('current_reading_hundredths')) {
+      context.handle(
+        _currentReadingHundredthsMeta,
+        currentReadingHundredths.isAcceptableOrUnknown(
+          data['current_reading_hundredths']!,
+          _currentReadingHundredthsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('reading_date')) {
+      context.handle(
+        _readingDateMeta,
+        readingDate.isAcceptableOrUnknown(
+          data['reading_date']!,
+          _readingDateMeta,
+        ),
+      );
     }
     if (data.containsKey('amount_paid_centavos')) {
       context.handle(
@@ -1041,6 +1104,18 @@ class $CachedBillsTable extends CachedBills
         DriftSqlType.int,
         data['${effectivePrefix}consumption_hundredths'],
       )!,
+      previousReadingHundredths: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}previous_reading_hundredths'],
+      ),
+      currentReadingHundredths: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}current_reading_hundredths'],
+      ),
+      readingDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reading_date'],
+      ),
       amountPaidCentavos: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}amount_paid_centavos'],
@@ -1072,6 +1147,13 @@ class CachedBillRow extends DataClass implements Insertable<CachedBillRow> {
   final String consumerId;
   final String cycleLabel;
   final int consumptionHundredths;
+
+  /// The dial figures the consumption came from, and the day of the reading.
+  /// Nullable: rows cached before schema v6 have none, and a bill whose
+  /// reading row has gone never had them. FR-25 shows them on Bill Details.
+  final int? previousReadingHundredths;
+  final int? currentReadingHundredths;
+  final String? readingDate;
   final int amountPaidCentavos;
 
   /// NULL until the cooperative amount is posted (FR-21b). CON-07 still has
@@ -1086,6 +1168,9 @@ class CachedBillRow extends DataClass implements Insertable<CachedBillRow> {
     required this.consumerId,
     required this.cycleLabel,
     required this.consumptionHundredths,
+    this.previousReadingHundredths,
+    this.currentReadingHundredths,
+    this.readingDate,
     required this.amountPaidCentavos,
     this.totalAmountCentavos,
     this.dueDate,
@@ -1099,6 +1184,19 @@ class CachedBillRow extends DataClass implements Insertable<CachedBillRow> {
     map['consumer_id'] = Variable<String>(consumerId);
     map['cycle_label'] = Variable<String>(cycleLabel);
     map['consumption_hundredths'] = Variable<int>(consumptionHundredths);
+    if (!nullToAbsent || previousReadingHundredths != null) {
+      map['previous_reading_hundredths'] = Variable<int>(
+        previousReadingHundredths,
+      );
+    }
+    if (!nullToAbsent || currentReadingHundredths != null) {
+      map['current_reading_hundredths'] = Variable<int>(
+        currentReadingHundredths,
+      );
+    }
+    if (!nullToAbsent || readingDate != null) {
+      map['reading_date'] = Variable<String>(readingDate);
+    }
     map['amount_paid_centavos'] = Variable<int>(amountPaidCentavos);
     if (!nullToAbsent || totalAmountCentavos != null) {
       map['total_amount_centavos'] = Variable<int>(totalAmountCentavos);
@@ -1119,6 +1217,16 @@ class CachedBillRow extends DataClass implements Insertable<CachedBillRow> {
       consumerId: Value(consumerId),
       cycleLabel: Value(cycleLabel),
       consumptionHundredths: Value(consumptionHundredths),
+      previousReadingHundredths:
+          previousReadingHundredths == null && nullToAbsent
+          ? const Value.absent()
+          : Value(previousReadingHundredths),
+      currentReadingHundredths: currentReadingHundredths == null && nullToAbsent
+          ? const Value.absent()
+          : Value(currentReadingHundredths),
+      readingDate: readingDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(readingDate),
       amountPaidCentavos: Value(amountPaidCentavos),
       totalAmountCentavos: totalAmountCentavos == null && nullToAbsent
           ? const Value.absent()
@@ -1145,6 +1253,13 @@ class CachedBillRow extends DataClass implements Insertable<CachedBillRow> {
       consumptionHundredths: serializer.fromJson<int>(
         json['consumptionHundredths'],
       ),
+      previousReadingHundredths: serializer.fromJson<int?>(
+        json['previousReadingHundredths'],
+      ),
+      currentReadingHundredths: serializer.fromJson<int?>(
+        json['currentReadingHundredths'],
+      ),
+      readingDate: serializer.fromJson<String?>(json['readingDate']),
       amountPaidCentavos: serializer.fromJson<int>(json['amountPaidCentavos']),
       totalAmountCentavos: serializer.fromJson<int?>(
         json['totalAmountCentavos'],
@@ -1162,6 +1277,13 @@ class CachedBillRow extends DataClass implements Insertable<CachedBillRow> {
       'consumerId': serializer.toJson<String>(consumerId),
       'cycleLabel': serializer.toJson<String>(cycleLabel),
       'consumptionHundredths': serializer.toJson<int>(consumptionHundredths),
+      'previousReadingHundredths': serializer.toJson<int?>(
+        previousReadingHundredths,
+      ),
+      'currentReadingHundredths': serializer.toJson<int?>(
+        currentReadingHundredths,
+      ),
+      'readingDate': serializer.toJson<String?>(readingDate),
       'amountPaidCentavos': serializer.toJson<int>(amountPaidCentavos),
       'totalAmountCentavos': serializer.toJson<int?>(totalAmountCentavos),
       'dueDate': serializer.toJson<String?>(dueDate),
@@ -1175,6 +1297,9 @@ class CachedBillRow extends DataClass implements Insertable<CachedBillRow> {
     String? consumerId,
     String? cycleLabel,
     int? consumptionHundredths,
+    Value<int?> previousReadingHundredths = const Value.absent(),
+    Value<int?> currentReadingHundredths = const Value.absent(),
+    Value<String?> readingDate = const Value.absent(),
     int? amountPaidCentavos,
     Value<int?> totalAmountCentavos = const Value.absent(),
     Value<String?> dueDate = const Value.absent(),
@@ -1185,6 +1310,13 @@ class CachedBillRow extends DataClass implements Insertable<CachedBillRow> {
     consumerId: consumerId ?? this.consumerId,
     cycleLabel: cycleLabel ?? this.cycleLabel,
     consumptionHundredths: consumptionHundredths ?? this.consumptionHundredths,
+    previousReadingHundredths: previousReadingHundredths.present
+        ? previousReadingHundredths.value
+        : this.previousReadingHundredths,
+    currentReadingHundredths: currentReadingHundredths.present
+        ? currentReadingHundredths.value
+        : this.currentReadingHundredths,
+    readingDate: readingDate.present ? readingDate.value : this.readingDate,
     amountPaidCentavos: amountPaidCentavos ?? this.amountPaidCentavos,
     totalAmountCentavos: totalAmountCentavos.present
         ? totalAmountCentavos.value
@@ -1205,6 +1337,15 @@ class CachedBillRow extends DataClass implements Insertable<CachedBillRow> {
       consumptionHundredths: data.consumptionHundredths.present
           ? data.consumptionHundredths.value
           : this.consumptionHundredths,
+      previousReadingHundredths: data.previousReadingHundredths.present
+          ? data.previousReadingHundredths.value
+          : this.previousReadingHundredths,
+      currentReadingHundredths: data.currentReadingHundredths.present
+          ? data.currentReadingHundredths.value
+          : this.currentReadingHundredths,
+      readingDate: data.readingDate.present
+          ? data.readingDate.value
+          : this.readingDate,
       amountPaidCentavos: data.amountPaidCentavos.present
           ? data.amountPaidCentavos.value
           : this.amountPaidCentavos,
@@ -1226,6 +1367,9 @@ class CachedBillRow extends DataClass implements Insertable<CachedBillRow> {
           ..write('consumerId: $consumerId, ')
           ..write('cycleLabel: $cycleLabel, ')
           ..write('consumptionHundredths: $consumptionHundredths, ')
+          ..write('previousReadingHundredths: $previousReadingHundredths, ')
+          ..write('currentReadingHundredths: $currentReadingHundredths, ')
+          ..write('readingDate: $readingDate, ')
           ..write('amountPaidCentavos: $amountPaidCentavos, ')
           ..write('totalAmountCentavos: $totalAmountCentavos, ')
           ..write('dueDate: $dueDate, ')
@@ -1241,6 +1385,9 @@ class CachedBillRow extends DataClass implements Insertable<CachedBillRow> {
     consumerId,
     cycleLabel,
     consumptionHundredths,
+    previousReadingHundredths,
+    currentReadingHundredths,
+    readingDate,
     amountPaidCentavos,
     totalAmountCentavos,
     dueDate,
@@ -1255,6 +1402,9 @@ class CachedBillRow extends DataClass implements Insertable<CachedBillRow> {
           other.consumerId == this.consumerId &&
           other.cycleLabel == this.cycleLabel &&
           other.consumptionHundredths == this.consumptionHundredths &&
+          other.previousReadingHundredths == this.previousReadingHundredths &&
+          other.currentReadingHundredths == this.currentReadingHundredths &&
+          other.readingDate == this.readingDate &&
           other.amountPaidCentavos == this.amountPaidCentavos &&
           other.totalAmountCentavos == this.totalAmountCentavos &&
           other.dueDate == this.dueDate &&
@@ -1267,6 +1417,9 @@ class CachedBillsCompanion extends UpdateCompanion<CachedBillRow> {
   final Value<String> consumerId;
   final Value<String> cycleLabel;
   final Value<int> consumptionHundredths;
+  final Value<int?> previousReadingHundredths;
+  final Value<int?> currentReadingHundredths;
+  final Value<String?> readingDate;
   final Value<int> amountPaidCentavos;
   final Value<int?> totalAmountCentavos;
   final Value<String?> dueDate;
@@ -1278,6 +1431,9 @@ class CachedBillsCompanion extends UpdateCompanion<CachedBillRow> {
     this.consumerId = const Value.absent(),
     this.cycleLabel = const Value.absent(),
     this.consumptionHundredths = const Value.absent(),
+    this.previousReadingHundredths = const Value.absent(),
+    this.currentReadingHundredths = const Value.absent(),
+    this.readingDate = const Value.absent(),
     this.amountPaidCentavos = const Value.absent(),
     this.totalAmountCentavos = const Value.absent(),
     this.dueDate = const Value.absent(),
@@ -1290,6 +1446,9 @@ class CachedBillsCompanion extends UpdateCompanion<CachedBillRow> {
     required String consumerId,
     required String cycleLabel,
     required int consumptionHundredths,
+    this.previousReadingHundredths = const Value.absent(),
+    this.currentReadingHundredths = const Value.absent(),
+    this.readingDate = const Value.absent(),
     this.amountPaidCentavos = const Value.absent(),
     this.totalAmountCentavos = const Value.absent(),
     this.dueDate = const Value.absent(),
@@ -1306,6 +1465,9 @@ class CachedBillsCompanion extends UpdateCompanion<CachedBillRow> {
     Expression<String>? consumerId,
     Expression<String>? cycleLabel,
     Expression<int>? consumptionHundredths,
+    Expression<int>? previousReadingHundredths,
+    Expression<int>? currentReadingHundredths,
+    Expression<String>? readingDate,
     Expression<int>? amountPaidCentavos,
     Expression<int>? totalAmountCentavos,
     Expression<String>? dueDate,
@@ -1319,6 +1481,11 @@ class CachedBillsCompanion extends UpdateCompanion<CachedBillRow> {
       if (cycleLabel != null) 'cycle_label': cycleLabel,
       if (consumptionHundredths != null)
         'consumption_hundredths': consumptionHundredths,
+      if (previousReadingHundredths != null)
+        'previous_reading_hundredths': previousReadingHundredths,
+      if (currentReadingHundredths != null)
+        'current_reading_hundredths': currentReadingHundredths,
+      if (readingDate != null) 'reading_date': readingDate,
       if (amountPaidCentavos != null)
         'amount_paid_centavos': amountPaidCentavos,
       if (totalAmountCentavos != null)
@@ -1335,6 +1502,9 @@ class CachedBillsCompanion extends UpdateCompanion<CachedBillRow> {
     Value<String>? consumerId,
     Value<String>? cycleLabel,
     Value<int>? consumptionHundredths,
+    Value<int?>? previousReadingHundredths,
+    Value<int?>? currentReadingHundredths,
+    Value<String?>? readingDate,
     Value<int>? amountPaidCentavos,
     Value<int?>? totalAmountCentavos,
     Value<String?>? dueDate,
@@ -1348,6 +1518,11 @@ class CachedBillsCompanion extends UpdateCompanion<CachedBillRow> {
       cycleLabel: cycleLabel ?? this.cycleLabel,
       consumptionHundredths:
           consumptionHundredths ?? this.consumptionHundredths,
+      previousReadingHundredths:
+          previousReadingHundredths ?? this.previousReadingHundredths,
+      currentReadingHundredths:
+          currentReadingHundredths ?? this.currentReadingHundredths,
+      readingDate: readingDate ?? this.readingDate,
       amountPaidCentavos: amountPaidCentavos ?? this.amountPaidCentavos,
       totalAmountCentavos: totalAmountCentavos ?? this.totalAmountCentavos,
       dueDate: dueDate ?? this.dueDate,
@@ -1376,6 +1551,19 @@ class CachedBillsCompanion extends UpdateCompanion<CachedBillRow> {
         consumptionHundredths.value,
       );
     }
+    if (previousReadingHundredths.present) {
+      map['previous_reading_hundredths'] = Variable<int>(
+        previousReadingHundredths.value,
+      );
+    }
+    if (currentReadingHundredths.present) {
+      map['current_reading_hundredths'] = Variable<int>(
+        currentReadingHundredths.value,
+      );
+    }
+    if (readingDate.present) {
+      map['reading_date'] = Variable<String>(readingDate.value);
+    }
     if (amountPaidCentavos.present) {
       map['amount_paid_centavos'] = Variable<int>(amountPaidCentavos.value);
     }
@@ -1402,6 +1590,9 @@ class CachedBillsCompanion extends UpdateCompanion<CachedBillRow> {
           ..write('consumerId: $consumerId, ')
           ..write('cycleLabel: $cycleLabel, ')
           ..write('consumptionHundredths: $consumptionHundredths, ')
+          ..write('previousReadingHundredths: $previousReadingHundredths, ')
+          ..write('currentReadingHundredths: $currentReadingHundredths, ')
+          ..write('readingDate: $readingDate, ')
           ..write('amountPaidCentavos: $amountPaidCentavos, ')
           ..write('totalAmountCentavos: $totalAmountCentavos, ')
           ..write('dueDate: $dueDate, ')
@@ -2944,6 +3135,275 @@ class CachedNotificationsCompanion
           ..write('disconnectionId: $disconnectionId, ')
           ..write('failedReason: $failedReason, ')
           ..write('sentAt: $sentAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $CachedQueriesTable extends CachedQueries
+    with TableInfo<$CachedQueriesTable, CachedQueryRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedQueriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _queryKeyMeta = const VerificationMeta(
+    'queryKey',
+  );
+  @override
+  late final GeneratedColumn<String> queryKey = GeneratedColumn<String>(
+    'query_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _rowsJsonMeta = const VerificationMeta(
+    'rowsJson',
+  );
+  @override
+  late final GeneratedColumn<String> rowsJson = GeneratedColumn<String>(
+    'rows_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _savedAtMeta = const VerificationMeta(
+    'savedAt',
+  );
+  @override
+  late final GeneratedColumn<String> savedAt = GeneratedColumn<String>(
+    'saved_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [queryKey, rowsJson, savedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_queries';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedQueryRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('query_key')) {
+      context.handle(
+        _queryKeyMeta,
+        queryKey.isAcceptableOrUnknown(data['query_key']!, _queryKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_queryKeyMeta);
+    }
+    if (data.containsKey('rows_json')) {
+      context.handle(
+        _rowsJsonMeta,
+        rowsJson.isAcceptableOrUnknown(data['rows_json']!, _rowsJsonMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_rowsJsonMeta);
+    }
+    if (data.containsKey('saved_at')) {
+      context.handle(
+        _savedAtMeta,
+        savedAt.isAcceptableOrUnknown(data['saved_at']!, _savedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_savedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {queryKey};
+  @override
+  CachedQueryRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedQueryRow(
+      queryKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}query_key'],
+      )!,
+      rowsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}rows_json'],
+      )!,
+      savedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}saved_at'],
+      )!,
+    );
+  }
+
+  @override
+  $CachedQueriesTable createAlias(String alias) {
+    return $CachedQueriesTable(attachedDatabase, alias);
+  }
+}
+
+class CachedQueryRow extends DataClass implements Insertable<CachedQueryRow> {
+  final String queryKey;
+  final String rowsJson;
+  final String savedAt;
+  const CachedQueryRow({
+    required this.queryKey,
+    required this.rowsJson,
+    required this.savedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['query_key'] = Variable<String>(queryKey);
+    map['rows_json'] = Variable<String>(rowsJson);
+    map['saved_at'] = Variable<String>(savedAt);
+    return map;
+  }
+
+  CachedQueriesCompanion toCompanion(bool nullToAbsent) {
+    return CachedQueriesCompanion(
+      queryKey: Value(queryKey),
+      rowsJson: Value(rowsJson),
+      savedAt: Value(savedAt),
+    );
+  }
+
+  factory CachedQueryRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedQueryRow(
+      queryKey: serializer.fromJson<String>(json['queryKey']),
+      rowsJson: serializer.fromJson<String>(json['rowsJson']),
+      savedAt: serializer.fromJson<String>(json['savedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'queryKey': serializer.toJson<String>(queryKey),
+      'rowsJson': serializer.toJson<String>(rowsJson),
+      'savedAt': serializer.toJson<String>(savedAt),
+    };
+  }
+
+  CachedQueryRow copyWith({
+    String? queryKey,
+    String? rowsJson,
+    String? savedAt,
+  }) => CachedQueryRow(
+    queryKey: queryKey ?? this.queryKey,
+    rowsJson: rowsJson ?? this.rowsJson,
+    savedAt: savedAt ?? this.savedAt,
+  );
+  CachedQueryRow copyWithCompanion(CachedQueriesCompanion data) {
+    return CachedQueryRow(
+      queryKey: data.queryKey.present ? data.queryKey.value : this.queryKey,
+      rowsJson: data.rowsJson.present ? data.rowsJson.value : this.rowsJson,
+      savedAt: data.savedAt.present ? data.savedAt.value : this.savedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedQueryRow(')
+          ..write('queryKey: $queryKey, ')
+          ..write('rowsJson: $rowsJson, ')
+          ..write('savedAt: $savedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(queryKey, rowsJson, savedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedQueryRow &&
+          other.queryKey == this.queryKey &&
+          other.rowsJson == this.rowsJson &&
+          other.savedAt == this.savedAt);
+}
+
+class CachedQueriesCompanion extends UpdateCompanion<CachedQueryRow> {
+  final Value<String> queryKey;
+  final Value<String> rowsJson;
+  final Value<String> savedAt;
+  final Value<int> rowid;
+  const CachedQueriesCompanion({
+    this.queryKey = const Value.absent(),
+    this.rowsJson = const Value.absent(),
+    this.savedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedQueriesCompanion.insert({
+    required String queryKey,
+    required String rowsJson,
+    required String savedAt,
+    this.rowid = const Value.absent(),
+  }) : queryKey = Value(queryKey),
+       rowsJson = Value(rowsJson),
+       savedAt = Value(savedAt);
+  static Insertable<CachedQueryRow> custom({
+    Expression<String>? queryKey,
+    Expression<String>? rowsJson,
+    Expression<String>? savedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (queryKey != null) 'query_key': queryKey,
+      if (rowsJson != null) 'rows_json': rowsJson,
+      if (savedAt != null) 'saved_at': savedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedQueriesCompanion copyWith({
+    Value<String>? queryKey,
+    Value<String>? rowsJson,
+    Value<String>? savedAt,
+    Value<int>? rowid,
+  }) {
+    return CachedQueriesCompanion(
+      queryKey: queryKey ?? this.queryKey,
+      rowsJson: rowsJson ?? this.rowsJson,
+      savedAt: savedAt ?? this.savedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (queryKey.present) {
+      map['query_key'] = Variable<String>(queryKey.value);
+    }
+    if (rowsJson.present) {
+      map['rows_json'] = Variable<String>(rowsJson.value);
+    }
+    if (savedAt.present) {
+      map['saved_at'] = Variable<String>(savedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedQueriesCompanion(')
+          ..write('queryKey: $queryKey, ')
+          ..write('rowsJson: $rowsJson, ')
+          ..write('savedAt: $savedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -4796,6 +5256,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $CachedPaymentsTable cachedPayments = $CachedPaymentsTable(this);
   late final $CachedNotificationsTable cachedNotifications =
       $CachedNotificationsTable(this);
+  late final $CachedQueriesTable cachedQueries = $CachedQueriesTable(this);
   late final $CacheOwnerTable cacheOwner = $CacheOwnerTable(this);
   late final $SyncMetaTable syncMeta = $SyncMetaTable(this);
   late final $OutboxRowsTable outboxRows = $OutboxRowsTable(this);
@@ -4830,6 +5291,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     cachedBills,
     cachedPayments,
     cachedNotifications,
+    cachedQueries,
     cacheOwner,
     syncMeta,
     outboxRows,
@@ -5240,6 +5702,9 @@ typedef $$CachedBillsTableCreateCompanionBuilder =
       required String consumerId,
       required String cycleLabel,
       required int consumptionHundredths,
+      Value<int?> previousReadingHundredths,
+      Value<int?> currentReadingHundredths,
+      Value<String?> readingDate,
       Value<int> amountPaidCentavos,
       Value<int?> totalAmountCentavos,
       Value<String?> dueDate,
@@ -5253,6 +5718,9 @@ typedef $$CachedBillsTableUpdateCompanionBuilder =
       Value<String> consumerId,
       Value<String> cycleLabel,
       Value<int> consumptionHundredths,
+      Value<int?> previousReadingHundredths,
+      Value<int?> currentReadingHundredths,
+      Value<String?> readingDate,
       Value<int> amountPaidCentavos,
       Value<int?> totalAmountCentavos,
       Value<String?> dueDate,
@@ -5291,6 +5759,21 @@ class $$CachedBillsTableFilterComposer
 
   ColumnFilters<int> get consumptionHundredths => $composableBuilder(
     column: $table.consumptionHundredths,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get previousReadingHundredths => $composableBuilder(
+    column: $table.previousReadingHundredths,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get currentReadingHundredths => $composableBuilder(
+    column: $table.currentReadingHundredths,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get readingDate => $composableBuilder(
+    column: $table.readingDate,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5349,6 +5832,21 @@ class $$CachedBillsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get previousReadingHundredths => $composableBuilder(
+    column: $table.previousReadingHundredths,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get currentReadingHundredths => $composableBuilder(
+    column: $table.currentReadingHundredths,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get readingDate => $composableBuilder(
+    column: $table.readingDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get amountPaidCentavos => $composableBuilder(
     column: $table.amountPaidCentavos,
     builder: (column) => ColumnOrderings(column),
@@ -5397,6 +5895,21 @@ class $$CachedBillsTableAnnotationComposer
 
   GeneratedColumn<int> get consumptionHundredths => $composableBuilder(
     column: $table.consumptionHundredths,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get previousReadingHundredths => $composableBuilder(
+    column: $table.previousReadingHundredths,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get currentReadingHundredths => $composableBuilder(
+    column: $table.currentReadingHundredths,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get readingDate => $composableBuilder(
+    column: $table.readingDate,
     builder: (column) => column,
   );
 
@@ -5455,6 +5968,9 @@ class $$CachedBillsTableTableManager
                 Value<String> consumerId = const Value.absent(),
                 Value<String> cycleLabel = const Value.absent(),
                 Value<int> consumptionHundredths = const Value.absent(),
+                Value<int?> previousReadingHundredths = const Value.absent(),
+                Value<int?> currentReadingHundredths = const Value.absent(),
+                Value<String?> readingDate = const Value.absent(),
                 Value<int> amountPaidCentavos = const Value.absent(),
                 Value<int?> totalAmountCentavos = const Value.absent(),
                 Value<String?> dueDate = const Value.absent(),
@@ -5466,6 +5982,9 @@ class $$CachedBillsTableTableManager
                 consumerId: consumerId,
                 cycleLabel: cycleLabel,
                 consumptionHundredths: consumptionHundredths,
+                previousReadingHundredths: previousReadingHundredths,
+                currentReadingHundredths: currentReadingHundredths,
+                readingDate: readingDate,
                 amountPaidCentavos: amountPaidCentavos,
                 totalAmountCentavos: totalAmountCentavos,
                 dueDate: dueDate,
@@ -5479,6 +5998,9 @@ class $$CachedBillsTableTableManager
                 required String consumerId,
                 required String cycleLabel,
                 required int consumptionHundredths,
+                Value<int?> previousReadingHundredths = const Value.absent(),
+                Value<int?> currentReadingHundredths = const Value.absent(),
+                Value<String?> readingDate = const Value.absent(),
                 Value<int> amountPaidCentavos = const Value.absent(),
                 Value<int?> totalAmountCentavos = const Value.absent(),
                 Value<String?> dueDate = const Value.absent(),
@@ -5490,6 +6012,9 @@ class $$CachedBillsTableTableManager
                 consumerId: consumerId,
                 cycleLabel: cycleLabel,
                 consumptionHundredths: consumptionHundredths,
+                previousReadingHundredths: previousReadingHundredths,
+                currentReadingHundredths: currentReadingHundredths,
+                readingDate: readingDate,
                 amountPaidCentavos: amountPaidCentavos,
                 totalAmountCentavos: totalAmountCentavos,
                 dueDate: dueDate,
@@ -6277,6 +6802,177 @@ typedef $$CachedNotificationsTableProcessedTableManager =
         >,
       ),
       CachedNotificationRow,
+      PrefetchHooks Function()
+    >;
+typedef $$CachedQueriesTableCreateCompanionBuilder =
+    CachedQueriesCompanion Function({
+      required String queryKey,
+      required String rowsJson,
+      required String savedAt,
+      Value<int> rowid,
+    });
+typedef $$CachedQueriesTableUpdateCompanionBuilder =
+    CachedQueriesCompanion Function({
+      Value<String> queryKey,
+      Value<String> rowsJson,
+      Value<String> savedAt,
+      Value<int> rowid,
+    });
+
+class $$CachedQueriesTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedQueriesTable> {
+  $$CachedQueriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get queryKey => $composableBuilder(
+    column: $table.queryKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get rowsJson => $composableBuilder(
+    column: $table.rowsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get savedAt => $composableBuilder(
+    column: $table.savedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedQueriesTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedQueriesTable> {
+  $$CachedQueriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get queryKey => $composableBuilder(
+    column: $table.queryKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get rowsJson => $composableBuilder(
+    column: $table.rowsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get savedAt => $composableBuilder(
+    column: $table.savedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedQueriesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedQueriesTable> {
+  $$CachedQueriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get queryKey =>
+      $composableBuilder(column: $table.queryKey, builder: (column) => column);
+
+  GeneratedColumn<String> get rowsJson =>
+      $composableBuilder(column: $table.rowsJson, builder: (column) => column);
+
+  GeneratedColumn<String> get savedAt =>
+      $composableBuilder(column: $table.savedAt, builder: (column) => column);
+}
+
+class $$CachedQueriesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CachedQueriesTable,
+          CachedQueryRow,
+          $$CachedQueriesTableFilterComposer,
+          $$CachedQueriesTableOrderingComposer,
+          $$CachedQueriesTableAnnotationComposer,
+          $$CachedQueriesTableCreateCompanionBuilder,
+          $$CachedQueriesTableUpdateCompanionBuilder,
+          (
+            CachedQueryRow,
+            BaseReferences<_$AppDatabase, $CachedQueriesTable, CachedQueryRow>,
+          ),
+          CachedQueryRow,
+          PrefetchHooks Function()
+        > {
+  $$CachedQueriesTableTableManager(_$AppDatabase db, $CachedQueriesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedQueriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CachedQueriesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CachedQueriesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> queryKey = const Value.absent(),
+                Value<String> rowsJson = const Value.absent(),
+                Value<String> savedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedQueriesCompanion(
+                queryKey: queryKey,
+                rowsJson: rowsJson,
+                savedAt: savedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String queryKey,
+                required String rowsJson,
+                required String savedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => CachedQueriesCompanion.insert(
+                queryKey: queryKey,
+                rowsJson: rowsJson,
+                savedAt: savedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$CachedQueriesTable, CachedQueryRow>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CachedQueriesTable,
+                    CachedQueryRow
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedQueriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CachedQueriesTable,
+      CachedQueryRow,
+      $$CachedQueriesTableFilterComposer,
+      $$CachedQueriesTableOrderingComposer,
+      $$CachedQueriesTableAnnotationComposer,
+      $$CachedQueriesTableCreateCompanionBuilder,
+      $$CachedQueriesTableUpdateCompanionBuilder,
+      (
+        CachedQueryRow,
+        BaseReferences<_$AppDatabase, $CachedQueriesTable, CachedQueryRow>,
+      ),
+      CachedQueryRow,
       PrefetchHooks Function()
     >;
 typedef $$CacheOwnerTableCreateCompanionBuilder =
@@ -7481,6 +8177,8 @@ class $AppDatabaseManager {
       $$CachedPaymentsTableTableManager(_db, _db.cachedPayments);
   $$CachedNotificationsTableTableManager get cachedNotifications =>
       $$CachedNotificationsTableTableManager(_db, _db.cachedNotifications);
+  $$CachedQueriesTableTableManager get cachedQueries =>
+      $$CachedQueriesTableTableManager(_db, _db.cachedQueries);
   $$CacheOwnerTableTableManager get cacheOwner =>
       $$CacheOwnerTableTableManager(_db, _db.cacheOwner);
   $$SyncMetaTableTableManager get syncMeta =>

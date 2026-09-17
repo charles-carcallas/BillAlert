@@ -15,6 +15,12 @@ final class CreateConsumer {
 
   const CreateConsumer({required this.consumers});
 
+  /// Offline nothing is saved, and nothing is kept to try later: the server
+  /// has to check the consumer, meter and mobile numbers are not already used.
+  static const String needsSignal =
+      'Adding a household needs signal. Nothing was saved. Try again when '
+      "you're back online.";
+
   /// The first thing wrong with these household details, in the order the
   /// form asks for them, or null when there is nothing.
   static ValidationFailure? check({
@@ -59,19 +65,21 @@ final class CreateConsumer {
     // index compares them exactly, so one spelling is chosen here.
     final String cleanMeterSerialNo = meterSerialNo.trim().toUpperCase();
 
-    return consumers.create(
-      consumerNo: ConsumerNumber(consumerNo.trim()),
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      areaId: areaId,
-      createdBy: createdBy,
-      // A blank optional value is absence. A real mobile number is preserved
-      // exactly as typed; the database trigger owns its normalisation.
-      contactNumber: contactNumber.trim().isEmpty ? null : contactNumber,
-      purok: purok.trim().isEmpty ? null : purok.trim(),
-      // Optional: a household can be registered before its meter is
-      // commissioned, and the number added then.
-      meterSerialNo: cleanMeterSerialNo.isEmpty ? null : cleanMeterSerialNo,
-    );
+    return consumers
+        .create(
+          consumerNo: ConsumerNumber(consumerNo.trim()),
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          areaId: areaId,
+          createdBy: createdBy,
+          // A blank optional value is absence. A real mobile number is preserved
+          // exactly as typed; the database trigger owns its normalisation.
+          contactNumber: contactNumber.trim().isEmpty ? null : contactNumber,
+          purok: purok.trim().isEmpty ? null : purok.trim(),
+          // Optional: a household can be registered before its meter is
+          // commissioned, and the number added then.
+          meterSerialNo: cleanMeterSerialNo.isEmpty ? null : cleanMeterSerialNo,
+        )
+        .then((result) => result.ifOffline(needsSignal));
   }
 }

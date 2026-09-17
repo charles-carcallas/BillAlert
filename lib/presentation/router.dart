@@ -27,6 +27,8 @@ import 'consumer/inbox_screen.dart';
 import 'consumer/receipt_screen.dart';
 import 'reader/consumers_screen.dart';
 import 'reader/reading_entry_screen.dart';
+import 'reader/reading_sheet_screen.dart';
+import 'reader/remittance_screen.dart';
 import 'reader/roster_screen.dart';
 
 class Routes {
@@ -87,6 +89,7 @@ class Routes {
   // this same path, which is what makes the correct tab light up on arrival.
   static const String reader = '/reader';
   static const String readingEntry = '/reader/entry/:consumerId';
+  static const String readingSheet = '/reader/sheet';
   static const String admin = '/admin';
   static const String cashier = '/cashier';
   static const String consumer = '/consumer';
@@ -120,14 +123,8 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
     initialLocation: Routes.splash,
     refreshListenable: refresh,
     routes: <RouteBase>[
-      GoRoute(
-        path: Routes.splash,
-        builder: (_, _) => const SplashScreen(),
-      ),
-      GoRoute(
-        path: Routes.login,
-        builder: (_, _) => const LoginScreen(),
-      ),
+      GoRoute(path: Routes.splash, builder: (_, _) => const SplashScreen()),
+      GoRoute(path: Routes.login, builder: (_, _) => const LoginScreen()),
       GoRoute(
         path: Routes.changePassword,
         builder: (_, _) => const ChangePasswordScreen(),
@@ -166,28 +163,31 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
       ),
       GoRoute(
         path: Routes.noticeDocument,
-        builder: (_, GoRouterState state) => NoticeDocumentScreen(
-          noticeId: state.pathParameters['noticeId']!,
-        ),
+        builder: (_, GoRouterState state) =>
+            NoticeDocumentScreen(noticeId: state.pathParameters['noticeId']!),
       ),
       GoRoute(
         path: Routes.readingEntry,
-        builder: (_, GoRouterState state) => ReadingEntryScreen(
-          consumerId: state.pathParameters['consumerId']!,
-        ),
+        builder: (_, GoRouterState state) =>
+            ReadingEntryScreen(consumerId: state.pathParameters['consumerId']!),
+      ),
+      GoRoute(
+        path: Routes.readingSheet,
+        builder: (_, _) => const ReadingSheetScreen(),
       ),
 
       ShellRoute(
         builder: (_, _, Widget child) => RoleShell(child: child),
         routes: <RouteBase>[
           // ---- Meter Reader ------------------------------------------
-          GoRoute(
-            path: Routes.reader,
-            builder: (_, _) => const RosterScreen(),
-          ),
+          GoRoute(path: Routes.reader, builder: (_, _) => const RosterScreen()),
           GoRoute(
             path: '/reader/consumers',
             builder: (_, _) => const ReaderConsumersScreen(),
+          ),
+          GoRoute(
+            path: '/reader/remittance',
+            builder: (_, _) => const RemittanceScreen(),
           ),
           GoRoute(
             path: '/reader/profile',

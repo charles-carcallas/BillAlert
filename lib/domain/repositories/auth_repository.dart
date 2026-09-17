@@ -33,6 +33,14 @@ abstract class AuthRepository {
   /// GEN-04: replaces a temporary password and clears must_change_password.
   Future<Result<void>> changePassword({required String newPassword});
 
+  /// Asks the server whether this phone's session still exists.
+  ///
+  /// An [AuthFailure] means the server says it has ended: an Area President
+  /// resetting the password ends every session of the account. Any other
+  /// failure, such as no signal, is not proof of that. Ok when the session is
+  /// alive, or when nobody is signed in.
+  Future<Result<void>> confirmSession();
+
   /// FR-31: provisions a Meter Reader or Cashier in the signed-in Admin's
   /// area. The implementation delegates the privileged auth-user write to
   /// the server; it must never use a service-role key in this client.

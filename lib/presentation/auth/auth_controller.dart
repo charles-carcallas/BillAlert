@@ -19,6 +19,10 @@ class AuthController extends AsyncNotifier<AppUser?> {
   /// finished, which would be an assignment to `state` that Riverpod rejects.
   bool _ready = false;
 
+  /// True while this person's own sign-out runs, so it is not mistaken for
+  /// the server ending the session.
+  bool _signingOut = false;
+
   @override
   Future<AppUser?> build() async {
     final repository = ref.watch(authRepositoryProvider);
@@ -27,8 +31,16 @@ class AuthController extends AsyncNotifier<AppUser?> {
     // moves without every screen having to poll.
     final subscription = repository.authChanges().listen((AppUser? user) {
       if (_ready) {
-        // A session that has ended cannot still be waiting to be unlocked.
-        if (user == null) ref.read(appLockControllerProvider.notifier).reset();
+        if (user == null) {
+          // A session that has ended cannot still be waiting to be unlocked.
+          ref.read(appLockControllerProvider.notifier).reset();
+          // Signed out without asking to be: the session was ended somewhere
+          // else, most often by a password reset. Say so on the sign-in
+          // screen instead of dropping them there with no reason.
+          if (!_signingOut && state.value != null) {
+            ref.read(signInNoticeProvider.notifier).show(_signedOutByReset);
+          }
+        }
         state = AsyncData<AppUser?>(user);
       }
     });
@@ -90,6 +102,9 @@ class AuthController extends AsyncNotifier<AppUser?> {
     switch (result) {
       case Ok(:final value):
         _ready = true;
+        // The server just accepted this password, so this phone may check it
+        // again later when the lock is opened without signal.
+        await ref.read(passwordVerifierProvider).remember(value.id, password);
         // A password is proof enough, so nothing stays locked — and this is
         // where the phone decides whether to offer fingerprint sign-in. It is
         // settled before the user is published, so the home screen the
@@ -111,20 +126,51 @@ class AuthController extends AsyncNotifier<AppUser?> {
   }
 
   Future<AppFailure?> signOut() async {
-    final result = await ref.read(signOutProvider)();
-    await ref.read(syncServiceProvider).stop();
-    // GEN-06 reaches the notification tray too. The next person to sign in on
-    // this phone must not be reminded about the last household's bills, nor
-    // see its notices.
-    await ref.read(backgroundAlertsProvider).stop();
-    await ref.read(phoneNotifierProvider).cancelAll();
-    ref.read(appLockControllerProvider.notifier).reset();
-    state = const AsyncData<AppUser?>(null);
+    _signingOut = true;
+    try {
+      final AppUser? leaving = state.value;
+      final result = await ref.read(signOutProvider)();
+      if (leaving != null) {
+        await ref.read(passwordVerifierProvider).forget(leaving.id);
+      }
+      await ref.read(syncServiceProvider).stop();
+      // GEN-06 reaches the notification tray too. The next person to sign in
+      // on this phone must not be reminded about the last household's bills,
+      // nor see its notices.
+      await ref.read(backgroundAlertsProvider).stop();
+      await ref.read(phoneNotifierProvider).cancelAll();
+      ref.read(appLockControllerProvider.notifier).reset();
+      state = const AsyncData<AppUser?>(null);
 
-    return switch (result) {
-      Ok() => null,
-      Err(:final failure) => failure,
-    };
+      return switch (result) {
+        Ok() => null,
+        Err(:final failure) => failure,
+      };
+    } finally {
+      _signingOut = false;
+    }
+  }
+
+  /// Signs out a phone whose session was ended on the server, as soon as the
+  /// phone can ask. A password reset ends every session of the account, but a
+  /// phone still holding a short-lived token could otherwise keep showing that
+  /// account for up to an hour.
+  ///
+  /// Without signal nothing happens: the phone keeps working from what it has
+  /// saved and asks again next time.
+  Future<void> confirmSession() async {
+    if (state.value == null) return;
+    final Result<void> result;
+    try {
+      result = await ref.read(authRepositoryProvider).confirmSession();
+    } catch (_) {
+      return;
+    }
+    if (result case Err(:final failure) when failure is AuthFailure) {
+      if (state.value == null) return;
+      ref.read(signInNoticeProvider.notifier).show(_signedOutByReset);
+      await signOut();
+    }
   }
 
   /// GEN-04: after the temporary password is replaced, the flag comes down
@@ -140,10 +186,28 @@ class AuthController extends AsyncNotifier<AppUser?> {
 
     switch (result) {
       case Err(:final failure):
+        if (failure is AuthFailure) {
+          // The session this screen opened with has ended on the server. An
+          // Area President resetting the password does exactly that: Supabase
+          // Auth ends every session of the account the moment a password is
+          // set for it. The phone can still read with its short-lived access
+          // token, which is how the change-password screen opened at all, but
+          // nothing that goes through Auth will work again. Staying on a
+          // screen that cannot be left or completed is a dead end, so sign
+          // out, and tell the sign-in screen why.
+          ref.read(signInNoticeProvider.notifier).show(_signedOutByReset);
+          await signOut();
+        }
         return failure;
       case Ok():
         final refreshed = await ref.read(authRepositoryProvider).currentUser();
         if (refreshed case Ok(:final value)) {
+          if (value != null) {
+            // The old password must stop opening the lock offline.
+            await ref
+                .read(passwordVerifierProvider)
+                .remember(value.id, newPassword);
+          }
           state = AsyncData<AppUser?>(value);
         }
         return null;
@@ -153,4 +217,25 @@ class AuthController extends AsyncNotifier<AppUser?> {
 
 final authControllerProvider = AsyncNotifierProvider<AuthController, AppUser?>(
   AuthController.new,
+);
+
+const String _signedOutByReset =
+    'You were signed out on this phone, usually because your password was '
+    'reset. Sign in with your current password, or the temporary one from '
+    'your Area President.';
+
+/// One sentence for the sign-in screen about why somebody is looking at it,
+/// when the app sent them there rather than they chose to sign out. Cleared
+/// by the next sign-in attempt.
+class SignInNotice extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void show(String message) => state = message;
+
+  void clear() => state = null;
+}
+
+final signInNoticeProvider = NotifierProvider<SignInNotice, String?>(
+  SignInNotice.new,
 );

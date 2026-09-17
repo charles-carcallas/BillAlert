@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../data/local/app_database.dart';
+import '../data/network/network_status.dart';
 import '../data/notifications/android_phone_notifier.dart';
 import '../data/notifications/secure_urgent_alerts_setting.dart';
 import '../data/notifications/supabase_alert_feed.dart';
@@ -17,6 +18,7 @@ import '../data/repositories/payment_repository_impl.dart';
 import '../data/repositories/reading_repository_impl.dart';
 import '../data/security/local_auth_device_unlock.dart';
 import '../data/security/secure_fingerprint_setting.dart';
+import '../data/security/secure_password_verifier.dart';
 import '../data/sync/supabase_outbox_gateway.dart';
 import '../data/sync/sync_service.dart';
 import '../domain/notifications/phone_alerts.dart';
@@ -31,6 +33,7 @@ import '../domain/repositories/payment_repository.dart';
 import '../domain/repositories/reading_repository.dart';
 import '../domain/security/device_unlock.dart';
 import '../domain/security/fingerprint_setting.dart';
+import '../domain/security/password_verifier.dart';
 import '../domain/time/ph_clock.dart';
 import '../domain/usecases/admin/issue_disconnection_notice.dart';
 import '../domain/usecases/admin/post_bill_amount.dart';
@@ -41,6 +44,7 @@ import '../domain/usecases/cashier/record_cash_payment.dart';
 import '../domain/usecases/consumer/open_tapped_notice.dart';
 import '../domain/usecases/consumer/refresh_phone_alerts.dart';
 import '../domain/usecases/reader/load_area_roster.dart';
+import '../domain/usecases/reader/load_reading_sheet.dart';
 import '../domain/usecases/reader/record_meter_reading.dart';
 import '../domain/value_objects/ids.dart';
 import '../domain/value_objects/temporary_password.dart';
@@ -64,6 +68,18 @@ final appDatabaseProvider = Provider<AppDatabase>((Ref ref) {
   return database;
 });
 
+/// Whether the server is reachable. `main` overrides this with the instance
+/// the Supabase HTTP client reports to; anywhere else (tests, previews) it
+/// says online and never changes.
+final networkStatusProvider = Provider<NetworkStatus>((Ref ref) {
+  final status = NetworkStatus(
+    linkChanges: const Stream<bool>.empty(),
+    checkLink: () async => true,
+  );
+  ref.onDispose(status.dispose);
+  return status;
+});
+
 final supabaseClientProvider = Provider<SupabaseClient>(
   (Ref ref) => Supabase.instance.client,
 );
@@ -75,6 +91,12 @@ final phClockProvider = Provider<PhClock>((Ref ref) => const SystemPhClock());
 /// about when the app locks can be tested without a sensor to press.
 final deviceUnlockProvider = Provider<DeviceUnlock>(
   (Ref ref) => LocalAuthDeviceUnlock(),
+);
+
+/// Checks a password against the last one the server accepted on this
+/// phone, so a locked session can be opened with it when there is no signal.
+final passwordVerifierProvider = Provider<PasswordVerifier>(
+  (Ref ref) => const SecurePasswordVerifier(),
 );
 
 /// Whether fingerprint sign-in is on for this phone, and for whom.
@@ -241,6 +263,14 @@ final loadAreaRosterProvider = Provider<LoadAreaRoster>(
     consumers: ref.watch(consumerRepositoryProvider),
     readings: ref.watch(readingRepositoryProvider),
     clock: ref.watch(phClockProvider),
+  ),
+);
+
+final loadReadingSheetProvider = Provider<LoadReadingSheet>(
+  (Ref ref) => LoadReadingSheet(
+    consumers: ref.watch(consumerRepositoryProvider),
+    bills: ref.watch(billRepositoryProvider),
+    outbox: ref.watch(outboxRepositoryProvider),
   ),
 );
 

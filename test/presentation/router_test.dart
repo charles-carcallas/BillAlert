@@ -90,7 +90,8 @@ void main() {
       expect(
         paths,
         contains(user.homeRoute),
-        reason: '${user.roleLabel} is sent to ${user.homeRoute} after signing '
+        reason:
+            '${user.roleLabel} is sent to ${user.homeRoute} after signing '
             'in, and nothing is declared there.',
       );
 
@@ -98,7 +99,8 @@ void main() {
         expect(
           paths,
           contains(tab.route),
-          reason: "The ${user.roleLabel}'s ${tab.label} tab points at "
+          reason:
+              "The ${user.roleLabel}'s ${tab.label} tab points at "
               '${tab.route}, and nothing is declared there. The tab would be '
               'tappable and blank.',
         );
@@ -113,6 +115,7 @@ void main() {
     // rename in one place and not the other is silent until somebody taps.
     for (final String route in <String>[
       Routes.login,
+      Routes.readingSheet,
       Routes.splash,
       Routes.changePassword,
       Routes.accountPassword,
@@ -142,15 +145,20 @@ void main() {
     );
   });
 
-  test('the notice document does not sit where "serve" could be read as an id',
-      () {
-    // /admin/disconnections/serve is a literal. Had the document been put at
-    // /admin/disconnections/:noticeId, only go_router's declaration order
-    // would stop "serve" matching as a notice id — and reordering routes is
-    // exactly the kind of tidying that looks harmless.
-    expect(Routes.noticeDocument.startsWith('/admin/disconnections/'), isFalse);
-    expect(Routes.serveNotice, '/admin/disconnections/serve');
-  });
+  test(
+    'the notice document does not sit where "serve" could be read as an id',
+    () {
+      // /admin/disconnections/serve is a literal. Had the document been put at
+      // /admin/disconnections/:noticeId, only go_router's declaration order
+      // would stop "serve" matching as a notice id — and reordering routes is
+      // exactly the kind of tidying that looks harmless.
+      expect(
+        Routes.noticeDocument.startsWith('/admin/disconnections/'),
+        isFalse,
+      );
+      expect(Routes.serveNotice, '/admin/disconnections/serve');
+    },
+  );
 
   testWidgets('a locked session is held on the sign-in screen, not its home', (
     WidgetTester tester,

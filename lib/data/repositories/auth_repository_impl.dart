@@ -12,6 +12,7 @@ import '../../domain/repositories/auth_repository.dart';
 import '../../domain/value_objects/ids.dart';
 import '../dto/profile_dto.dart';
 import '../local/app_database.dart';
+import '../local/query_cache.dart';
 import '../supabase/failure_mapper.dart';
 
 /// Sign-in against Supabase Auth, plus the `profiles` row that says who the
@@ -131,6 +132,43 @@ class AuthRepositoryImpl implements AuthRepository {
     }
   }
 
+  /// Supabase Auth's own names for a session that no longer exists.
+  static const Set<String> _endedSessionCodes = <String>{
+    'session_not_found',
+    'refresh_token_not_found',
+    'user_not_found',
+  };
+
+  @override
+  Future<Result<void>> confirmSession() async {
+    if (_client.auth.currentSession == null) return const Ok<void>(null);
+    try {
+      // Asked of Supabase Auth itself. A read through the database would
+      // still succeed on an ended session until the access token expires.
+      await _client.auth.getUser();
+      return const Ok<void>(null);
+    } on AuthException catch (error) {
+      if (_endedSessionCodes.contains(error.code)) {
+        return Err<void>(
+          AuthFailure(AuthFailure.defaultMessage, error.toString()),
+        );
+      }
+      return Err<void>(_notProofOfSignOut(error));
+    } catch (error) {
+      return Err<void>(_notProofOfSignOut(error));
+    }
+  }
+
+  /// No signal, a server hiccup, or a token that only needs refreshing: none
+  /// of these means the session ended, so none may come back as an
+  /// [AuthFailure] and sign somebody out.
+  static AppFailure _notProofOfSignOut(Object error) {
+    final AppFailure failure = FailureMapper.from(error);
+    return failure is AuthFailure
+        ? ServerFailure(ServerFailure.defaultMessage, failure.debugDetail)
+        : failure;
+  }
+
   @override
   Future<Result<void>> changePassword({required String newPassword}) async {
     try {
@@ -231,20 +269,26 @@ class AuthRepositoryImpl implements AuthRepository {
       // profile carries its area. A consumer's login profile does not, so
       // households with a login are found through consumers.profile_id,
       // whose row is area-scoped.
-      final staffRows = await _client
-          .from('profiles')
-          .select('id, first_name, last_name, username, role')
-          .eq('area_id', areaId.value)
-          .inFilter('role', <String>['meter_reader', 'cashier'])
-          .eq('account_status', 'active')
-          .order('last_name');
+      final staffRows = await QueryCache(_db).rows(
+        'staff_accounts:${areaId.value}',
+        () => _client
+            .from('profiles')
+            .select('id, first_name, last_name, username, role')
+            .eq('area_id', areaId.value)
+            .inFilter('role', <String>['meter_reader', 'cashier'])
+            .eq('account_status', 'active')
+            .order('last_name'),
+      );
 
-      final householdRows = await _client
-          .from('consumers')
-          .select('profile_id, first_name, last_name, consumer_no')
-          .eq('area_id', areaId.value)
-          .not('profile_id', 'is', null)
-          .order('last_name');
+      final householdRows = await QueryCache(_db).rows(
+        'household_accounts:${areaId.value}',
+        () => _client
+            .from('consumers')
+            .select('profile_id, first_name, last_name, consumer_no')
+            .eq('area_id', areaId.value)
+            .not('profile_id', 'is', null)
+            .order('last_name'),
+      );
 
       return Ok<List<ManagedAccount>>(<ManagedAccount>[
         for (final Map<String, dynamic> row in staffRows)
@@ -323,13 +367,16 @@ class AuthRepositoryImpl implements AuthRepository {
       // Under the Admin's own row-level security, which already confines
       // households to their area. Inactive households are left out: the
       // server would refuse them a sign-in anyway.
-      final rows = await _client
-          .from('consumers')
-          .select('id, consumer_no, first_name, last_name, purok')
-          .eq('area_id', areaId.value)
-          .eq('account_status', 'active')
-          .isFilter('profile_id', null)
-          .order('last_name');
+      final rows = await QueryCache(_db).rows(
+        'households_without_login:${areaId.value}',
+        () => _client
+            .from('consumers')
+            .select('id, consumer_no, first_name, last_name, purok')
+            .eq('area_id', areaId.value)
+            .eq('account_status', 'active')
+            .isFilter('profile_id', null)
+            .order('last_name'),
+      );
 
       return Ok<List<HouseholdWithoutLogin>>(<HouseholdWithoutLogin>[
         for (final Map<String, dynamic> row in rows)

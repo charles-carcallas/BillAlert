@@ -109,6 +109,14 @@ class FailureMapper {
     // GoTrue names its failures. The code is preferred over the prose
     // because the wording changes between releases and the code does not.
     switch (error.code) {
+      // The session was ended on the server. Setting a password for an
+      // account, as an Area President's reset does, ends all of its sessions.
+      case 'session_not_found':
+        return AuthFailure(
+          'You were signed out on this phone, usually because your password '
+          'was reset. Please sign in again.',
+          detail,
+        );
       case 'same_password':
         return ValidationFailure(
           'Your new password has to be different from the one you are using '

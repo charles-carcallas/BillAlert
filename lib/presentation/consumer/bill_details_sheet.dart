@@ -2,18 +2,21 @@ import 'package:flutter/material.dart';
 
 import '../../domain/entities/bill.dart';
 import '../../domain/value_objects/ph_date.dart';
+import '../common/expandable_bottom_sheet.dart';
 
 /// Opens one billing-cycle record without turning it into a payment receipt.
 Future<void> showConsumerBillDetails(
   BuildContext context, {
   required Bill bill,
   required PhDate today,
-}) => showModalBottomSheet<void>(
+}) => showExpandableBottomSheet<void>(
   context: context,
-  isScrollControlled: true,
-  useSafeArea: true,
-  showDragHandle: true,
-  builder: (_) => ConsumerBillDetails(bill: bill, today: today),
+  initialSize: 0.82,
+  builder: (_, ScrollController scrollController) => ConsumerBillDetails(
+    bill: bill,
+    today: today,
+    scrollController: scrollController,
+  ),
 );
 
 /// The facts BillAlert has for one bill. No tariff or derived amount appears
@@ -27,10 +30,12 @@ Future<void> showConsumerBillDetails(
 class ConsumerBillDetails extends StatelessWidget {
   final Bill bill;
   final PhDate today;
+  final ScrollController? scrollController;
 
   const ConsumerBillDetails({
     required this.bill,
     required this.today,
+    this.scrollController,
     super.key,
   });
 
@@ -38,11 +43,10 @@ class ConsumerBillDetails extends StatelessWidget {
   Widget build(BuildContext context) {
     final TextTheme text = Theme.of(context).textTheme;
 
-    return FractionallySizedBox(
-      heightFactor: 0.82,
-      child: Column(
-        children: <Widget>[
-          Padding(
+    return Column(
+      children: <Widget>[
+        SheetDragRegion(
+          child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 12, 12),
             child: Row(
               children: <Widget>[
@@ -55,23 +59,24 @@ class ConsumerBillDetails extends StatelessWidget {
               ],
             ),
           ),
-          const Divider(height: 1),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
-              children: <Widget>[
-                _StatementCard(bill: bill, today: today),
-                const SizedBox(height: 12),
-                _DueDateCard(bill: bill, today: today),
-                const SizedBox(height: 12),
-                _ProgressCard(bill: bill),
-                const SizedBox(height: 12),
-                _InformationCard(bill: bill),
-              ],
-            ),
+        ),
+        const Divider(height: 1),
+        Expanded(
+          child: ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+            children: <Widget>[
+              _StatementCard(bill: bill, today: today),
+              const SizedBox(height: 12),
+              _DueDateCard(bill: bill, today: today),
+              const SizedBox(height: 12),
+              _ProgressCard(bill: bill),
+              const SizedBox(height: 12),
+              _InformationCard(bill: bill),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -374,7 +379,8 @@ class _ProgressCard extends StatelessWidget {
           _ProgressStep(
             state: _Step.done,
             title: 'Meter read',
-            note: 'Your consumption for ${bill.cycle.displayName} was '
+            note:
+                'Your consumption for ${bill.cycle.displayName} was '
                 'recorded.',
             nextState: priced,
           ),
@@ -528,11 +534,36 @@ class _InformationCard extends StatelessWidget {
             value: bill.cycle.displayName,
           ),
           const Divider(height: 20),
+          // The two dial figures, above the difference they produce, so the
+          // consumption reads as arithmetic the household can check rather
+          // than a number it has to accept. A bill whose reading did not
+          // come back says so instead of printing a zero, which on a meter
+          // would mean a dial that never turned.
+          _InfoRow(
+            icon: Icons.speed_outlined,
+            label: 'Previous reading',
+            value: bill.previousReading?.format() ?? 'Not recorded',
+          ),
+          const Divider(height: 20),
+          _InfoRow(
+            icon: Icons.speed,
+            label: 'Present reading',
+            value: bill.currentReading?.format() ?? 'Not recorded',
+          ),
+          const Divider(height: 20),
           _InfoRow(
             icon: Icons.bolt,
             label: 'Electricity consumed',
             value: bill.consumption.format(),
           ),
+          if (bill.readingDate != null) ...<Widget>[
+            const Divider(height: 20),
+            _InfoRow(
+              icon: Icons.event_available_outlined,
+              label: 'Date read',
+              value: _friendlyDate(bill.readingDate!),
+            ),
+          ],
         ],
       ),
     );

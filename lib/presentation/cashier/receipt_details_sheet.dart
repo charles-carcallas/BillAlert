@@ -3,35 +3,41 @@ import 'package:flutter/services.dart';
 
 import '../../domain/repositories/payment_repository.dart';
 import '../../domain/value_objects/ph_date.dart';
+import '../common/expandable_bottom_sheet.dart';
 
 /// Opens the complete server-issued receipt without leaving the Cashier tab.
 Future<void> showCashierReceiptDetails(
   BuildContext context,
   PaymentSummary receipt,
-) => showModalBottomSheet<void>(
+) => showExpandableBottomSheet<void>(
   context: context,
-  isScrollControlled: true,
-  useSafeArea: true,
-  showDragHandle: true,
-  builder: (_) => CashierReceiptDetails(receipt: receipt),
+  initialSize: 0.9,
+  builder: (_, ScrollController scrollController) => CashierReceiptDetails(
+    receipt: receipt,
+    scrollController: scrollController,
+  ),
 );
 
 /// The facts from one cash handover, as returned by `v_payment_history`.
 class CashierReceiptDetails extends StatelessWidget {
   final PaymentSummary receipt;
+  final ScrollController? scrollController;
 
-  const CashierReceiptDetails({required this.receipt, super.key});
+  const CashierReceiptDetails({
+    required this.receipt,
+    this.scrollController,
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
     final TextTheme text = Theme.of(context).textTheme;
     final ColorScheme colours = Theme.of(context).colorScheme;
 
-    return FractionallySizedBox(
-      heightFactor: 0.9,
-      child: Column(
-        children: <Widget>[
-          Padding(
+    return Column(
+      children: <Widget>[
+        SheetDragRegion(
+          child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 12, 12),
             child: Row(
               children: <Widget>[
@@ -46,99 +52,100 @@ class CashierReceiptDetails extends StatelessWidget {
               ],
             ),
           ),
-          const Divider(height: 1),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-              children: <Widget>[
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: colours.primary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    children: <Widget>[
-                      Icon(Icons.verified, color: colours.primary, size: 32),
-                      const SizedBox(height: 8),
-                      Text(
-                        'OFFICIAL DIGITAL RECEIPT',
-                        style: text.labelMedium?.copyWith(
-                          color: colours.primary,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.7,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      SelectableText(
-                        receipt.receiptNo,
-                        style: text.titleLarge,
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
+        ),
+        const Divider(height: 1),
+        Expanded(
+          child: ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+            children: <Widget>[
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: colours.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                const SizedBox(height: 20),
-                _Fact(label: 'Consumer', value: receipt.consumerName),
-                _Fact(label: 'Date and time', value: _stamp(receipt.paidAt)),
-                _Fact(
-                  label: 'Verification code',
-                  value: receipt.verificationCode,
-                  selectable: true,
-                ),
-                const Divider(height: 28),
-                Text('Bills settled', style: text.titleMedium),
-                const SizedBox(height: 10),
-                for (final SettledBill bill in receipt.bills)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _AmountLine(
-                      label: bill.cycleLabel.isEmpty
-                          ? bill.billNo.value
-                          : bill.cycleLabel,
-                      value: bill.amountPaid.format(),
+                child: Column(
+                  children: <Widget>[
+                    Icon(Icons.verified, color: colours.primary, size: 32),
+                    const SizedBox(height: 8),
+                    Text(
+                      'OFFICIAL DIGITAL RECEIPT',
+                      style: text.labelMedium?.copyWith(
+                        color: colours.primary,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.7,
+                      ),
                     ),
-                  ),
-                const Divider(height: 24),
-                _AmountLine(
-                  label: 'Total paid',
-                  value: receipt.totalCollected.format(),
-                  emphasized: true,
+                    const SizedBox(height: 4),
+                    SelectableText(
+                      receipt.receiptNo,
+                      style: text.titleLarge,
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ),
-                if (receipt.cashTendered != null) ...<Widget>[
-                  const SizedBox(height: 10),
-                  _AmountLine(
-                    label: 'Cash received',
-                    value: receipt.cashTendered!.format(),
-                  ),
-                ],
-                if (receipt.changeDue != null) ...<Widget>[
-                  const SizedBox(height: 10),
-                  _AmountLine(
-                    label: 'Change',
-                    value: receipt.changeDue!.format(),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-            decoration: BoxDecoration(
-              color: colours.surface,
-              border: Border(top: BorderSide(color: colours.outlineVariant)),
-            ),
-            child: SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: () => _copy(context),
-                icon: const Icon(Icons.copy_outlined),
-                label: const Text('Copy receipt details'),
               ),
+              const SizedBox(height: 20),
+              _Fact(label: 'Consumer', value: receipt.consumerName),
+              _Fact(label: 'Date and time', value: _stamp(receipt.paidAt)),
+              _Fact(
+                label: 'Verification code',
+                value: receipt.verificationCode,
+                selectable: true,
+              ),
+              const Divider(height: 28),
+              Text('Bills settled', style: text.titleMedium),
+              const SizedBox(height: 10),
+              for (final SettledBill bill in receipt.bills)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _AmountLine(
+                    label: bill.cycleLabel.isEmpty
+                        ? bill.billNo.value
+                        : bill.cycleLabel,
+                    value: bill.amountPaid.format(),
+                  ),
+                ),
+              const Divider(height: 24),
+              _AmountLine(
+                label: 'Total paid',
+                value: receipt.totalCollected.format(),
+                emphasized: true,
+              ),
+              if (receipt.cashTendered != null) ...<Widget>[
+                const SizedBox(height: 10),
+                _AmountLine(
+                  label: 'Cash received',
+                  value: receipt.cashTendered!.format(),
+                ),
+              ],
+              if (receipt.changeDue != null) ...<Widget>[
+                const SizedBox(height: 10),
+                _AmountLine(
+                  label: 'Change',
+                  value: receipt.changeDue!.format(),
+                ),
+              ],
+            ],
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+          decoration: BoxDecoration(
+            color: colours.surface,
+            border: Border(top: BorderSide(color: colours.outlineVariant)),
+          ),
+          child: SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => _copy(context),
+              icon: const Icon(Icons.copy_outlined),
+              label: const Text('Copy receipt details'),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

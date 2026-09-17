@@ -138,6 +138,91 @@ void main() {
     expect(find.text('Not assigned yet'), findsOneWidget);
     expect(find.text('Payment received'), findsNothing);
   });
+
+  testWidgets('the dial figures behind the consumption are shown', (
+    WidgetTester tester,
+  ) async {
+    // 1,289.40 less 1,222.40 is the 67.00 kWh charged for. The point of
+    // printing all three is that the household can do that subtraction.
+    const Bill bill = Bill(
+      id: BillId('bill-4'),
+      billNo: BillNumber('BA-202609-000001'),
+      consumerId: ConsumerId('consumer-1'),
+      cycle: CycleLabel(2026, 9),
+      consumption: Kwh.fromHundredths(6700),
+      totalAmount: Money.fromCentavos(100500),
+      dueDate: PhDate(2026, 9, 30),
+      previousReading: Kwh.fromHundredths(122240),
+      currentReading: Kwh.fromHundredths(128940),
+      readingDate: PhDate(2026, 9, 8),
+    );
+
+    await tester.pumpWidget(
+      _testApp(
+        onOpen: (BuildContext context) => showConsumerBillDetails(
+          context,
+          bill: bill,
+          today: const PhDate(2026, 9, 20),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Open bill'));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('Present reading'),
+      160,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('1,222.40 kWh'), findsOneWidget);
+    expect(find.text('1,289.40 kWh'), findsOneWidget);
+    expect(find.text('67.00 kWh'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Date read'),
+      160,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('8 September 2026'), findsOneWidget);
+  });
+
+  testWidgets('a bill with no reading says so rather than showing zero', (
+    WidgetTester tester,
+  ) async {
+    // What a row cached before the readings were carried looks like, and
+    // what the Admin's pricing queue returns. A zero here would read as a
+    // meter that never turned.
+    const Bill bill = Bill(
+      id: BillId('bill-5'),
+      billNo: BillNumber('BA-202609-000002'),
+      consumerId: ConsumerId('consumer-1'),
+      cycle: CycleLabel(2026, 9),
+      consumption: Kwh.fromHundredths(6700),
+      totalAmount: Money.fromCentavos(100500),
+      dueDate: PhDate(2026, 9, 30),
+    );
+
+    await tester.pumpWidget(
+      _testApp(
+        onOpen: (BuildContext context) => showConsumerBillDetails(
+          context,
+          bill: bill,
+          today: const PhDate(2026, 9, 20),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Open bill'));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('Present reading'),
+      160,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('Not recorded'), findsNWidgets(2));
+    expect(find.text('0.00 kWh'), findsNothing);
+    expect(find.text('Date read'), findsNothing);
+  });
 }
 
 Widget _testApp({required ValueChanged<BuildContext> onOpen}) => MaterialApp(

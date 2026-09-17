@@ -6,6 +6,7 @@ import '../../domain/repositories/notice_repository.dart';
 import '../../domain/repositories/notification_repository.dart';
 import '../../domain/usecases/consumer/load_notification_details.dart';
 import '../../domain/value_objects/ph_date.dart';
+import '../common/expandable_bottom_sheet.dart';
 import '../providers.dart';
 import 'bill_details_sheet.dart';
 import 'notification_details_controller.dart';
@@ -15,12 +16,13 @@ import 'notification_labels.dart';
 Future<void> showNotificationDetails(
   BuildContext context, {
   required AppNotification alert,
-}) => showModalBottomSheet<void>(
+}) => showExpandableBottomSheet<void>(
   context: context,
-  isScrollControlled: true,
-  useSafeArea: true,
-  showDragHandle: true,
-  builder: (_) => NotificationDetailsSheet(alert: alert),
+  initialSize: 0.82,
+  builder: (_, ScrollController scrollController) => NotificationDetailsSheet(
+    alert: alert,
+    scrollController: scrollController,
+  ),
 );
 
 /// CON-05 — one notification, opened.
@@ -31,8 +33,13 @@ Future<void> showNotificationDetails(
 /// the server recorded or computed; nothing here is worked out on the phone.
 class NotificationDetailsSheet extends ConsumerWidget {
   final AppNotification alert;
+  final ScrollController? scrollController;
 
-  const NotificationDetailsSheet({required this.alert, super.key});
+  const NotificationDetailsSheet({
+    required this.alert,
+    this.scrollController,
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -43,11 +50,10 @@ class NotificationDetailsSheet extends ConsumerWidget {
       notificationDetailsProvider(alert),
     );
 
-    return FractionallySizedBox(
-      heightFactor: 0.82,
-      child: Column(
-        children: <Widget>[
-          Padding(
+    return Column(
+      children: <Widget>[
+        SheetDragRegion(
+          child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 12, 12),
             child: Row(
               children: <Widget>[
@@ -60,40 +66,41 @@ class NotificationDetailsSheet extends ConsumerWidget {
               ],
             ),
           ),
-          const Divider(height: 1),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
-              children: <Widget>[
-                _MessageCard(alert: alert),
+        ),
+        const Divider(height: 1),
+        Expanded(
+          child: ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+            children: <Widget>[
+              _MessageCard(alert: alert),
+              const SizedBox(height: 12),
+              _DeliveryCard(alert: alert),
+              if (hasRelated) ...<Widget>[
                 const SizedBox(height: 12),
-                _DeliveryCard(alert: alert),
-                if (hasRelated) ...<Widget>[
-                  const SizedBox(height: 12),
-                  details.when(
-                    loading: () => _LoadingCard(
-                      label: alert.noticeId != null
-                          ? 'Loading the notice…'
-                          : 'Loading your bill…',
-                    ),
-                    error: (Object _, StackTrace _) => _Unavailable(
-                      aboutNotice: alert.noticeId != null,
-                      onRetry: () =>
-                          ref.invalidate(notificationDetailsProvider(alert)),
-                    ),
-                    data: (NotificationDetails value) => _Related(
-                      details: value,
-                      today: today,
-                      onRetry: () =>
-                          ref.invalidate(notificationDetailsProvider(alert)),
-                    ),
+                details.when(
+                  loading: () => _LoadingCard(
+                    label: alert.noticeId != null
+                        ? 'Loading the notice…'
+                        : 'Loading your bill…',
                   ),
-                ],
+                  error: (Object _, StackTrace _) => _Unavailable(
+                    aboutNotice: alert.noticeId != null,
+                    onRetry: () =>
+                        ref.invalidate(notificationDetailsProvider(alert)),
+                  ),
+                  data: (NotificationDetails value) => _Related(
+                    details: value,
+                    today: today,
+                    onRetry: () =>
+                        ref.invalidate(notificationDetailsProvider(alert)),
+                  ),
+                ),
               ],
-            ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

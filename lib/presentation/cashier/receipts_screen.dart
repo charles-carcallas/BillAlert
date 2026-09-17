@@ -5,6 +5,7 @@ import '../../domain/repositories/payment_repository.dart';
 import '../../domain/value_objects/ph_date.dart';
 import '../common/failure_banner.dart';
 import '../common/local_search_field.dart';
+import '../common/local_sort_button.dart';
 import '../common/payment_search.dart';
 import '../common/staff_app_bar.dart';
 import 'receipt_details_sheet.dart';
@@ -25,8 +26,11 @@ class ReceiptsScreen extends ConsumerStatefulWidget {
   ConsumerState<ReceiptsScreen> createState() => _ReceiptsScreenState();
 }
 
+enum _ReceiptSort { newest, oldest }
+
 class _ReceiptsScreenState extends ConsumerState<ReceiptsScreen> {
   final TextEditingController _search = TextEditingController();
+  _ReceiptSort _sort = _ReceiptSort.newest;
 
   @override
   void dispose() {
@@ -39,9 +43,16 @@ class _ReceiptsScreenState extends ConsumerState<ReceiptsScreen> {
     final state = ref.watch(receiptsControllerProvider);
     final controller = ref.read(receiptsControllerProvider.notifier);
     final TextTheme text = Theme.of(context).textTheme;
-    final List<PaymentSummary> visible = state.receipts
-        .where((receipt) => paymentMatchesSearch(receipt, _search.text))
-        .toList();
+    final List<PaymentSummary> visible =
+        state.receipts
+            .where((receipt) => paymentMatchesSearch(receipt, _search.text))
+            .toList()
+          ..sort((a, b) {
+            final byDate = _sort == _ReceiptSort.newest
+                ? b.paidAt.compareTo(a.paidAt)
+                : a.paidAt.compareTo(b.paidAt);
+            return byDate != 0 ? byDate : a.receiptNo.compareTo(b.receiptNo);
+          });
 
     return Scaffold(
       appBar: const StaffAppBar(title: 'Receipts'),
@@ -51,7 +62,7 @@ class _ReceiptsScreenState extends ConsumerState<ReceiptsScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: <Widget>[
-              _TodayCard(today: state.today),
+              _TodayCard(today: state.today, outstanding: state.outstanding),
 
               if (state.failure != null) ...<Widget>[
                 const SizedBox(height: 12),
@@ -64,11 +75,40 @@ class _ReceiptsScreenState extends ConsumerState<ReceiptsScreen> {
               const SizedBox(height: 20),
 
               if (state.receipts.isNotEmpty) ...<Widget>[
-                LocalSearchField(
-                  fieldKey: const ValueKey<String>('cashier-receipts-search'),
-                  controller: _search,
-                  onChanged: (_) => setState(() {}),
-                  hintText: 'Search consumer or receipt number',
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: LocalSearchField(
+                        fieldKey: const ValueKey<String>(
+                          'cashier-receipts-search',
+                        ),
+                        controller: _search,
+                        onChanged: (_) => setState(() {}),
+                        hintText: 'Search consumer or receipt number',
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 120,
+                      child: LocalSortButton<_ReceiptSort>(
+                        buttonKey: const ValueKey('cashier-receipts-sort'),
+                        value: _sort,
+                        options: const <LocalSortOption<_ReceiptSort>>[
+                          LocalSortOption(
+                            value: _ReceiptSort.newest,
+                            label: 'Newest',
+                            icon: Icons.arrow_downward,
+                          ),
+                          LocalSortOption(
+                            value: _ReceiptSort.oldest,
+                            label: 'Oldest',
+                            icon: Icons.arrow_upward,
+                          ),
+                        ],
+                        onChanged: (value) => setState(() => _sort = value),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
               ],
@@ -203,17 +243,32 @@ class _ReceiptsScreenState extends ConsumerState<ReceiptsScreen> {
       _weekdays[DateTime.utc(day.year, day.month, day.day).weekday - 1];
 }
 
+/// What came in today, and what is still out there.
+///
+/// The card used to answer only the first. A cashier closing up also has to
+/// say how much of the area is still unsettled, and reading it off the
+/// household list one row at a time is how a figure gets miscounted.
+///
+/// The two halves are deliberately different colours: takings in the primary
+/// tone, what is still owed in red when any of it is overdue. They are not
+/// two views of one number — money collected and money outstanding never add
+/// up to anything meaningful — so nothing here totals them together.
 class _TodayCard extends StatelessWidget {
   final CollectionSummary today;
 
-  const _TodayCard({required this.today});
+  /// Null until the roll-up has loaded. The card then shows its top half
+  /// only, rather than claiming an outstanding balance of zero.
+  final AreaOutstanding? outstanding;
+
+  const _TodayCard({required this.today, required this.outstanding});
 
   @override
   Widget build(BuildContext context) {
     final TextTheme text = Theme.of(context).textTheme;
 
     final colours = Theme.of(context).colorScheme;
-    return Container(
+
+    final Widget collected = Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: colours.primary.withValues(alpha: 0.13),
@@ -248,6 +303,80 @@ class _TodayCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+
+    final AreaOutstanding? owed = outstanding;
+    if (owed == null) return collected;
+
+    final bool anyOverdue = owed.overdueHouseholds > 0;
+    final Color tone = anyOverdue ? colours.error : colours.onSurfaceVariant;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        collected,
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: anyOverdue
+                ? colours.errorContainer.withValues(alpha: 0.22)
+                : colours.surfaceContainerLowest,
+            border: Border.all(
+              color: anyOverdue
+                  ? colours.error.withValues(alpha: 0.35)
+                  : colours.outlineVariant,
+            ),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Still to collect',
+                      style: text.bodySmall?.copyWith(color: tone),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      owed.total.format(),
+                      style: text.headlineSmall?.copyWith(
+                        color: tone,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: <Widget>[
+                  Text(
+                    '${owed.households} household'
+                    '${owed.households == 1 ? '' : 's'}',
+                    style: text.bodyMedium?.copyWith(
+                      color: tone,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (anyOverdue) ...<Widget>[
+                    const SizedBox(height: 2),
+                    Text(
+                      '${owed.overdueHouseholds} overdue',
+                      style: text.bodySmall?.copyWith(
+                        color: colours.error,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

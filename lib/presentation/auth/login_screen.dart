@@ -5,6 +5,7 @@ import '../../core/config/app_config.dart';
 import '../../core/errors/app_failure.dart';
 import '../../domain/entities/app_user.dart';
 import '../common/failure_banner.dart';
+import '../providers.dart';
 import 'app_lock_controller.dart';
 import 'auth_controller.dart';
 import 'forgot_password_sheet.dart';
@@ -36,6 +37,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _isSubmitting = false;
   bool _obscure = true;
 
+  /// On the lock: the password field for the same account is showing in
+  /// place of the fingerprint button.
+  bool _passwordUnlock = false;
+
   @override
   void dispose() {
     _username.dispose();
@@ -49,6 +54,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _isSubmitting = true;
       _failure = null;
     });
+    ref.read(signInNoticeProvider.notifier).clear();
 
     final failure = await ref
         .read(authControllerProvider.notifier)
@@ -81,11 +87,57 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
   }
 
-  /// Somebody else using the phone, or the same person choosing a password:
-  /// sign the locked session out and show the ordinary form. Readings still
-  /// waiting to sync survive this — signing out keeps the outbox.
+  /// The lock's password route, for the same account. The session is kept,
+  /// so this works with no signal; see AppLockController.unlockWithPassword.
+  Future<void> _unlockWithPassword(AppUser user) async {
+    if (_isSubmitting) return;
+    setState(() {
+      _isSubmitting = true;
+      _failure = null;
+    });
+
+    final failure = await ref
+        .read(appLockControllerProvider.notifier)
+        .unlockWithPassword(user, _password.text);
+
+    if (!mounted) return;
+    setState(() {
+      _isSubmitting = false;
+      _failure = failure;
+    });
+    if (failure == null) _password.clear();
+  }
+
+  /// Somebody else using the phone: sign the locked session out and show the
+  /// ordinary form. Readings still waiting to sync survive this — signing out
+  /// keeps the outbox. With no signal nobody could sign back in afterwards,
+  /// so that is said before it happens rather than discovered after.
   Future<void> _useDifferentAccount() async {
     if (_isSubmitting) return;
+    if (!ref.read(networkStatusProvider).isOnline) {
+      final bool? goAhead = await showDialog<bool>(
+        context: context,
+        builder: (BuildContext dialogContext) => AlertDialog(
+          title: const Text('You’re offline'),
+          content: const Text(
+            'Signing out now removes this account from the phone, and signing '
+            'in again needs an internet connection. To keep using BillAlert '
+            'offline, unlock with your fingerprint or password instead.',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Stay on this account'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Sign out anyway'),
+            ),
+          ],
+        ),
+      );
+      if (goAhead != true || !mounted) return;
+    }
     setState(() {
       _isSubmitting = true;
       _failure = null;
@@ -183,84 +235,95 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  List<Widget> _passwordForm(TextTheme textTheme, ColorScheme colorScheme) =>
-      <Widget>[
-        Text('Username', style: textTheme.titleSmall),
-        const SizedBox(height: 6),
-        TextField(
-          controller: _username,
-          autocorrect: false,
-          enableSuggestions: false,
-          textInputAction: TextInputAction.next,
-          decoration: const InputDecoration(
-            // The mockup shows a real staff username here. A hint is only an
-            // example, but printing a valid account on the sign-in screen
-            // hands anyone holding the phone half of a login. The shape is
-            // what the hint is for.
-            hintText: 'firstname.lastname',
+  List<Widget> _passwordForm(
+    TextTheme textTheme,
+    ColorScheme colorScheme,
+  ) => <Widget>[
+    // Why the app brought them here, when it did: for example after an
+    // Area President reset the password and this phone was signed out.
+    if (ref.watch(signInNoticeProvider) case final String notice) ...<Widget>[
+      FailureBanner(failure: AuthFailure(notice)),
+      const SizedBox(height: 16),
+    ],
+    Text('Username', style: textTheme.titleSmall),
+    const SizedBox(height: 6),
+    TextField(
+      controller: _username,
+      autocorrect: false,
+      enableSuggestions: false,
+      textInputAction: TextInputAction.next,
+      decoration: const InputDecoration(
+        // The mockup shows a real staff username here. A hint is only an
+        // example, but printing a valid account on the sign-in screen
+        // hands anyone holding the phone half of a login. The shape is
+        // what the hint is for.
+        hintText: 'firstname.lastname',
+      ),
+    ),
+    const SizedBox(height: 16),
+    Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: <Widget>[
+        Text('Password', style: textTheme.titleSmall),
+        // Was a GestureDetector with an empty handler: it did nothing, and
+        // its hit area was the height of the text. A TextButton with the
+        // padded tap target gives a thumb the 48px the Material and WCAG
+        // guidance ask for.
+        TextButton(
+          onPressed: () => showForgotPasswordHelp(context),
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            minimumSize: const Size(0, 40),
+            tapTargetSize: MaterialTapTargetSize.padded,
           ),
+          child: Text('Forgot password?', style: textTheme.labelMedium),
         ),
-        const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: <Widget>[
-            Text('Password', style: textTheme.titleSmall),
-            // Was a GestureDetector with an empty handler: it did nothing, and
-            // its hit area was the height of the text. A TextButton with the
-            // padded tap target gives a thumb the 48px the Material and WCAG
-            // guidance ask for.
-            TextButton(
-              onPressed: () => showForgotPasswordHelp(context),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                minimumSize: const Size(0, 40),
-                tapTargetSize: MaterialTapTargetSize.padded,
-              ),
-              child: Text('Forgot password?', style: textTheme.labelMedium),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        TextField(
-          controller: _password,
-          obscureText: _obscure,
-          textInputAction: TextInputAction.done,
-          onSubmitted: (_) => _isSubmitting ? null : _submit(),
-          decoration: InputDecoration(
-            suffixIcon: IconButton(
-              icon: Icon(
-                _obscure
-                    ? Icons.visibility_outlined
-                    : Icons.visibility_off_outlined,
-                color: colorScheme.onSurfaceVariant,
-              ),
-              onPressed: () => setState(() => _obscure = !_obscure),
-            ),
+      ],
+    ),
+    const SizedBox(height: 6),
+    TextField(
+      controller: _password,
+      obscureText: _obscure,
+      textInputAction: TextInputAction.done,
+      onSubmitted: (_) => _isSubmitting ? null : _submit(),
+      decoration: InputDecoration(
+        // The tooltip is what a screen reader announces: without it this
+        // is an unlabelled button beside a field nobody can read.
+        suffixIcon: IconButton(
+          tooltip: _obscure ? 'Show password' : 'Hide password',
+          icon: Icon(
+            _obscure
+                ? Icons.visibility_outlined
+                : Icons.visibility_off_outlined,
+            color: colorScheme.onSurfaceVariant,
           ),
+          onPressed: () => setState(() => _obscure = !_obscure),
         ),
-        if (_failure != null) ...<Widget>[
-          const SizedBox(height: 16),
-          FailureBanner(failure: _failure!),
-        ],
-        const SizedBox(height: 20),
-        FilledButton(
-          onPressed: _isSubmitting ? null : _submit,
-          child: _isSubmitting
-              ? SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: colorScheme.onPrimary,
-                  ),
-                )
-              : const Text('Log in'),
-        ),
-        // No fingerprint button on this face. Signed out, there is no session
-        // on the phone for a fingerprint to unlock, and the mockup's button
-        // here did nothing at all. It appears on the other face — the lock —
-        // where it works.
-      ];
+      ),
+    ),
+    if (_failure != null) ...<Widget>[
+      const SizedBox(height: 16),
+      FailureBanner(failure: _failure!),
+    ],
+    const SizedBox(height: 20),
+    FilledButton(
+      onPressed: _isSubmitting ? null : _submit,
+      child: _isSubmitting
+          ? SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: colorScheme.onPrimary,
+              ),
+            )
+          : const Text('Log in'),
+    ),
+    // No fingerprint button on this face. Signed out, there is no session
+    // on the phone for a fingerprint to unlock, and the mockup's button
+    // here did nothing at all. It appears on the other face — the lock —
+    // where it works.
+  ];
 
   List<Widget> _unlockPanel(
     AppUser user,
@@ -310,30 +373,102 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       FailureBanner(failure: _failure!),
     ],
     const SizedBox(height: 20),
-    FilledButton.icon(
-      onPressed: _isSubmitting ? null : _unlock,
-      icon: _isSubmitting
-          ? SizedBox(
-              height: 18,
-              width: 18,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: colorScheme.onPrimary,
-              ),
-            )
-          : const Icon(Icons.fingerprint, size: 22),
-      label: const Text('Unlock with fingerprint'),
-    ),
-    const SizedBox(height: 8),
-    Text(
-      "Your fingerprint never leaves this device. Your phone's PIN works too.",
-      textAlign: TextAlign.center,
-      style: textTheme.bodySmall,
-    ),
-    const SizedBox(height: 12),
+    if (_passwordUnlock) ...<Widget>[
+      Text('Username', style: textTheme.titleSmall),
+      const SizedBox(height: 6),
+      // The account is fixed: this opens the session already on the phone,
+      // it does not sign anybody else in.
+      TextFormField(initialValue: user.username, enabled: false),
+      const SizedBox(height: 16),
+      Text('Password', style: textTheme.titleSmall),
+      const SizedBox(height: 6),
+      TextField(
+        key: const ValueKey<String>('unlock-password'),
+        controller: _password,
+        obscureText: _obscure,
+        autofocus: true,
+        textInputAction: TextInputAction.done,
+        onSubmitted: (_) => _unlockWithPassword(user),
+        decoration: InputDecoration(
+          suffixIcon: IconButton(
+            tooltip: _obscure ? 'Show password' : 'Hide password',
+            icon: Icon(
+              _obscure
+                  ? Icons.visibility_outlined
+                  : Icons.visibility_off_outlined,
+              color: colorScheme.onSurfaceVariant,
+            ),
+            onPressed: () => setState(() => _obscure = !_obscure),
+          ),
+        ),
+      ),
+      const SizedBox(height: 20),
+      FilledButton(
+        onPressed: _isSubmitting ? null : () => _unlockWithPassword(user),
+        child: _isSubmitting
+            ? SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: colorScheme.onPrimary,
+                ),
+              )
+            : const Text('Unlock'),
+      ),
+      const SizedBox(height: 8),
+      TextButton.icon(
+        onPressed: _isSubmitting
+            ? null
+            : () => setState(() {
+                _passwordUnlock = false;
+                _failure = null;
+                _password.clear();
+              }),
+        icon: const Icon(Icons.fingerprint, size: 20),
+        label: const Text('Use fingerprint instead'),
+      ),
+    ] else ...<Widget>[
+      FilledButton.icon(
+        onPressed: _isSubmitting ? null : _unlock,
+        icon: _isSubmitting
+            ? SizedBox(
+                height: 18,
+                width: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: colorScheme.onPrimary,
+                ),
+              )
+            : const Icon(Icons.fingerprint, size: 22),
+        label: const Text('Unlock with fingerprint'),
+      ),
+      const SizedBox(height: 8),
+      Text(
+        "Your fingerprint never leaves this device. Your phone's PIN works too.",
+        textAlign: TextAlign.center,
+        style: textTheme.bodySmall,
+      ),
+      const SizedBox(height: 12),
+      TextButton(
+        onPressed: _isSubmitting
+            ? null
+            : () => setState(() {
+                _passwordUnlock = true;
+                _failure = null;
+              }),
+        child: const Text('Use username and password'),
+      ),
+    ],
+    const SizedBox(height: 4),
     TextButton(
       onPressed: _isSubmitting ? null : _useDifferentAccount,
-      child: const Text('Use username and password'),
+      child: Text(
+        'Sign in with a different account',
+        style: textTheme.labelLarge?.copyWith(
+          color: colorScheme.onSurfaceVariant,
+        ),
+      ),
     ),
   ];
 }

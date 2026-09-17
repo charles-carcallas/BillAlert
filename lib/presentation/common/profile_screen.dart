@@ -94,6 +94,8 @@ class ProfileScreen extends ConsumerWidget {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    final ColorScheme colours = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: user is ConsumerUser
           ? const ConsumerAppBar(title: 'Profile')
@@ -113,87 +115,74 @@ class ProfileScreen extends ConsumerWidget {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: <Widget>[
-              _Identity(user: user, consumer: consumer?.value),
-              const SizedBox(height: 18),
-              const _SectionHeader(
-                icon: Icons.palette_outlined,
-                label: 'Appearance',
-              ),
-              const SizedBox(height: 6),
-              const _Panel(children: <Widget>[AppearanceSetting()]),
-              if (user is ConsumerUser) ...<Widget>[
-                const SizedBox(height: 18),
-                const _SectionHeader(
-                  icon: Icons.notifications_none,
-                  label: 'Notifications',
-                ),
-                const SizedBox(height: 6),
-                const _Panel(
+              _ProfileHeader(user: user, consumer: consumer?.value),
+              if (user is ConsumerUser)
+                _Group(
+                  title: 'Notifications',
+                  footer:
+                      'Alerts are also sent to your SMS number. Keep it '
+                      'current so important notices still arrive.',
                   children: <Widget>[
-                    _SettingRow(
+                    const _SettingRow(
+                      icon: Icons.notifications_none,
                       title: 'Inbox alerts',
                       subtitle:
                           'Bill ready, payment reminders, overdue alerts, and notices',
                       trailing: Icon(Icons.check_circle_outline),
                     ),
-                    Divider(),
-                    _UrgentAlertsRow(),
+                    const _UrgentAlertsRow(),
+                    _SmsRow(
+                      consumer: consumer,
+                      onEdit: consumer?.hasValue == true
+                          ? () async {
+                              final String? saved =
+                                  await showEditConsumerContactNumber(
+                                    context,
+                                    currentNumber:
+                                        consumer?.value?.contactNumber,
+                                  );
+                              if (saved != null) {
+                                ref.invalidate(profileConsumerProvider);
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'SMS number updated to $saved.',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              }
+                            }
+                          : null,
+                    ),
                   ],
                 ),
-                const SizedBox(height: 18),
-                const _SectionHeader(
-                  icon: Icons.sms_outlined,
-                  label: 'SMS delivery',
-                ),
-                const SizedBox(height: 6),
-                _SmsPanel(
-                  consumer: consumer,
-                  onEdit: consumer?.hasValue == true
-                      ? () async {
-                          final String? saved =
-                              await showEditConsumerContactNumber(
-                                context,
-                                currentNumber: consumer?.value?.contactNumber,
-                              );
-                          if (saved != null) {
-                            ref.invalidate(profileConsumerProvider);
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'SMS number updated to $saved.',
-                                  ),
-                                ),
-                              );
-                            }
-                          }
-                        }
-                      : null,
-                ),
-              ],
-              const SizedBox(height: 18),
-              const _SectionHeader(icon: Icons.sync, label: 'Sync'),
-              const SizedBox(height: 6),
-              _SyncPanel(pending: pending),
-              const SizedBox(height: 18),
-              const _SectionHeader(
-                icon: Icons.manage_accounts_outlined,
-                label: 'Account',
-              ),
-              const SizedBox(height: 6),
-              _Panel(
+              const _Group(
+                title: 'Appearance',
                 children: <Widget>[
-                  _DetailRow(label: 'Username', value: user.username),
-                  const Divider(),
-                  _DetailRow(label: 'Role', value: user.roleLabel),
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(16, 12, 16, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        _RowText(
+                          icon: Icons.palette_outlined,
+                          title: 'Theme',
+                          subtitle: 'Choose how BillAlert looks on this device',
+                        ),
+                        SizedBox(height: 14),
+                        AppearanceSetting(),
+                      ],
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 18),
-              const _SectionHeader(icon: Icons.lock_outline, label: 'Security'),
-              const SizedBox(height: 6),
-              _Panel(
+              _Group(
+                title: 'Security',
                 children: <Widget>[
                   _SettingRow(
+                    icon: Icons.lock_outline,
                     title: 'Change password',
                     subtitle: 'Update the password used to sign in',
                     trailing: const Icon(Icons.chevron_right),
@@ -201,27 +190,26 @@ class ProfileScreen extends ConsumerWidget {
                     // the back arrow has to return to it.
                     onTap: () => context.push(Routes.accountPassword),
                   ),
-                  const Divider(),
                   _FingerprintRow(user: user),
                 ],
               ),
-              const SizedBox(height: 24),
-              OutlinedButton.icon(
-                onPressed: () => _confirmSignOut(context, ref, pending),
-                icon: const Icon(Icons.logout),
-                label: const Text('Sign out'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Theme.of(context).colorScheme.error,
-                  side: BorderSide(color: Theme.of(context).colorScheme.error),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Signing out clears the data cached on this device. Anything '
-                'still waiting to sync stays saved and is sent when you sign '
-                'in again.',
-                style: Theme.of(context).textTheme.bodySmall,
-                textAlign: TextAlign.center,
+              _Group(
+                title: 'This phone',
+                footer:
+                    'Signing out clears the data cached on this device. '
+                    'Anything still waiting to sync stays saved and is sent '
+                    'when you sign in again.',
+                children: <Widget>[
+                  _SyncRow(pending: pending),
+                  _SettingRow(
+                    icon: Icons.logout,
+                    tint: colours.error,
+                    title: 'Sign out',
+                    subtitle: 'Leave BillAlert on this phone',
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _confirmSignOut(context, ref, pending),
+                  ),
+                ],
               ),
             ],
           ),
@@ -271,16 +259,15 @@ class ProfileScreen extends ConsumerWidget {
   }
 }
 
-class _SmsPanel extends StatelessWidget {
+/// The household's SMS delivery number, with the way to change it.
+class _SmsRow extends StatelessWidget {
   final AsyncValue<domain.Consumer?>? consumer;
   final VoidCallback? onEdit;
 
-  const _SmsPanel({required this.consumer, this.onEdit});
+  const _SmsRow({required this.consumer, this.onEdit});
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    final colours = Theme.of(context).colorScheme;
     final String number =
         consumer?.when(
           data: (value) => value?.contactNumber ?? 'No mobile number on file',
@@ -289,66 +276,25 @@ class _SmsPanel extends StatelessWidget {
         ) ??
         'Contact number unavailable';
 
-    return _Panel(
-      children: <Widget>[
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Container(
-                width: 38,
-                height: 38,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: colours.primary.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(Icons.sms_outlined, color: colours.primary),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      'Alerts are also sent to this number. Keep it current '
-                      'so important notices still arrive.',
-                      style: text.bodySmall,
-                    ),
-                    const SizedBox(height: 9),
-                    SelectableText(
-                      number,
-                      style: text.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: onEdit,
-                      icon: const Icon(Icons.edit_outlined, size: 18),
-                      label: Text(
-                        consumer?.value?.contactNumber == null
-                            ? 'Add SMS number'
-                            : 'Edit SMS number',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+    return _SettingRow(
+      icon: Icons.sms_outlined,
+      title: 'SMS delivery number',
+      subtitle: number,
+      trailing: TextButton(
+        onPressed: onEdit,
+        child: Text(consumer?.value?.contactNumber == null ? 'Add' : 'Edit'),
+      ),
     );
   }
 }
 
-class _Identity extends StatelessWidget {
+/// Who is signed in, with the account facts folded in rather than repeated
+/// in a card of their own further down.
+class _ProfileHeader extends StatelessWidget {
   final AppUser user;
   final domain.Consumer? consumer;
 
-  const _Identity({required this.user, this.consumer});
+  const _ProfileHeader({required this.user, this.consumer});
 
   @override
   Widget build(BuildContext context) {
@@ -356,62 +302,78 @@ class _Identity extends StatelessWidget {
     final ColorScheme colours = Theme.of(context).colorScheme;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(18, 20, 18, 14),
       decoration: BoxDecoration(
-        color: colours.surfaceContainerLowest,
-        border: Border.all(color: colours.outlineVariant),
-        borderRadius: BorderRadius.circular(16),
+        color: colours.primary.withValues(alpha: 0.08),
+        border: Border.all(color: colours.primary.withValues(alpha: 0.18)),
+        borderRadius: BorderRadius.circular(24),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Container(
-            height: 56,
-            width: 56,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: colours.primary.withValues(alpha: 0.14),
-              shape: BoxShape.circle,
-            ),
-            child: Text(
-              _initials(user),
-              style: text.titleLarge?.copyWith(
-                color: colours.primary,
-                fontWeight: FontWeight.w700,
+          Row(
+            children: <Widget>[
+              Container(
+                height: 60,
+                width: 60,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: colours.primary,
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  _initials(user),
+                  style: text.titleLarge?.copyWith(
+                    color: colours.onPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(user.fullName, style: text.titleLarge),
-                Text(
-                  user is ConsumerUser
-                      ? consumer?.consumerNo.value ?? user.username
-                      : 'Bohol I Electric Cooperative',
-                  style: text.bodySmall?.copyWith(letterSpacing: 0.3),
-                ),
-                const SizedBox(height: 7),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 9,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colours.primary.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    user.roleLabel.toUpperCase(),
-                    style: text.labelSmall?.copyWith(
-                      color: colours.primary,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.4,
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(user.fullName, style: text.titleLarge),
+                    const SizedBox(height: 2),
+                    Text(
+                      user is ConsumerUser
+                          ? consumer?.consumerNo.value ?? user.username
+                          : 'Bohol I Electric Cooperative',
+                      style: text.bodySmall?.copyWith(
+                        color: colours.onSurfaceVariant,
+                        letterSpacing: 0.3,
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              color: colours.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: IntrinsicHeight(
+              child: Row(
+                children: <Widget>[
+                  Expanded(
+                    child: _Fact(label: 'Username', value: user.username),
+                  ),
+                  VerticalDivider(
+                    width: 1,
+                    indent: 4,
+                    endIndent: 4,
+                    color: colours.outlineVariant,
+                  ),
+                  Expanded(
+                    child: _Fact(label: 'Role', value: user.roleLabel),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -429,27 +391,31 @@ class _Identity extends StatelessWidget {
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  final IconData icon;
+class _Fact extends StatelessWidget {
   final String label;
+  final String value;
 
-  const _SectionHeader({required this.icon, required this.label});
+  const _Fact({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
-    final colours = Theme.of(context).colorScheme;
+    final TextTheme text = Theme.of(context).textTheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Row(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Column(
         children: <Widget>[
-          Icon(icon, size: 15, color: colours.onSurfaceVariant),
-          const SizedBox(width: 6),
           Text(
-            label.toUpperCase(),
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: colours.onSurfaceVariant,
-              letterSpacing: 0.4,
+            label,
+            style: text.labelSmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: text.titleSmall,
           ),
         ],
       ),
@@ -457,101 +423,185 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _Panel extends StatelessWidget {
+/// A titled card of rows. The title sits close to its own card and far from
+/// the one above, so each group reads as one unit, and the rows inside are
+/// split by dividers that start where the text does.
+class _Group extends StatelessWidget {
+  final String title;
+  final String? footer;
   final List<Widget> children;
 
-  const _Panel({required this.children});
+  const _Group({required this.title, required this.children, this.footer});
 
   @override
   Widget build(BuildContext context) {
-    final colours = Theme.of(context).colorScheme;
-    return Container(
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: colours.surfaceContainerLowest,
-        border: Border.all(color: colours.outlineVariant),
-        borderRadius: BorderRadius.circular(16),
+    final TextTheme text = Theme.of(context).textTheme;
+    final ColorScheme colours = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+            child: Text(
+              title,
+              style: text.titleSmall?.copyWith(
+                color: colours.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Container(
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: colours.surfaceContainerLowest,
+              border: Border.all(color: colours.outlineVariant),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              children: <Widget>[
+                for (int i = 0; i < children.length; i++) ...<Widget>[
+                  if (i > 0)
+                    Divider(
+                      height: 1,
+                      thickness: 1,
+                      indent: 68,
+                      color: colours.outlineVariant.withValues(alpha: 0.6),
+                    ),
+                  children[i],
+                ],
+              ],
+            ),
+          ),
+          if (footer != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(6, 8, 6, 0),
+              child: Text(
+                footer!,
+                style: text.bodySmall?.copyWith(
+                  color: colours.onSurfaceVariant,
+                ),
+              ),
+            ),
+        ],
       ),
-      child: Column(children: children),
     );
   }
 }
 
-class _SyncPanel extends StatelessWidget {
+/// What has not reached the server yet, as a row like every other.
+class _SyncRow extends StatelessWidget {
   final AsyncValue<List<OutboxEntry>> pending;
 
-  const _SyncPanel({required this.pending});
+  const _SyncRow({required this.pending});
 
   @override
   Widget build(BuildContext context) {
     final TextTheme text = Theme.of(context).textTheme;
 
-    return _Panel(
+    return pending.when(
+      loading: () => const _SettingRow(
+        icon: Icons.sync,
+        title: 'Sync',
+        subtitle: 'Checking this phone…',
+        trailing: SizedBox.square(
+          dimension: 20,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      ),
+      error: (_, _) => const _SettingRow(
+        icon: Icons.sync_problem_outlined,
+        title: 'Sync',
+        subtitle: 'Could not read the queue on this phone.',
+        trailing: SizedBox.shrink(),
+      ),
+      data: (List<OutboxEntry> entries) {
+        if (entries.isEmpty) {
+          return const _SettingRow(
+            icon: Icons.cloud_done_outlined,
+            title: 'Sync',
+            subtitle: 'Everything has been sent.',
+            trailing: Icon(Icons.check_circle_outline),
+          );
+        }
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              _RowText(
+                icon: Icons.cloud_upload_outlined,
+                title: 'Sync',
+                subtitle:
+                    '${entries.length} item'
+                    '${entries.length == 1 ? '' : 's'} waiting to sync',
+              ),
+              const SizedBox(height: 6),
+              // Each queued action can say what it is - OutboxOperation
+              // carries its own description - so the list needs no switch
+              // on the operation code.
+              for (final OutboxEntry entry in entries)
+                Padding(
+                  padding: const EdgeInsets.only(left: 52, top: 2),
+                  child: Text('· ${entry.description}', style: text.bodySmall),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// The icon tile, title and subtitle every row on the screen starts with, so
+/// the cards share one rhythm.
+class _RowText extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color? tint;
+
+  const _RowText({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.tint,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme text = Theme.of(context).textTheme;
+    final ColorScheme colours = Theme.of(context).colorScheme;
+    final Color colour = tint ?? colours.primary;
+
+    return Row(
       children: <Widget>[
-        Padding(
-          padding: const EdgeInsets.all(14),
-          child: pending.when(
-            loading: () => const Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
-                child: SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+        Container(
+          width: 40,
+          height: 40,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: colour.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, size: 21, color: colour),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(title, style: text.titleSmall?.copyWith(color: tint)),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: text.bodySmall?.copyWith(
+                  color: colours.onSurfaceVariant,
                 ),
               ),
-            ),
-            error: (_, _) => Text(
-              'Could not read the queue on this phone.',
-              style: text.bodyMedium,
-            ),
-            data: (List<OutboxEntry> entries) {
-              if (entries.isEmpty) {
-                return Row(
-                  children: <Widget>[
-                    const Icon(Icons.cloud_done_outlined, size: 20),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Everything has been sent.',
-                        style: text.bodyMedium,
-                      ),
-                    ),
-                  ],
-                );
-              }
-
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Row(
-                    children: <Widget>[
-                      const Icon(Icons.cloud_upload_outlined, size: 20),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          '${entries.length} item'
-                          '${entries.length == 1 ? '' : 's'} waiting to sync',
-                          style: text.titleSmall,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  // Each queued action can say what it is - OutboxOperation
-                  // carries its own description - so the list needs no switch
-                  // on the operation code.
-                  for (final OutboxEntry entry in entries)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        '· ${entry.description}',
-                        style: text.bodySmall,
-                      ),
-                    ),
-                ],
-              );
-            },
+            ],
           ),
         ),
       ],
@@ -559,47 +609,21 @@ class _SyncPanel extends StatelessWidget {
   }
 }
 
-class _DetailRow extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _DetailRow({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    final TextTheme text = Theme.of(context).textTheme;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: <Widget>[
-          Text(label, style: text.bodyMedium),
-          const SizedBox(width: 16),
-          Flexible(
-            child: Text(
-              value,
-              style: text.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
-              textAlign: TextAlign.end,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _SettingRow extends StatelessWidget {
+  final IconData icon;
   final String title;
   final String subtitle;
   final Widget trailing;
   final VoidCallback? onTap;
+  final Color? tint;
 
   const _SettingRow({
+    required this.icon,
     required this.title,
     required this.subtitle,
     required this.trailing,
     this.onTap,
+    this.tint,
   });
 
   @override
@@ -608,20 +632,18 @@ class _SettingRow extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
         child: Row(
           children: <Widget>[
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(title, style: Theme.of(context).textTheme.titleSmall),
-                  const SizedBox(height: 2),
-                  Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
-                ],
+              child: _RowText(
+                icon: icon,
+                title: title,
+                subtitle: subtitle,
+                tint: tint,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             IconTheme(
               data: IconThemeData(
                 color: onTap == null
@@ -666,6 +688,7 @@ class _FingerprintRow extends ConsumerWidget {
         : 'This phone has no screen lock to unlock BillAlert with';
 
     return _SettingRow(
+      icon: Icons.fingerprint,
       title: 'Fingerprint sign-in',
       subtitle: subtitle,
       trailing: Switch(
@@ -719,6 +742,7 @@ class _UrgentAlertsRow extends ConsumerWidget {
         : 'Before a bill is due, the reminder pops up with a loud sound';
 
     return _SettingRow(
+      icon: Icons.alarm,
       title: 'Urgent due-date alerts',
       subtitle: subtitle,
       trailing: Switch(

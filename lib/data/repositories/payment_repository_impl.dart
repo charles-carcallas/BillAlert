@@ -7,6 +7,7 @@ import '../../domain/repositories/payment_repository.dart';
 import '../../domain/value_objects/ids.dart';
 import '../../domain/value_objects/money.dart';
 import '../local/app_database.dart';
+import '../local/query_cache.dart';
 import '../supabase/failure_mapper.dart';
 
 /// Payment history and the cashier's daily takings.
@@ -77,10 +78,19 @@ class PaymentRepositoryImpl implements PaymentRepository {
   @override
   Future<Result<CollectionSummary>> dailySummary(AreaId areaId) async {
     try {
-      final rows = await _client
-          .from('v_cashier_daily_summary')
-          .select('receipt_count, total_collected')
-          .eq('area_id', areaId.value);
+      // Keyed by the Philippine date, so a total saved yesterday is never
+      // shown as today's takings.
+      final DateTime manila = DateTime.now().toUtc().add(
+        const Duration(hours: 8),
+      );
+      final String today = '${manila.year}-${manila.month}-${manila.day}';
+      final rows = await QueryCache(_db).rows(
+        'daily_summary:${areaId.value}:$today',
+        () => _client
+            .from('v_cashier_daily_summary')
+            .select('receipt_count, total_collected')
+            .eq('area_id', areaId.value),
+      );
 
       if (rows.isEmpty) {
         return const Ok<CollectionSummary>(CollectionSummary.empty);
@@ -113,20 +123,107 @@ class PaymentRepositoryImpl implements PaymentRepository {
     int limit = 50,
   }) async {
     try {
-      final rows = await _client
-          .from('v_payment_history')
-          .select()
-          .eq('area_id', areaId.value)
-          .order('paid_at', ascending: false)
-          // The limit counts ROWS, and a row is one bill settled, so a
-          // handover covering three months uses three of them. Erring high
-          // is cheaper than a receipt appearing with a month missing.
-          .limit(limit);
+      final rows = await QueryCache(_db).rows(
+        'recent_receipts:${areaId.value}:$limit',
+        () => _client
+            .from('v_payment_history')
+            .select()
+            .eq('area_id', areaId.value)
+            .order('paid_at', ascending: false)
+            // The limit counts ROWS, and a row is one bill settled, so a
+            // handover covering three months uses three of them. Erring high
+            // is cheaper than a receipt appearing with a month missing.
+            .limit(limit),
+      );
 
       return Ok<List<PaymentSummary>>(_groupIntoReceipts(rows));
     } catch (error, stackTrace) {
       return Err<List<PaymentSummary>>(FailureMapper.from(error, stackTrace));
     }
+  }
+
+  @override
+  Future<Result<List<PaymentSummary>>> collectedInArea(
+    AreaId areaId, {
+    required DateTime from,
+    required DateTime until,
+  }) async {
+    try {
+      // No row limit: a remittance with a receipt missing would not match
+      // the cash in hand, which is the one thing it exists to do.
+      final rows = await _client
+          .from('v_payment_history')
+          .select()
+          .eq('area_id', areaId.value)
+          .gte('paid_at', from.toUtc().toIso8601String())
+          .lt('paid_at', until.toUtc().toIso8601String())
+          .order('paid_at', ascending: false);
+
+      // Saved for the handover itself, which may be made with no signal.
+      await _replaceRangeCache(from, until, rows);
+      await _markRefreshed(_areaRangeCacheKey(areaId, from));
+      return Ok<List<PaymentSummary>>(_groupIntoReceipts(rows));
+    } catch (error, stackTrace) {
+      final failure = FailureMapper.from(error, stackTrace);
+      if (failure is NetworkFailure &&
+          await _hasCache(_areaRangeCacheKey(areaId, from))) {
+        // The cache only ever holds the signed-in staff member's own area,
+        // so every saved receipt in the window belongs to this remittance.
+        return _cachedReceipts(
+          (CachedPaymentRow row) => _inRange(row.paidAt, from, until),
+        );
+      }
+      return Err<List<PaymentSummary>>(failure);
+    }
+  }
+
+  @override
+  Future<Result<DateTime?>> collectedInAreaSavedAt(
+    AreaId areaId, {
+    required DateTime from,
+  }) async {
+    try {
+      final key = _areaRangeCacheKey(areaId, from);
+      final row = await (_db.select(
+        _db.syncMeta,
+      )..where((table) => table.tableName_.equals(key))).getSingleOrNull();
+      final value = row?.lastRefreshedAt;
+      return Ok<DateTime?>(value == null ? null : DateTime.parse(value));
+    } catch (error) {
+      return Err<DateTime?>(
+        ServerFailure('Could not tell when this was saved.', '$error'),
+      );
+    }
+  }
+
+  static String _areaRangeCacheKey(AreaId areaId, DateTime from) =>
+      'area_payments:${areaId.value}:${from.toUtc().toIso8601String()}';
+
+  static bool _inRange(String paidAt, DateTime from, DateTime until) {
+    final DateTime? at = DateTime.tryParse(paidAt);
+    return at != null && !at.isBefore(from) && at.isBefore(until);
+  }
+
+  /// Replaces every saved receipt row inside the window with [rows], so a
+  /// receipt the server no longer returns does not linger in a saved total.
+  Future<void> _replaceRangeCache(
+    DateTime from,
+    DateTime until,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    await _db.transaction(() async {
+      final existing = await _db.select(_db.cachedPayments).get();
+      final stale = existing
+          .where((row) => _inRange(row.paidAt, from, until))
+          .map((row) => row.id)
+          .toList();
+      if (stale.isNotEmpty) {
+        await (_db.delete(
+          _db.cachedPayments,
+        )..where((table) => table.id.isIn(stale))).go();
+      }
+      await _insertRows(rows);
+    });
   }
 
   /// Collapses the per-bill rows of `v_payment_history` into one summary per
@@ -190,51 +287,61 @@ class PaymentRepositoryImpl implements PaymentRepository {
       await (_db.delete(
         _db.cachedPayments,
       )..where((table) => table.consumerId.equals(consumerId.value))).go();
-
-      for (final row in rows) {
-        final amountPaid = _money(row['amount_paid']);
-        final transactionTotal = _money(row['transaction_total']);
-        final cashTendered = _moneyOrNull(row['cash_tendered']);
-        final changeDue = _moneyOrNull(row['change_due']);
-        await _db
-            .into(_db.cachedPayments)
-            .insertOnConflictUpdate(
-              CachedPaymentsCompanion.insert(
-                id: row['payment_id'] as String,
-                consumerId: Value<String?>(row['consumer_id'] as String),
-                billId: Value<String?>(row['bill_id'] as String),
-                billNo: Value<String?>(row['bill_no'] as String),
-                cycleLabel: Value<String?>(row['cycle_label'] as String),
-                receiptNo: row['receipt_no'] as String,
-                consumerName: Value<String?>(
-                  row['consumer_name'] as String? ?? '',
-                ),
-                verificationCode: Value<String?>(
-                  row['verification_code'] as String? ?? '',
-                ),
-                amountPaidCentavos: amountPaid.centavos,
-                transactionTotalCentavos: Value<int?>(
-                  transactionTotal.centavos,
-                ),
-                cashTenderedCentavos: Value<int?>(cashTendered?.centavos),
-                changeDueCentavos: Value<int?>(changeDue?.centavos),
-                paidAt: row['paid_at'] as String,
-              ),
-            );
-      }
+      await _insertRows(rows);
     });
+  }
+
+  Future<void> _insertRows(List<Map<String, dynamic>> rows) async {
+    for (final row in rows) {
+      final amountPaid = _money(row['amount_paid']);
+      final transactionTotal = _money(row['transaction_total']);
+      final cashTendered = _moneyOrNull(row['cash_tendered']);
+      final changeDue = _moneyOrNull(row['change_due']);
+      await _db
+          .into(_db.cachedPayments)
+          .insertOnConflictUpdate(
+            CachedPaymentsCompanion.insert(
+              id: row['payment_id'] as String,
+              consumerId: Value<String?>(row['consumer_id'] as String),
+              billId: Value<String?>(row['bill_id'] as String),
+              billNo: Value<String?>(row['bill_no'] as String),
+              cycleLabel: Value<String?>(row['cycle_label'] as String),
+              receiptNo: row['receipt_no'] as String,
+              consumerName: Value<String?>(
+                row['consumer_name'] as String? ?? '',
+              ),
+              verificationCode: Value<String?>(
+                row['verification_code'] as String? ?? '',
+              ),
+              amountPaidCentavos: amountPaid.centavos,
+              transactionTotalCentavos: Value<int?>(transactionTotal.centavos),
+              cashTenderedCentavos: Value<int?>(cashTendered?.centavos),
+              changeDueCentavos: Value<int?>(changeDue?.centavos),
+              paidAt: row['paid_at'] as String,
+            ),
+          );
+    }
   }
 
   Future<Result<List<PaymentSummary>>> _cachedHistoryFor(
     ConsumerId consumerId,
+  ) => _cachedReceipts(
+    (CachedPaymentRow row) => row.consumerId == consumerId.value,
+  );
+
+  /// Saved receipt rows matching [keep], grouped back into receipts, newest
+  /// first.
+  Future<Result<List<PaymentSummary>>> _cachedReceipts(
+    bool Function(CachedPaymentRow row) keep,
   ) async {
     try {
-      final query = _db.select(_db.cachedPayments)
-        ..where((table) => table.consumerId.equals(consumerId.value))
-        ..orderBy(<OrderingTerm Function($CachedPaymentsTable)>[
-          (table) => OrderingTerm.desc(table.paidAt),
-        ]);
-      final rows = await query.get();
+      final rows =
+          (await _db.select(_db.cachedPayments).get()).where(keep).toList()
+            ..sort(
+              (a, b) => (DateTime.tryParse(b.paidAt) ?? DateTime(0)).compareTo(
+                DateTime.tryParse(a.paidAt) ?? DateTime(0),
+              ),
+            );
 
       // Rows created by the old, unused cache shape cannot reconstruct an
       // honest receipt. Skip them rather than inventing missing facts.
@@ -292,6 +399,26 @@ class PaymentRepositoryImpl implements PaymentRepository {
         ),
       );
     }
+  }
+
+  Future<void> _markRefreshed(String key) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+    await _db
+        .into(_db.syncMeta)
+        .insertOnConflictUpdate(
+          SyncMetaCompanion.insert(
+            tableName_: key,
+            lastRefreshedAt: Value<String?>(now),
+            lastAttemptAt: Value<String?>(now),
+            lastError: const Value<String?>(null),
+          ),
+        );
+  }
+
+  Future<bool> _hasCache(String key) async {
+    final query = _db.select(_db.syncMeta)
+      ..where((table) => table.tableName_.equals(key));
+    return await query.getSingleOrNull() != null;
   }
 
   Future<void> _markConsumerPaymentsRefreshed(ConsumerId consumerId) async {

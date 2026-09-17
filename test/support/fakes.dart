@@ -236,9 +236,25 @@ final class FakeConsumerRepository implements ConsumerRepository {
   Future<Result<DateTime?>> lastRefreshedAt() async =>
       Ok<DateTime?>(refreshedAt);
 
+  /// What the server holds. When set, a refresh copies it into
+  /// [households] and stamps [refreshedAt], the way the real cache fills.
+  List<Consumer>? serverHouseholds;
+
+  /// Returned by [refreshAreaRoster] when set, as if there were no signal.
+  AppFailure? refreshFailure;
+
   @override
   Future<Result<void>> refreshAreaRoster(AreaId areaId) async {
     refreshCount++;
+    final AppFailure? failure = refreshFailure;
+    if (failure != null) return Err<void>(failure);
+    final List<Consumer>? server = serverHouseholds;
+    if (server != null) {
+      households
+        ..clear()
+        ..addAll(server);
+      refreshedAt = DateTime.utc(2026, 9, 9);
+    }
     return const Ok<void>(null);
   }
 }
@@ -328,9 +344,26 @@ final class FakeAuthRepository implements AuthRepository {
   @override
   Stream<AppUser?> authChanges() => _controller.stream;
 
+  AppFailure? nextChangePasswordFailure;
+
+  /// What the server says about this phone's session when asked.
+  Result<void> sessionCheck = const Ok<void>(null);
+  int sessionChecks = 0;
+
   @override
-  Future<Result<void>> changePassword({required String newPassword}) async =>
-      const Ok<void>(null);
+  Future<Result<void>> confirmSession() async {
+    sessionChecks++;
+    return sessionCheck;
+  }
+
+  /// The server ending the session on its own, as a password reset does.
+  void endSessionFromServer() => _controller.add(null);
+
+  @override
+  Future<Result<void>> changePassword({required String newPassword}) async {
+    final AppFailure? failure = nextChangePasswordFailure;
+    return failure == null ? const Ok<void>(null) : Err<void>(failure);
+  }
 
   String? createdStaffPassword;
 
@@ -459,6 +492,10 @@ class FakeAuthController extends AuthController {
   @override
   Future<AppUser?> build() async => signedInUser;
 
+  /// Screens under test never reach a real server to ask.
+  @override
+  Future<void> confirmSession() async {}
+
   @override
   Future<AppFailure?> signIn({
     required String username,
@@ -494,11 +531,14 @@ final class FakeBillRepository implements BillRepository {
   Future<Result<Bill?>> currentBillFor(ConsumerId consumerId) async =>
       const Ok<Bill?>(null);
 
+  /// What [historyFor] returns, for every household.
+  List<Bill> history = <Bill>[];
+
   @override
   Future<Result<List<Bill>>> historyFor(
     ConsumerId consumerId, {
     int limit = 12,
-  }) async => const Ok<List<Bill>>(<Bill>[]);
+  }) async => Ok<List<Bill>>(history);
 
   /// What [byId] finds, by bill id. Missing means "no such bill", which is
   /// also how row-level security makes another household's bill look.
@@ -526,6 +566,19 @@ final class FakeBillRepository implements BillRepository {
   AppFailure? outstandingFailure;
 
   @override
+  Future<Result<List<Bill>>> readingsForCycle(
+    AreaId areaId,
+    CycleLabel cycle,
+  ) async {
+    final AppFailure? failure = readingsFailure;
+    if (failure != null) return Err<List<Bill>>(failure);
+    return Ok<List<Bill>>(history.where((Bill b) => b.cycle == cycle).toList());
+  }
+
+  /// Returned by [readingsForCycle] when set, as if there were no signal.
+  AppFailure? readingsFailure;
+
+  @override
   Future<Result<List<ConsumerOutstanding>>> outstandingInArea(
     AreaId areaId,
   ) async {
@@ -541,7 +594,7 @@ final class FakeBillRepository implements BillRepository {
 /// methods that would reach outside the test. The real one checks
 /// connectivity, which a widget test cannot answer.
 final class FakeSyncService extends SyncService {
-  FakeSyncService() : super(FakeOutboxRepository(), const _NoopOutboxGateway());
+  FakeSyncService() : super(FakeOutboxRepository(), const NoopOutboxGateway());
 
   final StreamController<SyncReport> _fakeReports =
       StreamController<SyncReport>.broadcast();
@@ -573,8 +626,8 @@ final class FakeSyncService extends SyncService {
   }
 }
 
-final class _NoopOutboxGateway implements OutboxGateway {
-  const _NoopOutboxGateway();
+final class NoopOutboxGateway implements OutboxGateway {
+  const NoopOutboxGateway();
 
   @override
   Future<Result<String>> submitReading(RecordReadingOperation o) async =>

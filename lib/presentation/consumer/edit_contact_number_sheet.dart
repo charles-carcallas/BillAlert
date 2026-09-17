@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../common/expandable_bottom_sheet.dart';
 import '../common/failure_banner.dart';
 import '../common/final_confirmation_dialog.dart';
 import 'contact_number_controller.dart';
@@ -8,18 +9,25 @@ import 'contact_number_controller.dart';
 Future<String?> showEditConsumerContactNumber(
   BuildContext context, {
   String? currentNumber,
-}) => showModalBottomSheet<String>(
+}) => showExpandableBottomSheet<String>(
   context: context,
-  isScrollControlled: true,
-  useSafeArea: true,
-  showDragHandle: true,
-  builder: (_) => EditConsumerContactNumberSheet(currentNumber: currentNumber),
+  initialSize: 0.6,
+  builder: (_, ScrollController scrollController) =>
+      EditConsumerContactNumberSheet(
+        currentNumber: currentNumber,
+        scrollController: scrollController,
+      ),
 );
 
 class EditConsumerContactNumberSheet extends ConsumerStatefulWidget {
   final String? currentNumber;
+  final ScrollController? scrollController;
 
-  const EditConsumerContactNumberSheet({this.currentNumber, super.key});
+  const EditConsumerContactNumberSheet({
+    this.currentNumber,
+    this.scrollController,
+    super.key,
+  });
 
   @override
   ConsumerState<EditConsumerContactNumberSheet> createState() =>
@@ -80,11 +88,11 @@ class _EditConsumerContactNumberSheetState
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(consumerContactNumberControllerProvider);
-    final double keyboard = MediaQuery.viewInsetsOf(context).bottom;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(20, 4, 20, 20 + keyboard),
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
       child: SingleChildScrollView(
+        controller: widget.scrollController,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,

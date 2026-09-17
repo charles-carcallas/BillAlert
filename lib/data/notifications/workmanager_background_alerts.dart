@@ -7,6 +7,8 @@ import '../../core/config/app_config.dart';
 import '../../domain/notifications/phone_alerts.dart';
 import '../../domain/time/ph_clock.dart';
 import '../../domain/usecases/consumer/refresh_phone_alerts.dart';
+import '../network/fail_fast_http_client.dart';
+import '../network/network_status.dart';
 import 'android_phone_notifier.dart';
 import 'secure_urgent_alerts_setting.dart';
 import 'supabase_alert_feed.dart';
@@ -35,6 +37,9 @@ void phoneAlertsCallbackDispatcher() {
         // No screen, so no sign-in link can arrive, and the deep-link
         // listener this would otherwise start needs one.
         authOptions: const FlutterAuthClientOptions(detectSessionInUri: false),
+        // The same limits as the app: skip at once with no network, and give
+        // up on a stalled server rather than hold the background run open.
+        httpClient: FailFastHttpClient(NetworkStatus()),
       );
 
       final AndroidPhoneNotifier phone = AndroidPhoneNotifier();

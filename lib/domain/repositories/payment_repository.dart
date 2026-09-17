@@ -22,6 +22,24 @@ abstract class PaymentRepository {
     AreaId areaId, {
     int limit = 50,
   });
+
+  /// Every receipt issued in this area with [from] <= paid_at < [until],
+  /// newest first. The Meter Reader's remittance: the cash they carry to the
+  /// BOHECO office. Backed by `v_payment_history`, so row-level security
+  /// keeps it to the caller's own area.
+  Future<Result<List<PaymentSummary>>> collectedInArea(
+    AreaId areaId, {
+    required DateTime from,
+    required DateTime until,
+  });
+
+  /// When [collectedInArea] for the window starting at [from] was last saved
+  /// on this phone, or null if it never was. Shown so a remittance read
+  /// without signal says how old it is.
+  Future<Result<DateTime?>> collectedInAreaSavedAt(
+    AreaId areaId, {
+    required DateTime from,
+  });
 }
 
 /// One cash handover: one receipt, however many bills it settled.

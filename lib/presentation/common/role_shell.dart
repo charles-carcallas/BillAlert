@@ -5,8 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../../domain/entities/app_user.dart';
 import '../auth/auth_controller.dart';
 import '../auth/fingerprint_offer.dart';
+import '../auth/session_check_gate.dart';
 import '../consumer/inbox_controller.dart';
 import '../consumer/phone_alerts_gate.dart';
+import 'offline_indicator.dart';
 
 /// The bottom navigation every signed-in role sits inside.
 ///
@@ -49,8 +51,21 @@ class RoleShell extends ConsumerWidget {
       // ask — once — about fingerprint sign-in for next time.
       // Phone notifications are a household's: staff are never sent any, so
       // only a household's tabs start the background check.
-      body: FingerprintOfferGate(
-        child: user is ConsumerUser ? PhoneAlertsGate(child: child) : child,
+      // The offline bar sits just above the tabs, on every tab, so losing
+      // signal is visible wherever the person is.
+      body: Column(
+        children: <Widget>[
+          Expanded(
+            child: SessionCheckGate(
+              child: FingerprintOfferGate(
+                child: user is ConsumerUser
+                    ? PhoneAlertsGate(child: child)
+                    : child,
+              ),
+            ),
+          ),
+          const OfflineIndicator(),
+        ],
       ),
       // Built directly rather than with NavigationBar. Material 3 draws its
       // selection indicator behind the ICON only and gives no way to extend
@@ -145,6 +160,10 @@ class RoleShell extends ConsumerWidget {
     NavIcon.receipts => (
       outlined: Icons.receipt_long_outlined,
       filled: Icons.receipt_long,
+    ),
+    NavIcon.remittance => (
+      outlined: Icons.account_balance_wallet_outlined,
+      filled: Icons.account_balance_wallet,
     ),
     NavIcon.bill => (
       outlined: Icons.description_outlined,

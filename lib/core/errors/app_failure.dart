@@ -24,8 +24,19 @@ sealed class AppFailure {
 
 /// The phone could not reach the server. In BillAlert this is ordinary, not
 /// exceptional: the meter reader works with no signal for hours at a time.
+///
+/// The default says only what is true of every such failure. It used to add
+/// "your work is saved on this phone and will sync", which is true of the
+/// outbox and of nothing else, and so it was shown on a list that would not
+/// load, on marking an alert read, on sign-in, on creating an account and on
+/// changing a password, none of which had saved anything.
 final class NetworkFailure extends AppFailure {
   static const String defaultMessage =
+      'No connection right now. Check your signal and try again.';
+
+  /// Only for work that really is waiting in the outbox: readings, amounts,
+  /// payments and notices.
+  static const String savedForLater =
       'No connection right now. Your work is saved on this phone and will '
       'sync by itself when you are back in signal.';
 

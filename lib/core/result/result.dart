@@ -31,3 +31,20 @@ final class Err<T> extends Result<T> {
   final AppFailure failure;
   const Err(this.failure);
 }
+
+/// For work only the server can do, which is never kept to sync later:
+/// creating an account or a household, resetting or changing a password.
+///
+/// A reading or a payment made without signal waits in the outbox, and the
+/// app's general offline message says so: "your work is saved on this phone
+/// and will sync". For these it is untrue. Nothing was saved, and a person
+/// who believes otherwise walks away thinking an account exists. [message]
+/// replaces it, and should say that nothing happened.
+extension ServerOnlyResult<T> on Result<T> {
+  Result<T> ifOffline(String message) => switch (this) {
+    Err<T>(:final NetworkFailure failure) => Err<T>(
+      NetworkFailure(message, failure.debugDetail),
+    ),
+    _ => this,
+  };
+}

@@ -24,7 +24,10 @@ abstract class BillRepository {
   Future<Result<Bill?>> currentBillFor(ConsumerId consumerId);
 
   /// CON-07: recent cycles for the history screen.
-  Future<Result<List<Bill>>> historyFor(ConsumerId consumerId, {int limit = 12});
+  Future<Result<List<Bill>>> historyFor(
+    ConsumerId consumerId, {
+    int limit = 12,
+  });
 
   /// One bill, for the post-amount screen.
   Future<Result<Bill?>> byId(BillId id);
@@ -41,6 +44,11 @@ abstract class BillRepository {
   /// which is a per-consumer aggregate and cannot produce a [Bill] - it is
   /// the answer to "who owes what", not "which bills".
   Future<Result<List<ConsumerOutstanding>>> outstandingInArea(AreaId areaId);
+
+  /// Every bill in the area for [cycle], each carrying the meter reading it
+  /// was made from. The Meter Reader's sheet for BOHECO. Backed by
+  /// `v_bill_status`; online only.
+  Future<Result<List<Bill>>> readingsForCycle(AreaId areaId, CycleLabel cycle);
 }
 
 /// What one household owes, across every unpaid month.
@@ -161,15 +169,16 @@ final class AwaitingAmountEntry {
       currentReading:
           Kwh.tryParse(json['current_reading'].toString()) ?? Kwh.zero,
       readingDate:
-          PhDate.tryParse(json['reading_date'].toString()) ?? const PhDate(1970, 1, 1),
+          PhDate.tryParse(json['reading_date'].toString()) ??
+          const PhDate(1970, 1, 1),
       daysWaiting: (json['days_waiting'] as num?)?.toInt() ?? 0,
     );
   }
 
   /// "today", "1 day", "6 days" — the wait badge on the mockup.
   String get waitLabel => switch (daysWaiting) {
-        <= 0 => 'today',
-        1 => '1 day',
-        _ => '$daysWaiting days',
-      };
+    <= 0 => 'today',
+    1 => '1 day',
+    _ => '$daysWaiting days',
+  };
 }

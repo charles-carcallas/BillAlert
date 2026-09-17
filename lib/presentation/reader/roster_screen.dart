@@ -9,6 +9,8 @@ import '../auth/auth_controller.dart';
 import '../common/consumer_search.dart';
 import '../common/failure_banner.dart';
 import '../common/local_search_field.dart';
+import '../common/local_sort_button.dart';
+import '../router.dart';
 import 'roster_controller.dart';
 
 /// MTR-11 — the meter reader's round for this billing cycle.
@@ -28,6 +30,12 @@ class RosterScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text(user == null ? 'My round' : 'My round · ${user.firstName}'),
         actions: <Widget>[
+          // Step 2 of the month: the list that goes onto BOHECO's paper.
+          IconButton(
+            tooltip: 'Reading sheet',
+            icon: const Icon(Icons.table_rows_outlined),
+            onPressed: () => context.push(Routes.readingSheet),
+          ),
           IconButton(
             tooltip: 'Sign out',
             icon: const Icon(Icons.logout),
@@ -44,7 +52,11 @@ class RosterScreen extends ConsumerWidget {
               failure: error is AppFailure
                   ? error
                   : ServerFailure(ServerFailure.defaultMessage, '$error'),
-              onRetry: () => ref.invalidate(rosterControllerProvider),
+              // Retrying tries the server again, not just the empty cache.
+              onRetry: () {
+                ref.invalidate(initialRosterRefreshProvider);
+                ref.invalidate(rosterControllerProvider);
+              },
             ),
           ),
           data: (RosterView view) => _RosterBody(view: view),
@@ -100,6 +112,7 @@ class _RosterBody extends ConsumerStatefulWidget {
 
 class _RosterBodyState extends ConsumerState<_RosterBody> {
   final TextEditingController _search = TextEditingController();
+  _RosterSort _sort = _RosterSort.routeOrder;
 
   @override
   void dispose() {
@@ -121,6 +134,14 @@ class _RosterBodyState extends ConsumerState<_RosterBody> {
               consumerMatchesSearch(entry.consumer, _search.text),
         )
         .toList();
+    if (_sort != _RosterSort.routeOrder) {
+      matching.sort((a, b) {
+        final compared = a.consumer.fullName.toLowerCase().compareTo(
+          b.consumer.fullName.toLowerCase(),
+        );
+        return _sort == _RosterSort.nameAz ? compared : -compared;
+      });
+    }
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -146,11 +167,43 @@ class _RosterBodyState extends ConsumerState<_RosterBody> {
           ],
           const SizedBox(height: 16),
           if (roster.remaining.isNotEmpty) ...<Widget>[
-            LocalSearchField(
-              fieldKey: const ValueKey<String>('reader-roster-search'),
-              controller: _search,
-              onChanged: (_) => setState(() {}),
-              hintText: 'Search name, account, purok or meter',
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: LocalSearchField(
+                    fieldKey: const ValueKey<String>('reader-roster-search'),
+                    controller: _search,
+                    onChanged: (_) => setState(() {}),
+                    hintText: 'Search name, account, purok or meter',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 132,
+                  child: LocalSortButton<_RosterSort>(
+                    buttonKey: const ValueKey('reader-roster-sort'),
+                    value: _sort,
+                    options: const <LocalSortOption<_RosterSort>>[
+                      LocalSortOption(
+                        value: _RosterSort.routeOrder,
+                        label: 'Route order',
+                        icon: Icons.route_outlined,
+                      ),
+                      LocalSortOption(
+                        value: _RosterSort.nameAz,
+                        label: 'Name A–Z',
+                        icon: Icons.sort_by_alpha,
+                      ),
+                      LocalSortOption(
+                        value: _RosterSort.nameZa,
+                        label: 'Name Z–A',
+                        icon: Icons.sort_by_alpha,
+                      ),
+                    ],
+                    onChanged: (value) => setState(() => _sort = value),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
           ],
@@ -239,6 +292,8 @@ class _RosterBodyState extends ConsumerState<_RosterBody> {
   }
 }
 
+enum _RosterSort { routeOrder, nameAz, nameZa }
+
 class _ProgressCard extends StatelessWidget {
   final AreaRoster roster;
   final DateTime? lastRefreshedAt;
@@ -271,12 +326,26 @@ class _ProgressCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             // GEN-11: never let anybody read a cached number without knowing
-            // how old it is.
-            Text(
-              lastRefreshedAt == null
-                  ? 'Not yet loaded from the server'
-                  : 'Updated ${_ago(lastRefreshedAt!)}',
-              style: Theme.of(context).textTheme.bodySmall,
+            // how old it is. It says what was refreshed - the household list
+            // on this phone - because "Updated just now" on its own read as
+            // though something had been read or billed today.
+            Row(
+              children: <Widget>[
+                Icon(
+                  Icons.sync,
+                  size: 14,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    lastRefreshedAt == null
+                        ? 'Household list not yet downloaded from the server'
+                        : 'Household list synced ${_ago(lastRefreshedAt!)}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              ],
             ),
           ],
         ),

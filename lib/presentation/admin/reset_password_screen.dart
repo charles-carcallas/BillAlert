@@ -5,6 +5,7 @@ import '../../core/errors/app_failure.dart';
 import '../../domain/entities/managed_account.dart';
 import '../common/failure_banner.dart';
 import '../common/final_confirmation_dialog.dart';
+import '../common/local_sort_button.dart';
 import 'account_form_widgets.dart';
 import 'reset_password_controller.dart';
 import 'temporary_password_card.dart';
@@ -32,6 +33,7 @@ class _AdminResetPasswordScreenState
     extends ConsumerState<AdminResetPasswordScreen> {
   ManagedAccount? _selected;
   String _query = '';
+  LocalNameSort _sort = LocalNameSort.az;
 
   @override
   Widget build(BuildContext context) {
@@ -103,12 +105,29 @@ class _AdminResetPasswordScreenState
                     style: text.bodySmall,
                   ),
                   const SizedBox(height: 12),
-                  TextField(
-                    onChanged: (String value) => setState(() => _query = value),
-                    decoration: const InputDecoration(
-                      hintText: 'Search by name, username or consumer number',
-                      prefixIcon: Icon(Icons.search),
-                    ),
+                  Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: TextField(
+                          onChanged: (String value) =>
+                              setState(() => _query = value),
+                          decoration: const InputDecoration(
+                            hintText: 'Search name, username or account',
+                            prefixIcon: Icon(Icons.search),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 120,
+                        child: LocalSortButton<LocalNameSort>(
+                          buttonKey: const ValueKey('reset-password-sort'),
+                          value: _sort,
+                          options: localNameSortOptions,
+                          onChanged: (value) => setState(() => _sort = value),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -142,9 +161,9 @@ class _AdminResetPasswordScreenState
       );
     }
 
-    final List<ManagedAccount> visible = all
-        .where((ManagedAccount a) => a.matches(_query))
-        .toList();
+    final List<ManagedAccount> visible =
+        all.where((ManagedAccount a) => a.matches(_query)).toList()
+          ..sort((a, b) => compareNames(a.fullName, b.fullName, _sort));
     if (visible.isEmpty) {
       return const _Empty(
         title: 'No matching accounts',

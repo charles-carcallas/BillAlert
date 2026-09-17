@@ -73,6 +73,15 @@ class CachedBills extends Table {
   IntColumn get consumptionHundredths =>
       integer().named('consumption_hundredths')();
 
+  /// The dial figures the consumption came from, and the day of the reading.
+  /// Nullable: rows cached before schema v6 have none, and a bill whose
+  /// reading row has gone never had them. FR-25 shows them on Bill Details.
+  IntColumn get previousReadingHundredths =>
+      integer().named('previous_reading_hundredths').nullable()();
+  IntColumn get currentReadingHundredths =>
+      integer().named('current_reading_hundredths').nullable()();
+  TextColumn get readingDate => text().named('reading_date').nullable()();
+
   IntColumn get amountPaidCentavos =>
       integer().named('amount_paid_centavos').withDefault(const Constant(0))();
 
@@ -197,6 +206,21 @@ class CacheOwner extends Table {
 
   @override
   Set<Column<Object>> get primaryKey => <Column<Object>>{id};
+}
+
+/// The last server answer to a staff read that has no table of its own, as
+/// the JSON rows PostgREST returned. See `query_cache.dart`.
+@DataClassName('CachedQueryRow')
+class CachedQueries extends Table {
+  @override
+  String get tableName => 'cached_queries';
+
+  TextColumn get queryKey => text().named('query_key')();
+  TextColumn get rowsJson => text().named('rows_json')();
+  TextColumn get savedAt => text().named('saved_at')();
+
+  @override
+  Set<Column<Object>> get primaryKey => <Column<Object>>{queryKey};
 }
 
 /// GEN-11: what was refreshed, and when. Every screen showing cached data

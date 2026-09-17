@@ -9,6 +9,7 @@ import '../../domain/value_objects/ph_date.dart';
 import '../auth/auth_controller.dart';
 import '../common/failure_banner.dart';
 import '../common/local_search_field.dart';
+import '../common/local_sort_button.dart';
 import '../common/notice_search.dart';
 import '../common/staff_app_bar.dart';
 import '../providers.dart';
@@ -54,8 +55,11 @@ class DisconnectionsScreen extends ConsumerStatefulWidget {
 
 enum _NoticeFilter { all, elapsed }
 
+enum _NoticeSort { oldest, newest }
+
 class _DisconnectionsScreenState extends ConsumerState<DisconnectionsScreen> {
   _NoticeFilter _filter = _NoticeFilter.all;
+  _NoticeSort _sort = _NoticeSort.oldest;
   final TextEditingController _search = TextEditingController();
 
   @override
@@ -98,12 +102,20 @@ class _DisconnectionsScreenState extends ConsumerState<DisconnectionsScreen> {
                 .where((ActiveNotice notice) => notice.periodElapsed)
                 .length;
             final String query = _search.text.trim();
-            final visible = list.where((ActiveNotice notice) {
-              final bool matchesFilter =
-                  _filter == _NoticeFilter.all || notice.periodElapsed;
-              if (!matchesFilter) return false;
-              return noticeMatchesSearch(notice, query);
-            }).toList();
+            final visible =
+                list.where((ActiveNotice notice) {
+                  final bool matchesFilter =
+                      _filter == _NoticeFilter.all || notice.periodElapsed;
+                  if (!matchesFilter) return false;
+                  return noticeMatchesSearch(notice, query);
+                }).toList()..sort((a, b) {
+                  final byDate = _sort == _NoticeSort.oldest
+                      ? a.servedAt.compareTo(b.servedAt)
+                      : b.servedAt.compareTo(a.servedAt);
+                  return byDate != 0
+                      ? byDate
+                      : a.noticeNo.compareTo(b.noticeNo);
+                });
             return RefreshIndicator(
               onRefresh: () async => ref.invalidate(activeNoticesProvider),
               child: ListView(
@@ -161,11 +173,40 @@ class _DisconnectionsScreenState extends ConsumerState<DisconnectionsScreen> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    LocalSearchField(
-                      fieldKey: const ValueKey<String>('admin-notices-search'),
-                      controller: _search,
-                      onChanged: (_) => setState(() {}),
-                      hintText: 'Search consumer, account or notice number',
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: LocalSearchField(
+                            fieldKey: const ValueKey<String>(
+                              'admin-notices-search',
+                            ),
+                            controller: _search,
+                            onChanged: (_) => setState(() {}),
+                            hintText: 'Search consumer, account or notice',
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          width: 120,
+                          child: LocalSortButton<_NoticeSort>(
+                            buttonKey: const ValueKey('admin-notices-sort'),
+                            value: _sort,
+                            options: const <LocalSortOption<_NoticeSort>>[
+                              LocalSortOption(
+                                value: _NoticeSort.oldest,
+                                label: 'Oldest',
+                                icon: Icons.arrow_upward,
+                              ),
+                              LocalSortOption(
+                                value: _NoticeSort.newest,
+                                label: 'Newest',
+                                icon: Icons.arrow_downward,
+                              ),
+                            ],
+                            onChanged: (value) => setState(() => _sort = value),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 10),
                     Wrap(

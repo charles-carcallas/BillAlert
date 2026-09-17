@@ -5,6 +5,7 @@ import '../../domain/repositories/notice_repository.dart';
 import '../../domain/value_objects/ids.dart';
 import '../../domain/value_objects/money.dart';
 import '../local/app_database.dart';
+import '../local/query_cache.dart';
 import '../supabase/failure_mapper.dart';
 
 /// DOM-05 — disconnection notices still inside their period.
@@ -37,13 +38,16 @@ class NoticeRepositoryImpl implements NoticeRepository {
   @override
   Future<Result<List<ActiveNotice>>> activeFor(AreaId areaId) async {
     try {
-      final rows = await _client
-          .from('v_active_disconnection_warnings')
-          .select(_columns)
-          .eq('area_id', areaId.value)
-          // Oldest first: the notice closest to its lawful moment is the one
-          // that needs a decision soonest.
-          .order('served_at', ascending: true);
+      final rows = await QueryCache(_db).rows(
+        'active_notices:${areaId.value}',
+        () => _client
+            .from('v_active_disconnection_warnings')
+            .select(_columns)
+            .eq('area_id', areaId.value)
+            // Oldest first: the notice closest to its lawful moment is the one
+            // that needs a decision soonest.
+            .order('served_at', ascending: true),
+      );
 
       return Ok<List<ActiveNotice>>(rows.map(_fromRow).toList());
     } catch (error, stackTrace) {
@@ -54,11 +58,15 @@ class NoticeRepositoryImpl implements NoticeRepository {
   @override
   Future<Result<ActiveNotice?>> byId(NoticeId id) async {
     try {
-      final row = await _client
-          .from('v_active_disconnection_warnings')
-          .select(_columns)
-          .eq('notice_id', id.value)
-          .maybeSingle();
+      final rows = await QueryCache(_db).rows(
+        'notice:${id.value}',
+        () => _client
+            .from('v_active_disconnection_warnings')
+            .select(_columns)
+            .eq('notice_id', id.value)
+            .limit(1),
+      );
+      final Map<String, dynamic>? row = rows.isEmpty ? null : rows.first;
 
       return Ok<ActiveNotice?>(row == null ? null : _fromRow(row));
     } catch (error, stackTrace) {
@@ -97,8 +105,9 @@ class NoticeRepositoryImpl implements NoticeRepository {
   /// that date itself; it only counts down to the one it was given.
   static ActiveNotice _fromRow(Map<String, dynamic> row) {
     final DateTime servedAt = DateTime.parse(row['served_at'] as String);
-    final DateTime lawfulAt =
-        DateTime.parse(row['earliest_lawful_at'] as String);
+    final DateTime lawfulAt = DateTime.parse(
+      row['earliest_lawful_at'] as String,
+    );
 
     final int hours = lawfulAt.difference(DateTime.now().toUtc()).inHours;
 
@@ -106,7 +115,8 @@ class NoticeRepositoryImpl implements NoticeRepository {
       id: NoticeId(row['notice_id'] as String),
       noticeNo: row['notice_no'] as String? ?? '',
       consumerId: ConsumerId(row['consumer_id'] as String),
-      consumerLabel: row['consumer_name'] as String? ??
+      consumerLabel:
+          row['consumer_name'] as String? ??
           row['consumer_no'] as String? ??
           '',
       consumerNo: row['consumer_no'] as String?,

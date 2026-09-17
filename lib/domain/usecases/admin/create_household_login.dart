@@ -23,6 +23,11 @@ final class CreateHouseholdLogin {
     required this.newTemporaryPassword,
   });
 
+  /// Offline nothing is created, and nothing is kept to try later.
+  static const String needsSignal =
+      'Giving a household a sign-in needs signal. Nothing was created. Try '
+      "again when you're back online.";
+
   /// What is wrong with [username] as typed, or null when it is well formed.
   /// Whether it is free only the server can say.
   static ValidationFailure? checkUsername(String username) {
@@ -44,10 +49,10 @@ final class CreateHouseholdLogin {
     final ValidationFailure? invalid = checkUsername(username);
     if (invalid != null) return Err<CreatedHouseholdLogin>(invalid);
 
-    return auth.createHouseholdLogin(
+    return (await auth.createHouseholdLogin(
       household: household,
       username: username.trim().toLowerCase(),
       temporaryPassword: newTemporaryPassword(),
-    );
+    )).ifOffline(needsSignal);
   }
 }

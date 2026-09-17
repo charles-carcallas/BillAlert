@@ -20,6 +20,11 @@ final class ResetAccountPassword {
     required this.newTemporaryPassword,
   });
 
+  /// Offline the password is not changed, and nothing is kept to try later.
+  static const String needsSignal =
+      'Resetting a password needs signal. The password was not changed. Try '
+      "again when you're back online.";
+
   /// The new temporary password, to be handed over once, when the reset
   /// succeeds.
   Future<Result<String>> call({required ManagedAccount account}) async {
@@ -32,7 +37,7 @@ final class ResetAccountPassword {
 
     return switch (result) {
       Ok() => Ok<String>(temporaryPassword),
-      Err(:final failure) => Err<String>(failure),
+      Err(:final failure) => Err<String>(failure).ifOffline(needsSignal),
     };
   }
 }

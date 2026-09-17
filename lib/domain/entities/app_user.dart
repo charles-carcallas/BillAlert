@@ -10,6 +10,7 @@ enum NavIcon {
   disconnections,
   accounts,
   receipts,
+  remittance,
   bill,
   history,
   inbox,
@@ -97,15 +98,15 @@ final class AdminUser extends AppUser {
   /// is the job that has a queue waiting on it.
   @override
   List<AppTab> get permittedTabs => const <AppTab>[
-        AppTab(label: 'Amounts', route: '/admin', icon: NavIcon.amounts),
-        AppTab(
-          label: 'Notices',
-          route: '/admin/disconnections',
-          icon: NavIcon.disconnections,
-        ),
-        AppTab(label: 'Accounts', route: '/admin/accounts', icon: NavIcon.accounts),
-        AppTab(label: 'Profile', route: '/admin/profile', icon: NavIcon.profile),
-      ];
+    AppTab(label: 'Amounts', route: '/admin', icon: NavIcon.amounts),
+    AppTab(
+      label: 'Notices',
+      route: '/admin/disconnections',
+      icon: NavIcon.disconnections,
+    ),
+    AppTab(label: 'Accounts', route: '/admin/accounts', icon: NavIcon.accounts),
+    AppTab(label: 'Profile', route: '/admin/profile', icon: NavIcon.profile),
+  ];
 }
 
 /// Walks the area and records readings, usually with no signal.
@@ -130,14 +131,19 @@ final class MeterReaderUser extends AppUser {
 
   @override
   List<AppTab> get permittedTabs => const <AppTab>[
-        AppTab(label: 'Readings', route: '/reader', icon: NavIcon.readings),
-        AppTab(
-          label: 'Consumers',
-          route: '/reader/consumers',
-          icon: NavIcon.consumers,
-        ),
-        AppTab(label: 'Profile', route: '/reader/profile', icon: NavIcon.profile),
-      ];
+    AppTab(label: 'Readings', route: '/reader', icon: NavIcon.readings),
+    AppTab(
+      label: 'Consumers',
+      route: '/reader/consumers',
+      icon: NavIcon.consumers,
+    ),
+    AppTab(
+      label: 'Remit',
+      route: '/reader/remittance',
+      icon: NavIcon.remittance,
+    ),
+    AppTab(label: 'Profile', route: '/reader/profile', icon: NavIcon.profile),
+  ];
 }
 
 /// Takes cash at the counter and issues one receipt per handover.
@@ -167,14 +173,14 @@ final class CashierUser extends AppUser {
   /// happen.
   @override
   List<AppTab> get permittedTabs => const <AppTab>[
-        AppTab(label: 'Consumers', route: '/cashier', icon: NavIcon.consumers),
-        AppTab(
-          label: 'Receipts',
-          route: '/cashier/receipts',
-          icon: NavIcon.receipts,
-        ),
-        AppTab(label: 'Profile', route: '/cashier/profile', icon: NavIcon.profile),
-      ];
+    AppTab(label: 'Consumers', route: '/cashier', icon: NavIcon.consumers),
+    AppTab(
+      label: 'Receipts',
+      route: '/cashier/receipts',
+      icon: NavIcon.receipts,
+    ),
+    AppTab(label: 'Profile', route: '/cashier/profile', icon: NavIcon.profile),
+  ];
 }
 
 /// The household. Sees their own bill, history, receipts and alerts.
@@ -198,9 +204,9 @@ final class ConsumerUser extends AppUser {
 
   @override
   List<AppTab> get permittedTabs => const <AppTab>[
-        AppTab(label: 'Bill', route: '/consumer', icon: NavIcon.bill),
-        AppTab(label: 'History', route: '/consumer/history', icon: NavIcon.history),
-        AppTab(label: 'Inbox', route: '/consumer/inbox', icon: NavIcon.inbox),
-        AppTab(label: 'Profile', route: '/consumer/profile', icon: NavIcon.profile),
-      ];
+    AppTab(label: 'Bill', route: '/consumer', icon: NavIcon.bill),
+    AppTab(label: 'History', route: '/consumer/history', icon: NavIcon.history),
+    AppTab(label: 'Inbox', route: '/consumer/inbox', icon: NavIcon.inbox),
+    AppTab(label: 'Profile', route: '/consumer/profile', icon: NavIcon.profile),
+  ];
 }

@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/errors/app_failure.dart';
@@ -11,6 +12,7 @@ import '../../domain/value_objects/kwh.dart';
 import '../../domain/value_objects/money.dart';
 import '../../domain/value_objects/ph_date.dart';
 import '../local/app_database.dart';
+import '../local/query_cache.dart';
 import '../supabase/failure_mapper.dart';
 
 /// Bills, read from the Supabase views and cached on the phone.
@@ -58,16 +60,71 @@ class BillRepositoryImpl implements BillRepository {
   /// are integers the server already computed, so the entity never has to
   /// read a month back out of rendered text. `v_bill_status` is the one view
   /// that offers them - confirmed against the live database, not assumed.
-  static const String _billColumns =
+  static const String _baseBillColumns =
       'bill_id:id, bill_no, consumer_id, cycle_year, cycle_month, consumption, '
       'total_amount, due_date, amount_paid';
 
-  /// [refreshFor] additionally caches when the bill was generated.
-  /// The same columns, for the background notification check, which reads
-  /// bills without the cache and so without this class.
-  static const String billColumns = _billColumns;
+  /// Appended to `v_bill_status` by `15_bill_meter_readings.sql` so Bill
+  /// Details can show the dial figures behind the consumption (FR-25).
+  static const String _readingColumns =
+      'previous_reading, current_reading, reading_date';
 
-  static const String _cachedBillColumns = '$_billColumns, generated_at';
+  /// SQLSTATE 42703: the column is not there.
+  static const String _undefinedColumn = '42703';
+
+  /// Whether this server has run migration 15 yet.
+  ///
+  /// It is asked by requesting the columns and seeing what comes back, not by
+  /// interrogating the schema: one wasted round trip the first time a phone
+  /// meets an un-migrated server, and none after that.
+  ///
+  /// Static because it describes the server, not this object, and a phone
+  /// talks to one server. It only ever flips to false, so applying the
+  /// migration while the app is open is not noticed until the app is next
+  /// started — which is the right trade against re-testing a known-missing
+  /// column on every query for the life of the process.
+  ///
+  /// The cost of guessing wrong in the optimistic direction is one retried
+  /// query. The cost of guessing wrong the other way was a household opening
+  /// History and being told the server is broken, which is what this exists
+  /// to prevent.
+  static bool _serverHasReadingColumns = true;
+
+  /// Lets a test start from a known state, since the flag outlives any one
+  /// repository.
+  @visibleForTesting
+  static void resetSchemaProbe() => _serverHasReadingColumns = true;
+
+  static String get _billColumns => _serverHasReadingColumns
+      ? '$_baseBillColumns, $_readingColumns'
+      : _baseBillColumns;
+
+  /// For the background notification check, which reads bills without the
+  /// cache and so without this class. It asks only whether a bill is unpaid
+  /// and when it falls due, so it never wants the readings and is never
+  /// exposed to a server that lacks them.
+  static const String billColumns = _baseBillColumns;
+
+  /// Runs a bill query, and if the server turns out not to have the reading
+  /// columns, runs it once more without them.
+  ///
+  /// The retry is what keeps a missing migration to a "Not recorded" on one
+  /// row of Bill Details instead of a failed screen. Anything other than
+  /// 42703 is rethrown untouched: a real server problem must not be quietly
+  /// retried into a half-populated bill.
+  static Future<T> _withBillColumns<T>(
+    Future<T> Function(String columns) run,
+  ) async {
+    try {
+      return await run(_billColumns);
+    } on PostgrestException catch (error) {
+      if (error.code != _undefinedColumn || !_serverHasReadingColumns) {
+        rethrow;
+      }
+      _serverHasReadingColumns = false;
+      return await run(_billColumns);
+    }
+  }
 
   static String _consumerCacheKey(ConsumerId id) =>
       'consumer_bills:${id.value}';
@@ -85,13 +142,16 @@ class BillRepositoryImpl implements BillRepository {
     AreaId areaId,
   ) async {
     try {
-      final rows = await _client
-          .from('v_readings_awaiting_amount')
-          .select()
-          .eq('area_id', areaId.value)
-          // Oldest first: the household that has waited longest is priced
-          // first, and that wait is what the screen leads with.
-          .order('reading_date', ascending: true);
+      final rows = await QueryCache(_db).rows(
+        'awaiting_amount:${areaId.value}',
+        () => _client
+            .from('v_readings_awaiting_amount')
+            .select()
+            .eq('area_id', areaId.value)
+            // Oldest first: the household that has waited longest is priced
+            // first, and that wait is what the screen leads with.
+            .order('reading_date', ascending: true),
+      );
 
       return Ok<List<AwaitingAmountEntry>>(
         rows.map(AwaitingAmountEntry.fromJson).toList(),
@@ -151,12 +211,14 @@ class BillRepositoryImpl implements BillRepository {
     int limit = 12,
   }) async {
     try {
-      final rows = await _client
-          .from('v_bill_status')
-          .select(_billColumns)
-          .eq('consumer_id', consumerId.value)
-          .order('period_start', ascending: false)
-          .limit(limit);
+      final rows = await _withBillColumns(
+        (String columns) async => await _client
+            .from('v_bill_status')
+            .select(columns)
+            .eq('consumer_id', consumerId.value)
+            .order('period_start', ascending: false)
+            .limit(limit),
+      );
 
       await _replaceCachedBills(consumerId, rows);
       await _markConsumerBillsRefreshed(consumerId);
@@ -180,15 +242,92 @@ class BillRepositoryImpl implements BillRepository {
     }
   }
 
+  @override
+  Future<Result<List<Bill>>> readingsForCycle(
+    AreaId areaId,
+    CycleLabel cycle,
+  ) async {
+    try {
+      final rows = await _withBillColumns(
+        (String columns) async => await _client
+            .from('v_bill_status')
+            .select(columns)
+            .eq('area_id', areaId.value)
+            .eq('cycle_year', cycle.year)
+            .eq('cycle_month', cycle.month),
+      );
+
+      // Saved so the reading sheet can still be written up with no signal.
+      await _db.transaction(() async {
+        final ids = rows.map((row) => row['bill_id'] as String).toList();
+        await (_db.delete(_db.cachedBills)..where(
+              (table) =>
+                  table.cycleLabel.equals(cycle.value) & table.id.isNotIn(ids),
+            ))
+            .go();
+        for (final row in rows) {
+          await _upsertCachedBill(row);
+        }
+      });
+      await _markRefreshed(_areaCycleCacheKey(areaId, cycle));
+      return Ok<List<Bill>>(rows.map(Bill.fromJson).toList());
+    } catch (error, stackTrace) {
+      final failure = FailureMapper.from(error, stackTrace);
+      if (failure is NetworkFailure &&
+          await _hasCache(_areaCycleCacheKey(areaId, cycle))) {
+        try {
+          // The cache holds only the signed-in reader's own area.
+          final saved = await (_db.select(
+            _db.cachedBills,
+          )..where((table) => table.cycleLabel.equals(cycle.value))).get();
+          return Ok<List<Bill>>(saved.map(_billFromCacheRow).toList());
+        } catch (error) {
+          return Err<List<Bill>>(
+            ServerFailure(
+              'Could not read the readings saved on this phone.',
+              error.toString(),
+            ),
+          );
+        }
+      }
+      return Err<List<Bill>>(failure);
+    }
+  }
+
+  static String _areaCycleCacheKey(AreaId areaId, CycleLabel cycle) =>
+      'area_bills:${areaId.value}:${cycle.value}';
+
+  Future<void> _markRefreshed(String key) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+    await _db
+        .into(_db.syncMeta)
+        .insertOnConflictUpdate(
+          SyncMetaCompanion.insert(
+            tableName_: key,
+            lastRefreshedAt: Value<String?>(now),
+            lastAttemptAt: Value<String?>(now),
+            lastError: const Value<String?>(null),
+          ),
+        );
+  }
+
+  Future<bool> _hasCache(String key) async {
+    final query = _db.select(_db.syncMeta)
+      ..where((table) => table.tableName_.equals(key));
+    return await query.getSingleOrNull() != null;
+  }
+
   /// One bill, priced or not.
   @override
   Future<Result<Bill?>> byId(BillId id) async {
     try {
-      final row = await _client
-          .from('v_bill_status')
-          .select(_billColumns)
-          .eq('id', id.value)
-          .maybeSingle();
+      final row = await _withBillColumns(
+        (String columns) async => await _client
+            .from('v_bill_status')
+            .select(columns)
+            .eq('id', id.value)
+            .maybeSingle(),
+      );
 
       return Ok<Bill?>(row == null ? null : Bill.fromJson(row));
     } catch (error, stackTrace) {
@@ -230,6 +369,15 @@ class BillRepositoryImpl implements BillRepository {
           : Money.fromCentavos(row.totalAmountCentavos!),
       dueDate: row.dueDate == null ? null : PhDate.tryParse(row.dueDate!),
       amountPaid: Money.fromCentavos(row.amountPaidCentavos),
+      previousReading: row.previousReadingHundredths == null
+          ? null
+          : Kwh.fromHundredths(row.previousReadingHundredths!),
+      currentReading: row.currentReadingHundredths == null
+          ? null
+          : Kwh.fromHundredths(row.currentReadingHundredths!),
+      readingDate: row.readingDate == null
+          ? null
+          : PhDate.tryParse(row.readingDate!),
     );
   }
 
@@ -245,14 +393,19 @@ class BillRepositoryImpl implements BillRepository {
   @override
   Future<Result<List<Bill>>> payableFor(ConsumerId consumerId) async {
     try {
-      final rows = await _client
-          .from('v_bill_status')
-          .select(_billColumns)
-          .eq('consumer_id', consumerId.value)
-          .not('total_amount', 'is', null)
-          .neq('status', 'paid')
-          // Oldest debt first, which is the order a cashier settles them in.
-          .order('due_date', ascending: true);
+      final rows = await QueryCache(_db).rows(
+        'payable:${consumerId.value}',
+        () => _withBillColumns(
+          (String columns) async => await _client
+              .from('v_bill_status')
+              .select(columns)
+              .eq('consumer_id', consumerId.value)
+              .not('total_amount', 'is', null)
+              .neq('status', 'paid')
+              // Oldest debt first: the order a cashier settles them in.
+              .order('due_date', ascending: true),
+        ),
+      );
 
       return Ok<List<Bill>>(rows.map(Bill.fromJson).toList());
     } catch (error, stackTrace) {
@@ -270,11 +423,14 @@ class BillRepositoryImpl implements BillRepository {
     AreaId areaId,
   ) async {
     try {
-      final rows = await _client
-          .from('v_consumer_outstanding')
-          .select()
-          .eq('area_id', areaId.value)
-          .order('consumer_name', ascending: true);
+      final rows = await QueryCache(_db).rows(
+        'outstanding:${areaId.value}',
+        () => _client
+            .from('v_consumer_outstanding')
+            .select()
+            .eq('area_id', areaId.value)
+            .order('consumer_name', ascending: true),
+      );
 
       return Ok<List<ConsumerOutstanding>>(
         rows.map(ConsumerOutstanding.fromJson).toList(),
@@ -301,12 +457,15 @@ class BillRepositoryImpl implements BillRepository {
     CycleLabel cycle,
   ) async {
     try {
-      final rows = await _client
-          .from('v_bill_status')
-          .select(_cachedBillColumns)
-          .eq('consumer_id', consumerId.value)
-          .eq('cycle_year', cycle.year)
-          .eq('cycle_month', cycle.month);
+      final rows = await _withBillColumns(
+        // [refreshFor] additionally caches when the bill was generated.
+        (String columns) async => await _client
+            .from('v_bill_status')
+            .select('$columns, generated_at')
+            .eq('consumer_id', consumerId.value)
+            .eq('cycle_year', cycle.year)
+            .eq('cycle_month', cycle.month),
+      );
 
       await _db.transaction(() async {
         for (final Map<String, dynamic> row in rows) {
@@ -318,6 +477,8 @@ class BillRepositoryImpl implements BillRepository {
               : Money.tryParse(row['amount_paid'].toString()) ?? Money.zero;
           final Kwh consumption =
               Kwh.tryParse(row['consumption'].toString()) ?? Kwh.zero;
+          final Kwh? previous = _readingFrom(row['previous_reading']);
+          final Kwh? current = _readingFrom(row['current_reading']);
 
           await _db
               .into(_db.cachedBills)
@@ -334,6 +495,9 @@ class BillRepositoryImpl implements BillRepository {
                   totalAmountCentavos: Value<int?>(total?.centavos),
                   dueDate: Value<String?>(row['due_date'] as String?),
                   generatedAt: Value<String?>(row['generated_at'] as String?),
+                  previousReadingHundredths: Value<int?>(previous?.hundredths),
+                  currentReadingHundredths: Value<int?>(current?.hundredths),
+                  readingDate: Value<String?>(row['reading_date'] as String?),
                 ),
               );
         }
@@ -377,6 +541,8 @@ class BillRepositoryImpl implements BillRepository {
         ? Money.zero
         : Money.tryParse(row['amount_paid'].toString()) ?? Money.zero;
     final consumption = Kwh.tryParse(row['consumption'].toString()) ?? Kwh.zero;
+    final previous = _readingFrom(row['previous_reading']);
+    final current = _readingFrom(row['current_reading']);
 
     return CachedBillsCompanion.insert(
       id: row['bill_id'] as String,
@@ -388,8 +554,17 @@ class BillRepositoryImpl implements BillRepository {
       totalAmountCentavos: Value<int?>(total?.centavos),
       dueDate: Value<String?>(row['due_date'] as String?),
       generatedAt: Value<String?>(row['generated_at'] as String?),
+      previousReadingHundredths: Value<int?>(previous?.hundredths),
+      currentReadingHundredths: Value<int?>(current?.hundredths),
+      readingDate: Value<String?>(row['reading_date'] as String?),
     );
   }
+
+  /// A meter reading as the view returned it, or null when the query did not
+  /// carry one. Unparseable text is null too: a reading the cache cannot
+  /// trust is better absent than stored wrong, and the screen says so.
+  static Kwh? _readingFrom(Object? value) =>
+      value == null ? null : Kwh.tryParse(value.toString());
 
   Future<Result<List<Bill>>> _cachedBillsFor(ConsumerId consumerId) async {
     try {

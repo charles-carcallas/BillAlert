@@ -14,13 +14,8 @@ import '../../support/fakes.dart';
 void main() {
   Widget buildTestableWidget({required FakeAuthController controller}) {
     return ProviderScope(
-      overrides: [
-        authControllerProvider.overrideWith(() => controller),
-      ],
-      child: MaterialApp(
-        theme: AppTheme.light(),
-        home: const LoginScreen(),
-      ),
+      overrides: [authControllerProvider.overrideWith(() => controller)],
+      child: MaterialApp(theme: AppTheme.light(), home: const LoginScreen()),
     );
   }
 
@@ -35,8 +30,31 @@ void main() {
       expect(find.text('Password'), findsOneWidget);
     });
 
-    testWidgets('2. Tapping "Sign in" calls signIn exactly once',
-        (WidgetTester tester) async {
+    testWidgets('1b. The eye uncovers the password and names what it does', (
+      WidgetTester tester,
+    ) async {
+      final fakeAuth = FakeAuthController();
+      await tester.pumpWidget(buildTestableWidget(controller: fakeAuth));
+
+      TextField passwordField() =>
+          tester.widgetList<TextField>(find.byType(TextField)).elementAt(1);
+
+      expect(passwordField().obscureText, isTrue);
+
+      await tester.tap(find.byTooltip('Show password'));
+      await tester.pumpAndSettle();
+      expect(passwordField().obscureText, isFalse);
+
+      // The tooltip now offers the opposite action, and is the only label a
+      // screen reader has for this button.
+      await tester.tap(find.byTooltip('Hide password'));
+      await tester.pumpAndSettle();
+      expect(passwordField().obscureText, isTrue);
+    });
+
+    testWidgets('2. Tapping "Sign in" calls signIn exactly once', (
+      WidgetTester tester,
+    ) async {
       final fakeAuth = FakeAuthController();
       await tester.pumpWidget(buildTestableWidget(controller: fakeAuth));
 
@@ -50,32 +68,34 @@ void main() {
     });
 
     testWidgets(
-        '3. A double tap produces exactly ONE signIn call (the button should disable on _isSubmitting)',
-        (WidgetTester tester) async {
-      final pendingSignIn = Completer<void>();
-      final fakeAuth = FakeAuthController(pendingSignIn: pendingSignIn);
-      await tester.pumpWidget(buildTestableWidget(controller: fakeAuth));
+      '3. A double tap produces exactly ONE signIn call (the button should disable on _isSubmitting)',
+      (WidgetTester tester) async {
+        final pendingSignIn = Completer<void>();
+        final fakeAuth = FakeAuthController(pendingSignIn: pendingSignIn);
+        await tester.pumpWidget(buildTestableWidget(controller: fakeAuth));
 
-      final button = find.byType(FilledButton);
-      expect(button, findsOneWidget);
+        final button = find.byType(FilledButton);
+        expect(button, findsOneWidget);
 
-      // First tap begins submission
-      await tester.tap(button);
-      await tester.pump(); // Triggers setState(_isSubmitting = true)
+        // First tap begins submission
+        await tester.tap(button);
+        await tester.pump(); // Triggers setState(_isSubmitting = true)
 
-      // Button is now disabled; second tap should do nothing
-      await tester.tap(button, warnIfMissed: false);
-      await tester.pump();
+        // Button is now disabled; second tap should do nothing
+        await tester.tap(button, warnIfMissed: false);
+        await tester.pump();
 
-      // Complete the pending asynchronous sign in operation
-      pendingSignIn.complete();
-      await tester.pumpAndSettle();
+        // Complete the pending asynchronous sign in operation
+        pendingSignIn.complete();
+        await tester.pumpAndSettle();
 
-      expect(fakeAuth.signInCalls, equals(1));
-    });
+        expect(fakeAuth.signInCalls, equals(1));
+      },
+    );
 
-    testWidgets('4. A returned failure renders a FailureBanner',
-        (WidgetTester tester) async {
+    testWidgets('4. A returned failure renders a FailureBanner', (
+      WidgetTester tester,
+    ) async {
       const failure = ValidationFailure('Invalid username or password');
       final fakeAuth = FakeAuthController(failureToReturn: failure);
       await tester.pumpWidget(buildTestableWidget(controller: fakeAuth));

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/repositories/notification_repository.dart';
 import '../../domain/value_objects/ids.dart';
 import '../common/failure_banner.dart';
+import '../common/local_sort_button.dart';
 import 'consumer_app_bar.dart';
 import 'inbox_controller.dart';
 import 'inbox_focus.dart';
@@ -25,6 +26,8 @@ import 'phone_notifications_banner.dart';
 /// cannot be sent twice or go missing when the amount was saved.
 enum _InboxFilter { all, unread, urgent }
 
+enum _InboxSort { newest, oldest }
+
 class InboxScreen extends ConsumerStatefulWidget {
   const InboxScreen({super.key});
 
@@ -34,6 +37,7 @@ class InboxScreen extends ConsumerStatefulWidget {
 
 class _InboxScreenState extends ConsumerState<InboxScreen> {
   _InboxFilter _filter = _InboxFilter.all;
+  _InboxSort _sort = _InboxSort.newest;
   bool _markingAll = false;
 
   /// Read while mounted, because Riverpod does not allow `ref` in dispose.
@@ -78,16 +82,24 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
         focus.explanation ??
         (highlightMissing ? "That notification isn't on this account." : null);
 
-    final List<AppNotification> visibleAlerts = state.alerts.where((alert) {
-      // The notice a tapped notification points at stays in view whatever
-      // the filter says.
-      if (highlight != null && alert.id.value == highlight.value) return true;
-      return switch (_filter) {
-        _InboxFilter.all => true,
-        _InboxFilter.unread => !alert.isRead,
-        _InboxFilter.urgent => isUrgentNotification(alert.type),
-      };
-    }).toList();
+    final List<AppNotification> visibleAlerts =
+        state.alerts.where((alert) {
+          // The notice a tapped notification points at stays in view whatever
+          // the filter says.
+          if (highlight != null && alert.id.value == highlight.value) {
+            return true;
+          }
+          return switch (_filter) {
+            _InboxFilter.all => true,
+            _InboxFilter.unread => !alert.isRead,
+            _InboxFilter.urgent => isUrgentNotification(alert.type),
+          };
+        }).toList()..sort((a, b) {
+          final byDate = _sort == _InboxSort.newest
+              ? b.createdAt.compareTo(a.createdAt)
+              : a.createdAt.compareTo(b.createdAt);
+          return byDate != 0 ? byDate : a.id.value.compareTo(b.id.value);
+        });
 
     return Scaffold(
       appBar: const ConsumerAppBar(title: 'Inbox'),
@@ -173,6 +185,29 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                       label: const Text('Mark all read'),
                     ),
                 ],
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: SizedBox(
+                  width: 120,
+                  child: LocalSortButton<_InboxSort>(
+                    buttonKey: const ValueKey('consumer-inbox-sort'),
+                    value: _sort,
+                    options: const <LocalSortOption<_InboxSort>>[
+                      LocalSortOption(
+                        value: _InboxSort.newest,
+                        label: 'Newest',
+                        icon: Icons.arrow_downward,
+                      ),
+                      LocalSortOption(
+                        value: _InboxSort.oldest,
+                        label: 'Oldest',
+                        icon: Icons.arrow_upward,
+                      ),
+                    ],
+                    onChanged: (value) => setState(() => _sort = value),
+                  ),
+                ),
               ),
               const SizedBox(height: 8),
               if (state.failure != null) ...<Widget>[

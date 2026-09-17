@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../common/expandable_bottom_sheet.dart';
+
 /// "Forgot password?" on the sign-in screen.
 ///
 /// There is no reset link to send. A username signs in with a synthetic
@@ -10,16 +12,17 @@ import 'package:flutter/material.dart';
 /// next sign-in (GEN-04) — and this sheet says exactly that, rather than
 /// offering a form that could not deliver.
 Future<void> showForgotPasswordHelp(BuildContext context) =>
-    showModalBottomSheet<void>(
+    showExpandableBottomSheet<void>(
       context: context,
-      useSafeArea: true,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (_) => const ForgotPasswordHelp(),
+      initialSize: 0.75,
+      builder: (_, ScrollController scrollController) =>
+          ForgotPasswordHelp(scrollController: scrollController),
     );
 
 class ForgotPasswordHelp extends StatelessWidget {
-  const ForgotPasswordHelp({super.key});
+  final ScrollController? scrollController;
+
+  const ForgotPasswordHelp({this.scrollController, super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -27,6 +30,7 @@ class ForgotPasswordHelp extends StatelessWidget {
     final ColorScheme colours = Theme.of(context).colorScheme;
 
     return SingleChildScrollView(
+      controller: scrollController,
       padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
       child: Column(
         mainAxisSize: MainAxisSize.min,

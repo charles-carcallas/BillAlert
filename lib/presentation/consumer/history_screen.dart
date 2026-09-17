@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../domain/entities/bill.dart';
 import '../../domain/value_objects/ph_date.dart';
 import '../common/failure_banner.dart';
+import '../common/local_sort_button.dart';
 import '../providers.dart';
 import '../router.dart';
 import 'bill_details_sheet.dart';
@@ -122,25 +123,23 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   ),
                   const SizedBox(width: 8),
                   SizedBox(
-                    width: 142,
-                    child: DropdownButtonFormField<_DateOrder>(
-                      initialValue: _dateOrder,
-                      decoration: const InputDecoration(
-                        labelText: 'Sort by date',
-                      ),
-                      items: const <DropdownMenuItem<_DateOrder>>[
-                        DropdownMenuItem<_DateOrder>(
+                    width: 120,
+                    child: LocalSortButton<_DateOrder>(
+                      buttonKey: const ValueKey('consumer-history-sort'),
+                      value: _dateOrder,
+                      options: const <LocalSortOption<_DateOrder>>[
+                        LocalSortOption(
                           value: _DateOrder.newestFirst,
-                          child: Text('Newest'),
+                          label: 'Newest',
+                          icon: Icons.arrow_downward,
                         ),
-                        DropdownMenuItem<_DateOrder>(
+                        LocalSortOption(
                           value: _DateOrder.oldestFirst,
-                          child: Text('Oldest'),
+                          label: 'Oldest',
+                          icon: Icons.arrow_upward,
                         ),
                       ],
-                      onChanged: (_DateOrder? value) {
-                        if (value != null) setState(() => _dateOrder = value);
-                      },
+                      onChanged: (value) => setState(() => _dateOrder = value),
                     ),
                   ),
                 ],

@@ -6,6 +6,7 @@ import '../../core/errors/app_failure.dart';
 import '../../domain/entities/household_login.dart';
 import '../common/failure_banner.dart';
 import '../common/final_confirmation_dialog.dart';
+import '../common/local_sort_button.dart';
 import 'account_form_widgets.dart';
 import 'household_login_controller.dart';
 import 'temporary_password_card.dart';
@@ -40,6 +41,7 @@ class _AdminHouseholdLoginScreenState
 
   HouseholdWithoutLogin? _selected;
   String _query = '';
+  LocalNameSort _sort = LocalNameSort.az;
 
   /// Opened for one household, so there is no list to go back to.
   bool get _openedForOne => widget.household != null;
@@ -131,12 +133,29 @@ class _AdminHouseholdLoginScreenState
                     style: text.bodySmall,
                   ),
                   const SizedBox(height: 12),
-                  TextField(
-                    onChanged: (String value) => setState(() => _query = value),
-                    decoration: const InputDecoration(
-                      hintText: 'Search by name or consumer number',
-                      prefixIcon: Icon(Icons.search),
-                    ),
+                  Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: TextField(
+                          onChanged: (String value) =>
+                              setState(() => _query = value),
+                          decoration: const InputDecoration(
+                            hintText: 'Search by name or consumer number',
+                            prefixIcon: Icon(Icons.search),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 120,
+                        child: LocalSortButton<LocalNameSort>(
+                          buttonKey: const ValueKey('household-login-sort'),
+                          value: _sort,
+                          options: localNameSortOptions,
+                          onChanged: (value) => setState(() => _sort = value),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -173,9 +192,9 @@ class _AdminHouseholdLoginScreenState
       );
     }
 
-    final List<HouseholdWithoutLogin> visible = all
-        .where((HouseholdWithoutLogin h) => h.matches(_query))
-        .toList();
+    final List<HouseholdWithoutLogin> visible =
+        all.where((HouseholdWithoutLogin h) => h.matches(_query)).toList()
+          ..sort((a, b) => compareNames(a.fullName, b.fullName, _sort));
     if (visible.isEmpty) {
       return const _Empty(
         title: 'No matching households',

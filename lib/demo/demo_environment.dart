@@ -386,6 +386,9 @@ final class _DemoAuthRepository implements AuthRepository {
       const Ok<void>(null);
 
   @override
+  Future<Result<void>> confirmSession() async => const Ok<void>(null);
+
+  @override
   Future<Result<CreatedStaffAccount>> createStaffAccount({
     required String username,
     required String firstName,
@@ -614,6 +617,13 @@ final class _DemoBillRepository implements BillRepository {
       const Ok<void>(null);
 
   @override
+  Future<Result<List<Bill>>> readingsForCycle(
+    AreaId areaId,
+    CycleLabel cycle,
+  ) async =>
+      Ok<List<Bill>>(store.bills.where((Bill b) => b.cycle == cycle).toList());
+
+  @override
   Future<Result<List<ConsumerOutstanding>>> outstandingInArea(
     AreaId areaId,
   ) async {
@@ -670,6 +680,24 @@ final class _DemoPaymentRepository implements PaymentRepository {
     AreaId areaId, {
     int limit = 50,
   }) async => Ok<List<PaymentSummary>>(store.payments.take(limit).toList());
+  @override
+  Future<Result<List<PaymentSummary>>> collectedInArea(
+    AreaId areaId, {
+    required DateTime from,
+    required DateTime until,
+  }) async => Ok<List<PaymentSummary>>(
+    store.payments
+        .where(
+          (PaymentSummary p) =>
+              !p.paidAt.isBefore(from) && p.paidAt.isBefore(until),
+        )
+        .toList(),
+  );
+  @override
+  Future<Result<DateTime?>> collectedInAreaSavedAt(
+    AreaId areaId, {
+    required DateTime from,
+  }) async => const Ok<DateTime?>(null);
 }
 
 final class _DemoNoticeRepository implements NoticeRepository {

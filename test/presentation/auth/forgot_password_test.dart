@@ -42,6 +42,8 @@ void main() {
 
     await tester.tap(find.text('Forgot password?'));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Back to sign in'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Back to sign in'));
     await tester.pumpAndSettle();
 

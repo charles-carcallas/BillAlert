@@ -25,6 +25,18 @@ final class Bill {
   final CycleLabel cycle;
   final Kwh consumption;
 
+  /// The two dial figures the consumption was worked out from, and the day
+  /// the meter was read.
+  ///
+  /// Null when the row came from a query that does not carry them — the
+  /// Admin's pricing queue, or a bill cached on this phone before the app
+  /// started asking for them. A screen that shows a reading has to be able
+  /// to say "not recorded" rather than print a zero that looks like a dial
+  /// that never turned, so these are nullable and stay nullable.
+  final Kwh? previousReading;
+  final Kwh? currentReading;
+  final PhDate? readingDate;
+
   /// Null until the Admin posts the cooperative's figure.
   final Money? totalAmount;
 
@@ -42,6 +54,9 @@ final class Bill {
     required this.totalAmount,
     required this.dueDate,
     this.amountPaid = Money.zero,
+    this.previousReading,
+    this.currentReading,
+    this.readingDate,
   });
 
   factory Bill.fromJson(Map<String, dynamic> json) {
@@ -74,8 +89,22 @@ final class Bill {
       amountPaid: json['amount_paid'] != null
           ? Money.tryParse(json['amount_paid'].toString()) ?? Money.zero
           : Money.zero,
+      previousReading: json['previous_reading'] != null
+          ? Kwh.tryParse(json['previous_reading'].toString())
+          : null,
+      currentReading: json['current_reading'] != null
+          ? Kwh.tryParse(json['current_reading'].toString())
+          : null,
+      readingDate: json['reading_date'] != null
+          ? PhDate.tryParse(json['reading_date'].toString())
+          : null,
     );
   }
+
+  /// Whether this bill knows the dial figures behind its consumption. Both
+  /// or neither: a reading with only one end of it is not a reading.
+  bool get hasMeterReadings =>
+      previousReading != null && currentReading != null;
 
   /// The reading is in, the amount is not. The consumer can see their
   /// consumption but there is nothing to pay yet.

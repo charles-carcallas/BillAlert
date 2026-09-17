@@ -4,6 +4,7 @@ import '../../core/errors/app_failure.dart';
 import '../../core/result/result.dart';
 import '../../data/sync/sync_service.dart';
 import '../../domain/entities/area_roster.dart';
+import '../../domain/value_objects/ids.dart';
 import '../auth/auth_controller.dart';
 import '../providers.dart';
 
@@ -19,6 +20,72 @@ final class RosterView {
   const RosterView({required this.roster, this.lastRefreshedAt});
 }
 
+/// Fills the phone's copy of the area roster from the server, once per
+/// sign-in.
+///
+/// Signing out empties the cache, so without this a reader who has just
+/// signed in would see an empty round until they thought to pull down. Both
+/// reader tabs wait on it only when the phone has never been filled; with a
+/// roster already saved they show that at once and pick up the fresh copy
+/// when this finishes.
+///
+/// Resolves to the failure, or null. A failure is not thrown: with no signal
+/// the saved roster is still the right thing to show.
+final initialRosterRefreshProvider = FutureProvider<AppFailure?>((
+  Ref ref,
+) async {
+  // Only a different person or area starts it again, not every token refresh
+  // that hands out a new user object.
+  final String? areaId = ref.watch(
+    authControllerProvider.select((state) => state.value?.areaId?.value),
+  );
+  if (areaId == null) return null;
+  final result = await ref.read(refreshAreaRosterProvider)(
+    areaId: AreaId(areaId),
+  );
+  return switch (result) {
+    Ok() => null,
+    Err(:final failure) => failure,
+  };
+});
+
+/// Whether the phone holds a roster the server has filled at least once.
+Future<bool> _hasSavedRoster(Ref ref) async {
+  final result = await ref.read(consumerRepositoryProvider).lastRefreshedAt();
+  return switch (result) {
+    Ok(:final value) => value != null,
+    Err() => false,
+  };
+}
+
+/// Waits for [initialRosterRefreshProvider] when nothing has been saved yet,
+/// and otherwise lets it finish in the background and reloads [ref] once it
+/// has. Throws its failure only when there is nothing saved to fall back on.
+///
+/// Call it at the very start of a build, before any other await, so the
+/// subscription that keeps the refresh running is in place.
+Future<void> awaitFirstRosterIfEmpty(Ref ref) async {
+  // Listened rather than watched: a watch would restart the build the moment
+  // the refresh lands, abandoning the build that was still waiting on it.
+  var waiting = false;
+  ref.listen<AsyncValue<AppFailure?>>(initialRosterRefreshProvider, (
+    AsyncValue<AppFailure?>? previous,
+    AsyncValue<AppFailure?> next,
+  ) {
+    if (!waiting && previous?.isLoading == true && !next.isLoading) {
+      ref.invalidateSelf();
+    }
+  });
+
+  if (await _hasSavedRoster(ref)) return;
+
+  waiting = true;
+  final AppFailure? failure = await ref.read(
+    initialRosterRefreshProvider.future,
+  );
+  if (failure != null && !await _hasSavedRoster(ref)) throw failure;
+}
+
 /// The meter reader's round for this cycle.
 ///
 /// A view model, and note what it does not have: no Supabase client, no
@@ -30,6 +97,8 @@ class RosterController extends AsyncNotifier<RosterView> {
   Future<RosterView> build() async {
     final user = ref.watch(authControllerProvider).value;
     final areaId = user?.areaId;
+    // Watched before any await, so a finished first refresh rebuilds this.
+    final firstLoad = awaitFirstRosterIfEmpty(ref);
 
     if (areaId == null) {
       throw const PermissionFailure(
@@ -37,6 +106,8 @@ class RosterController extends AsyncNotifier<RosterView> {
         'show. Ask your Area President to check your account.',
       );
     }
+
+    await firstLoad;
 
     // Reads the cache. Works with no signal, which is the whole point.
     final result = await ref.read(loadAreaRosterProvider)(areaId: areaId);

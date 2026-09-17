@@ -61,6 +61,11 @@ void main() {
       scrollable: find.byType(Scrollable).last,
     );
     expect(find.text('August 2026'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('September 2026'),
+      180,
+      scrollable: find.byType(Scrollable).last,
+    );
     expect(find.text('September 2026'), findsOneWidget);
 
     await tester.scrollUntilVisible(

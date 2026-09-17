@@ -46,9 +46,8 @@ void main() {
             for (final AppTab tab in user.permittedTabs)
               GoRoute(
                 path: tab.route,
-                builder: (_, _) => Scaffold(
-                  body: Center(child: Text('panel:${tab.label}')),
-                ),
+                builder: (_, _) =>
+                    Scaffold(body: Center(child: Text('panel:${tab.label}'))),
               ),
           ],
         ),
@@ -61,10 +60,7 @@ void main() {
           () => FakeAuthController(signedInUser: user),
         ),
       ],
-      child: MaterialApp.router(
-        theme: AppTheme.light(),
-        routerConfig: router,
-      ),
+      child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
     );
   }
 
@@ -107,21 +103,25 @@ void main() {
     expect(find.text('Payment'), findsNothing);
   });
 
-  testWidgets('a meter reader gets their three, from the same widget',
-      (WidgetTester tester) async {
+  testWidgets('a meter reader gets their four, from the same widget', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(shellUnderTest(user: reader, at: '/reader'));
     await tester.pumpAndSettle();
 
-    expect(tabsOf(tester).length, 3);
+    expect(tabsOf(tester).length, 4);
     expect(find.text('Readings'), findsOneWidget);
     expect(find.text('Consumers'), findsOneWidget);
+    // They carry the collected cash to the BOHECO office.
+    expect(find.text('Remit'), findsOneWidget);
     expect(find.text('Profile'), findsOneWidget);
     // Nothing of the cashier's leaks in.
     expect(find.text('Receipts'), findsNothing);
   });
 
-  testWidgets('the longest matching route wins, not the first',
-      (WidgetTester tester) async {
+  testWidgets('the longest matching route wins, not the first', (
+    WidgetTester tester,
+  ) async {
     // Every cashier route begins with "/cashier", so a first-match search
     // would light up Consumers while the Payment screen is on show.
     await tester.pumpWidget(
@@ -133,7 +133,9 @@ void main() {
     expect(selectedIndexOf(tester), 1);
   });
 
-  testWidgets('the home route selects the first tab', (WidgetTester tester) async {
+  testWidgets('the home route selects the first tab', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(shellUnderTest(user: cashier, at: '/cashier'));
     await tester.pumpAndSettle();
 
@@ -141,8 +143,9 @@ void main() {
     expect(selectedIndexOf(tester), 0);
   });
 
-  testWidgets('tapping a tab moves to it and moves the selection',
-      (WidgetTester tester) async {
+  testWidgets('tapping a tab moves to it and moves the selection', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(shellUnderTest(user: cashier, at: '/cashier'));
     await tester.pumpAndSettle();
 
@@ -153,8 +156,9 @@ void main() {
     expect(selectedIndexOf(tester), 2);
   });
 
-  testWidgets('every tab a role offers can actually be reached',
-      (WidgetTester tester) async {
+  testWidgets('every tab a role offers can actually be reached', (
+    WidgetTester tester,
+  ) async {
     // A tab in the bar with no route behind it is a dead end, and the bar is
     // built from the same list the routes are - so this catches the two
     // drifting apart.

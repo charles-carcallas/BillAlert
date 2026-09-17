@@ -12,7 +12,10 @@ import '../auth/auth_controller.dart';
 import '../common/consumer_search.dart';
 import '../common/failure_banner.dart';
 import '../common/local_search_field.dart';
+import '../common/local_sort_button.dart';
 import '../providers.dart';
+import 'household_details_sheet.dart';
+import 'roster_controller.dart';
 
 /// The households of this reader's area, from the encrypted cache.
 ///
@@ -22,6 +25,7 @@ import '../providers.dart';
 final readerHouseholdsProvider = FutureProvider<List<Consumer>>((
   Ref ref,
 ) async {
+  final firstLoad = awaitFirstRosterIfEmpty(ref);
   final user = await ref.watch(authControllerProvider.future);
   final areaId = user?.areaId;
   if (areaId == null) {
@@ -31,6 +35,7 @@ final readerHouseholdsProvider = FutureProvider<List<Consumer>>((
     );
   }
 
+  await firstLoad;
   final result = await ref.watch(consumerRepositoryProvider).areaRoster(areaId);
   return switch (result) {
     Ok(:final value) => value,
@@ -53,6 +58,7 @@ class ReaderConsumersScreen extends ConsumerStatefulWidget {
 
 class _ReaderConsumersScreenState extends ConsumerState<ReaderConsumersScreen> {
   final TextEditingController _search = TextEditingController();
+  LocalNameSort _sort = LocalNameSort.az;
 
   @override
   void dispose() {
@@ -76,16 +82,27 @@ class _ReaderConsumersScreenState extends ConsumerState<ReaderConsumersScreen> {
               failure: error is AppFailure
                   ? error
                   : ServerFailure(ServerFailure.defaultMessage, '$error'),
-              onRetry: () => ref.invalidate(readerHouseholdsProvider),
+              // Retrying tries the server again, not just the empty cache.
+              onRetry: () {
+                ref.invalidate(initialRosterRefreshProvider);
+                ref.invalidate(readerHouseholdsProvider);
+              },
             ),
           ),
           data: (List<Consumer> list) {
-            final List<Consumer> visible = list
-                .where(
-                  (Consumer household) =>
-                      consumerMatchesSearch(household, _search.text),
-                )
-                .toList();
+            final List<Consumer> visible =
+                list
+                    .where(
+                      (Consumer household) =>
+                          consumerMatchesSearch(household, _search.text),
+                    )
+                    .toList()
+                  ..sort((a, b) {
+                    final compared = a.fullName.toLowerCase().compareTo(
+                      b.fullName.toLowerCase(),
+                    );
+                    return _sort == LocalNameSort.az ? compared : -compared;
+                  });
 
             return RefreshIndicator(
               onRefresh: () async {
@@ -142,13 +159,33 @@ class _ReaderConsumersScreenState extends ConsumerState<ReaderConsumersScreen> {
                   : ListView(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
                       children: <Widget>[
-                        LocalSearchField(
-                          fieldKey: const ValueKey<String>(
-                            'reader-consumers-search',
-                          ),
-                          controller: _search,
-                          onChanged: (_) => setState(() {}),
-                          hintText: 'Search name, account, purok or meter',
+                        Row(
+                          children: <Widget>[
+                            Expanded(
+                              child: LocalSearchField(
+                                fieldKey: const ValueKey<String>(
+                                  'reader-consumers-search',
+                                ),
+                                controller: _search,
+                                onChanged: (_) => setState(() {}),
+                                hintText:
+                                    'Search name, account, purok or meter',
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 120,
+                              child: LocalSortButton<LocalNameSort>(
+                                buttonKey: const ValueKey(
+                                  'reader-consumers-sort',
+                                ),
+                                value: _sort,
+                                options: localNameSortOptions,
+                                onChanged: (value) =>
+                                    setState(() => _sort = value),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 12),
                         Text(
@@ -188,7 +225,7 @@ class _ReaderConsumersScreenState extends ConsumerState<ReaderConsumersScreen> {
                           ) ...<Widget>[
                             _HouseholdTile(household: visible[index]),
                             if (index < visible.length - 1)
-                              const Divider(height: 1),
+                              const SizedBox(height: 10),
                           ],
                       ],
                     ),
@@ -200,6 +237,8 @@ class _ReaderConsumersScreenState extends ConsumerState<ReaderConsumersScreen> {
   }
 }
 
+/// One household, drawn as a card that is plainly something to open: its own
+/// surface, a ripple on tap, and a chevron pointing into its details.
 class _HouseholdTile extends StatelessWidget {
   final Consumer household;
 
@@ -208,30 +247,97 @@ class _HouseholdTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final TextTheme text = Theme.of(context).textTheme;
+    final ColorScheme colours = Theme.of(context).colorScheme;
+    final String initials =
+        '${household.firstName.isEmpty ? '' : household.firstName[0]}'
+                '${household.lastName.isEmpty ? '' : household.lastName[0]}'
+            .toUpperCase();
+    final String identity = <String>[
+      household.consumerNo.value,
+      if (household.purok != null) household.purok!,
+      if (household.meterSerialNo != null) household.meterSerialNo!,
+    ].join(' · ');
 
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Text(household.fullName, style: text.titleMedium),
-      subtitle: Text(
-        <String>[
-          household.consumerNo.value,
-          if (household.purok != null) household.purok!,
-          if (household.meterSerialNo != null) household.meterSerialNo!,
-        ].join(' · '),
-        style: text.bodySmall,
+    // Material rather than a decorated Container, so the ripple is drawn on
+    // the card itself instead of underneath it.
+    return Material(
+      color: colours.surfaceContainerLowest,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colours.outlineVariant),
       ),
-      trailing: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: <Widget>[
-          Text(household.previousReading.format(), style: text.bodyLarge),
-          Text(
-            household.previousReadingDate == null
-                ? 'No previous reading'
-                : 'Last read ${_formatReadingDate(household.previousReadingDate!)}',
-            style: text.bodySmall,
+      child: InkWell(
+        onTap: () => showReaderHouseholdDetails(context, household),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+          child: Row(
+            children: <Widget>[
+              Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: colours.primary.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  initials.isEmpty ? '?' : initials,
+                  style: text.titleSmall?.copyWith(
+                    color: colours.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      household.fullName,
+                      style: text.titleMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      identity,
+                      style: text.bodySmall?.copyWith(
+                        color: colours.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: <Widget>[
+                        Icon(
+                          Icons.bolt_outlined,
+                          size: 15,
+                          color: colours.primary,
+                        ),
+                        const SizedBox(width: 3),
+                        Flexible(
+                          child: Text(
+                            household.previousReadingDate == null
+                                ? 'No previous reading'
+                                : '${household.previousReading.format()}'
+                                      ' · read '
+                                      '${_formatReadingDate(household.previousReadingDate!)}',
+                            style: text.bodySmall,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(Icons.chevron_right, color: colours.onSurfaceVariant),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

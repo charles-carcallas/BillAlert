@@ -115,6 +115,65 @@ ordinary terminal: inside the coding agent's sandbox, Gradle stops with
 
 ---
 
+### Accounts: household sign-in and password reset (Carcallas)
+
+Both run through Supabase Edge Functions, called from the app by the Area
+President. The phone used as the household's is a TECNO KL4 (Android 14),
+which also holds the SIM ending 8436.
+
+| Check | Evidence | Date |
+|---|---|---|
+| Existing household given a sign-in (MTR-04) | as `mario.ombajin`: Accounts → New consumer → "Give an existing household a sign-in" → Elena Bongcaras (`2018-0442-TUB`, previously `has_login=false`). `create-household-login` returned the username and a one-time `BillAlert####` password | 16 Sep 2026 |
+| Forced password change on first sign-in (GEN-04) | signed in on the KL4 as `elena.bongcaras` with the one-time password; the app required a new password before anything else | 16 Sep 2026 |
+| Password reset by the Area President | `reset-account-password` accepted the reset for Elena | 17 Sep 2026 |
+| A reset ends the household's sessions everywhere | the KL4, still signed in as Elena, was signed out as soon as BillAlert came back to the front, with "You were signed out on this phone, usually because your password was reset…" | 17 Sep 2026 |
+| Offline, a password change says it needs signal | KL4 in airplane mode after the reset: Profile → Change password showed "Changing your password needs signal. Nothing was changed…"; back online, the phone was signed out with the same explanation | 17 Sep 2026 |
+| Recovery | signed in with the temporary password, chose a new one, reached Elena's Bill screen | 17 Sep 2026 |
+
+**Problem found and fixed on the way.** Supabase Auth ends every session of an
+account the moment an admin sets its password (`User.UpdatePassword` →
+`Logout` in Supabase Auth's source). A phone still holding a short-lived access
+token could keep reading the account for up to an hour, opened the compulsory
+change-password screen, and then failed to save with "You have been signed
+out" while leaving the household stuck on a screen with no way out. The app now:
+
+- asks Supabase Auth whether the session still exists when the tabs open and
+  whenever the app returns to the front, and signs out with an explanation if
+  it has ended (no signal: nothing happens);
+- signs out with the same explanation if a password change is refused because
+  the session ended, or if Supabase signs the phone out by itself;
+- says a password change needs signal instead of the general "your work is
+  saved and will sync" message, which was untrue for a password.
+
+Covered by `test/presentation/auth/password_reset_session_test.dart` and
+`test/domain/change_password_test.dart`.
+
+---
+
+### Workstream C on phones: accounts, collection, offline, fingerprint (Carcallas)
+
+Run on the phones against the live project. The household side used the
+Samsung A31 (Android 12) on Wi-Fi. Identifiers were read back from the live
+database afterwards.
+
+| Check | Evidence | Date |
+|---|---|---|
+| Staff account rule (FR-31) | as `mario.ombajin`, creating a second Meter Reader was refused because `ledesman.dormal` is already the active Meter Reader for Area 3. The server's rule reached the screen | 17 Sep 2026 |
+| New Consumer creates the household and its sign-in (ADM-03, MTR-04) | test household `12345678910` (Test Tset2), no mobile number, created with its sign-in and signed in on the A31 | 17 Sep 2026 |
+| A reading alerts nobody (FR-13) | the Meter Reader recorded that household's reading (`current_reading=51.00`, captured 21:38:53.857, synced 21:38:54.882); no alert reached the household, as designed: the alert fires when the amount is posted | 17 Sep 2026 |
+| Posting alerts the household in the app | after the amount was posted, the household's Inbox showed "Your bill is ready" | 17 Sep 2026 |
+| Phone notification with the app closed | app fully closed, fingerprint off, phone on and on Wi-Fi: the notification appeared in the phone's tray within 15 minutes, from the background check | 17 Sep 2026 |
+| Cashier collection (FR-30, CON-03) | as `mercedita.gales`: bill `BA-202609-000009` for Test Tset2, ₱520.00, receipt **`BIEC-2026-09-004473`** at 21:58:56. The household's History showed the same receipt | 17 Sep 2026 |
+| Offline reading and sync (NFR-05, MTR-12) | airplane mode → reading recorded for `1234567891011` (Test tset3, no number) → app closed and reopened → back online. `current_reading=53.00`, `captured_at` 22:05:11.833, `synced_at` 22:06:20.122: saved on the phone offline, sent 1 minute 8 seconds later, and still stamped with the time it was taken | 17 Sep 2026 |
+| Fingerprint sign-in | turned on in Profile; after closing and reopening, the app opened only after the fingerprint or PIN | 17 Sep 2026 |
+
+**Found:** with the household's app **open**, a newly posted bill appeared in
+the Inbox but not in the phone's notification tray until the next background
+check (up to 15 minutes). The tray is only refreshed when the app starts and by
+that background check, never while the app stays open.
+
+---
+
 ### Automated checks
 
 | Check | Evidence | Date |
@@ -139,13 +198,6 @@ ordinary terminal: inside the coding agent's sandbox, Gradle stops with
   `docs/week12/urgent_due_date_alerts.md`): full screen on Android 14 and
   later, a loud pop-up on Android 13 and older. Not yet seen on a phone. The
   A31 runs Android 12, so it can only show the pop-up.
-- **The rest of Workstream C, on a phone:**
-  - offline reading and sync;
-  - the due-date reminder;
-  - New Consumer with its sign-in;
-  - password reset;
-  - staff account;
-  - fingerprint unlock;
-  - cashier receipt on both phones.
+- **The due-date reminder at 08:00**, on a phone.
 - **Code state.** Everything above that was built this week is uncommitted on
   `master` as of this entry.

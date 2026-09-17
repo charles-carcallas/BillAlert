@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart' hide Consumer;
 
 import '../../domain/entities/consumer.dart';
 import '../common/failure_banner.dart';
+import '../common/local_sort_button.dart';
 import 'serve_notice_controller.dart';
 
 /// DOM-05 — Admin › serve a disconnection notice.
@@ -189,27 +190,79 @@ class _ServeNoticeScreenState extends ConsumerState<ServeNoticeScreen> {
   }
 }
 
-class _Picker extends StatelessWidget {
+enum _ServeSort { eligibleFirst, nameAz, nameZa }
+
+class _Picker extends StatefulWidget {
   final ServeNoticeState state;
   final ServeNoticeController controller;
 
   const _Picker({required this.state, required this.controller});
 
   @override
+  State<_Picker> createState() => _PickerState();
+}
+
+class _PickerState extends State<_Picker> {
+  _ServeSort _sort = _ServeSort.eligibleFirst;
+
+  @override
   Widget build(BuildContext context) {
     final TextTheme text = Theme.of(context).textTheme;
-    final List<Consumer> visible = state.visible;
+    final state = widget.state;
+    final controller = widget.controller;
+    final List<Consumer> visible = List.of(state.visible);
+    if (_sort != _ServeSort.eligibleFirst) {
+      visible.sort(
+        (a, b) => compareNames(
+          a.fullName,
+          b.fullName,
+          _sort == _ServeSort.nameAz ? LocalNameSort.az : LocalNameSort.za,
+        ),
+      );
+    }
 
     return Column(
       children: <Widget>[
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: TextField(
-            onChanged: controller.search,
-            decoration: const InputDecoration(
-              hintText: 'Search name or account number',
-              prefixIcon: Icon(Icons.search),
-            ),
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: TextField(
+                  onChanged: controller.search,
+                  decoration: const InputDecoration(
+                    hintText: 'Search name or account number',
+                    prefixIcon: Icon(Icons.search),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 132,
+                child: LocalSortButton<_ServeSort>(
+                  buttonKey: const ValueKey('serve-notice-sort'),
+                  value: _sort,
+                  options: const <LocalSortOption<_ServeSort>>[
+                    LocalSortOption(
+                      value: _ServeSort.eligibleFirst,
+                      label: 'Eligible',
+                      icon: Icons.priority_high,
+                    ),
+                    LocalSortOption(
+                      value: _ServeSort.nameAz,
+                      label: 'Name A–Z',
+                      icon: Icons.sort_by_alpha,
+                    ),
+                    LocalSortOption(
+                      value: _ServeSort.nameZa,
+                      label: 'Name Z–A',
+                      icon: Icons.sort_by_alpha,
+                    ),
+                  ],
+                  onChanged: (value) => setState(() => _sort = value),
+                ),
+              ),
+            ],
           ),
         ),
         if (state.failure != null)

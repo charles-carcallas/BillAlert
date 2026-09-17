@@ -8,9 +8,12 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 // with { ok: false, kind, message } so the Flutter client can show the
 // server's own plain-English message rather than an opaque error.
 //
-// Known limit: this does not sign the person out of sessions already open on
-// other devices. The Auth Admin API has no "end every session for this user"
-// call, so those end when their tokens next need refreshing.
+// Setting the password here ALSO ends every session the account has open:
+// Supabase Auth's admin update calls User.UpdatePassword with no session,
+// which logs the user out everywhere. A phone still holding a short-lived
+// access token can read data for up to an hour, but any Auth call, such as
+// changing the password, fails with session_not_found. The app answers that
+// by signing the phone out and telling the person to sign in again.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

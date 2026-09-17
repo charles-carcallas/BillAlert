@@ -83,7 +83,11 @@ class SyncService {
 
     final status = await _connectivity.checkConnectivity();
     if (!_hasConnection(status)) {
-      return const Err<SyncReport>(NetworkFailure());
+      // Everything this would have sent is still in the outbox, so here the
+      // promise is true.
+      return const Err<SyncReport>(
+        NetworkFailure(NetworkFailure.savedForLater),
+      );
     }
 
     _isDraining = true;
@@ -134,7 +138,7 @@ class SyncService {
             // hammering a dead connection helps nobody.
             await _outbox.markFailed(
               entry.operation.clientUuid,
-              failure.message,
+              NetworkFailure.savedForLater,
             );
             return Ok<SyncReport>(
               SyncReport(

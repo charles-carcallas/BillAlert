@@ -33,6 +33,13 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
   AppFailure? _failure;
   bool _isSubmitting = false;
 
+  /// Each field hides itself until asked. Separately, because revealing the
+  /// password you are choosing is a different decision from revealing the
+  /// one you are typing back to confirm it — and a single switch that
+  /// uncovered both would make the confirmation a copy rather than a check.
+  bool _obscurePassword = true;
+  bool _obscureConfirm = true;
+
   /// Only ever seen on the voluntary path. The forced one is redirected away
   /// the instant the password changes, so it never renders this.
   bool _succeeded = false;
@@ -50,11 +57,12 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
       _failure = null;
     });
 
-    final failure =
-        await ref.read(authControllerProvider.notifier).changePassword(
-              newPassword: _password.text,
-              confirmPassword: _confirm.text,
-            );
+    final failure = await ref
+        .read(authControllerProvider.notifier)
+        .changePassword(
+          newPassword: _password.text,
+          confirmPassword: _confirm.text,
+        );
 
     if (!mounted) return;
     setState(() {
@@ -87,26 +95,31 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                       user == null
                           ? 'Please choose a new password.'
                           : forced
-                              ? 'Welcome, ${user.firstName}. You signed in '
-                                  'with a temporary password from your Area '
-                                  'President. Please choose your own password '
-                                  'before you continue.'
-                              : 'Choose a new password for your account.',
+                          ? 'Welcome, ${user.firstName}. You signed in '
+                                'with a temporary password from your Area '
+                                'President. Please choose your own password '
+                                'before you continue.'
+                          : 'Choose a new password for your account.',
                       style: Theme.of(context).textTheme.bodyLarge,
                     ),
                     const SizedBox(height: 24),
-                    TextField(
+                    _PasswordField(
                       controller: _password,
-                      obscureText: true,
-                      decoration:
-                          const InputDecoration(labelText: 'New password'),
+                      label: 'New password',
+                      obscured: _obscurePassword,
+                      onToggle: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
+                      action: TextInputAction.next,
                     ),
                     const SizedBox(height: 16),
-                    TextField(
+                    _PasswordField(
                       controller: _confirm,
-                      obscureText: true,
-                      decoration:
-                          const InputDecoration(labelText: 'Type it again'),
+                      label: 'Type it again',
+                      obscured: _obscureConfirm,
+                      onToggle: () =>
+                          setState(() => _obscureConfirm = !_obscureConfirm),
+                      action: TextInputAction.done,
+                      onSubmitted: _isSubmitting ? null : _submit,
                     ),
                     if (_failure != null) ...<Widget>[
                       const SizedBox(height: 16),
@@ -119,6 +132,59 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                     ),
                   ],
                 ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A password box with the eye that uncovers it.
+///
+/// Choosing a password you cannot see is guesswork, and this screen asks for
+/// one twice before it will let anyone past — so a household that mistypes
+/// has no way to find out which of the two boxes was wrong. The eye is what
+/// makes that recoverable.
+///
+/// The icon says what tapping it will do, not what the field is doing now:
+/// a covered field offers the open eye. That is the same way round as the
+/// sign-in screen, and the tooltip says it in words for a screen reader.
+class _PasswordField extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+  final bool obscured;
+  final VoidCallback onToggle;
+  final TextInputAction action;
+  final VoidCallback? onSubmitted;
+
+  const _PasswordField({
+    required this.controller,
+    required this.label,
+    required this.obscured,
+    required this.onToggle,
+    required this.action,
+    this.onSubmitted,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme colours = Theme.of(context).colorScheme;
+
+    return TextField(
+      controller: controller,
+      obscureText: obscured,
+      textInputAction: action,
+      onSubmitted: onSubmitted == null ? null : (_) => onSubmitted!(),
+      decoration: InputDecoration(
+        labelText: label,
+        suffixIcon: IconButton(
+          tooltip: obscured ? 'Show $label' : 'Hide $label',
+          icon: Icon(
+            obscured
+                ? Icons.visibility_outlined
+                : Icons.visibility_off_outlined,
+            color: colours.onSurfaceVariant,
+          ),
+          onPressed: onToggle,
         ),
       ),
     );

@@ -12,6 +12,13 @@ final class ChangePassword {
 
   static const int minimumLength = 8;
 
+  /// Offline, a password change is not saved for later the way a reading or a
+  /// payment is: nothing changed, and nothing will sync. The app's general
+  /// offline message says the opposite, so this one replaces it.
+  static const String needsSignal =
+      'Changing your password needs signal. Nothing was changed. Try again '
+      "when you're back online.";
+
   const ChangePassword({required this.auth});
 
   Future<Result<void>> call({
@@ -19,15 +26,21 @@ final class ChangePassword {
     required String confirmPassword,
   }) async {
     if (newPassword.length < minimumLength) {
-      return const Err(ValidationFailure(
-        'Your new password must be at least $minimumLength characters long.',
-      ));
+      return const Err(
+        ValidationFailure(
+          'Your new password must be at least $minimumLength characters long.',
+        ),
+      );
     }
     if (newPassword != confirmPassword) {
-      return const Err(ValidationFailure(
-        'The two passwords do not match. Please type them again.',
-      ));
+      return const Err(
+        ValidationFailure(
+          'The two passwords do not match. Please type them again.',
+        ),
+      );
     }
-    return auth.changePassword(newPassword: newPassword);
+    return (await auth.changePassword(
+      newPassword: newPassword,
+    )).ifOffline(needsSignal);
   }
 }

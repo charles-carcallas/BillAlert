@@ -9,6 +9,7 @@ import '../../domain/value_objects/money.dart';
 import '../../domain/value_objects/ph_date.dart';
 import '../common/failure_banner.dart';
 import '../common/final_confirmation_dialog.dart';
+import '../common/local_sort_button.dart';
 import '../common/staff_app_bar.dart';
 import '../providers.dart';
 import 'record_payment_controller.dart';
@@ -68,16 +69,26 @@ class RecordPaymentScreen extends ConsumerWidget {
 }
 
 /// CSH-02 — who is at the counter.
-class _HouseholdPicker extends StatelessWidget {
+class _HouseholdPicker extends StatefulWidget {
   final RecordPaymentState state;
   final RecordPaymentController controller;
 
   const _HouseholdPicker({required this.state, required this.controller});
 
   @override
+  State<_HouseholdPicker> createState() => _HouseholdPickerState();
+}
+
+class _HouseholdPickerState extends State<_HouseholdPicker> {
+  LocalNameSort _sort = LocalNameSort.az;
+
+  @override
   Widget build(BuildContext context) {
     final TextTheme text = Theme.of(context).textTheme;
-    final List<ConsumerOutstanding> visible = state.visibleHouseholds;
+    final state = widget.state;
+    final controller = widget.controller;
+    final List<ConsumerOutstanding> visible = List.of(state.visibleHouseholds)
+      ..sort((a, b) => compareNames(a.consumerName, b.consumerName, _sort));
     final Money total = state.households.fold(
       Money.zero,
       (Money sum, ConsumerOutstanding item) => sum + item.totalOutstanding,
@@ -90,12 +101,28 @@ class _HouseholdPicker extends StatelessWidget {
       children: <Widget>[
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: TextField(
-            onChanged: controller.search,
-            decoration: const InputDecoration(
-              hintText: 'Search name or account number',
-              prefixIcon: Icon(Icons.search),
-            ),
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: TextField(
+                  onChanged: controller.search,
+                  decoration: const InputDecoration(
+                    hintText: 'Search name or account number',
+                    prefixIcon: Icon(Icons.search),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 120,
+                child: LocalSortButton<LocalNameSort>(
+                  buttonKey: const ValueKey('cashier-consumers-sort'),
+                  value: _sort,
+                  options: localNameSortOptions,
+                  onChanged: (value) => setState(() => _sort = value),
+                ),
+              ),
+            ],
           ),
         ),
         if (state.households.isNotEmpty)
@@ -181,16 +208,20 @@ class _HouseholdTile extends StatelessWidget {
     final ColorScheme colours = Theme.of(context).colorScheme;
     final TextTheme text = Theme.of(context).textTheme;
     final bool overdue = household.overdueCount > 0;
-    final Color accent = overdue ? colours.tertiary : colours.primary;
+    // Red, the same red the Consumer's own overdue bill is drawn in. This
+    // used to be the tertiary tone, which reads as a highlight rather than a
+    // warning — and a household past its due date is the one a cashier must
+    // not walk past.
+    final Color accent = overdue ? colours.error : colours.primary;
 
     return Material(
       color: overdue
-          ? colours.tertiaryContainer.withValues(alpha: 0.25)
+          ? colours.errorContainer.withValues(alpha: 0.25)
           : colours.surfaceContainerLowest,
       shape: RoundedRectangleBorder(
         side: BorderSide(
           color: overdue
-              ? colours.tertiary.withValues(alpha: 0.4)
+              ? colours.error.withValues(alpha: 0.4)
               : colours.outlineVariant,
         ),
         borderRadius: BorderRadius.circular(14),
@@ -240,7 +271,7 @@ class _HouseholdTile extends StatelessWidget {
                         children: <Widget>[
                           Expanded(
                             child: Text(
-                              _HouseholdPicker._billsPhrase(household),
+                              _HouseholdPickerState._billsPhrase(household),
                               style: text.bodySmall,
                             ),
                           ),
@@ -251,13 +282,13 @@ class _HouseholdTile extends StatelessWidget {
                                 vertical: 3,
                               ),
                               decoration: BoxDecoration(
-                                color: colours.tertiaryContainer,
+                                color: colours.errorContainer,
                                 borderRadius: BorderRadius.circular(999),
                               ),
                               child: Text(
                                 '${household.overdueCount} overdue',
                                 style: text.labelSmall?.copyWith(
-                                  color: colours.onTertiaryContainer,
+                                  color: colours.onErrorContainer,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),

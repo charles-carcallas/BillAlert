@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../domain/entities/app_user.dart';
 import '../../domain/entities/bill.dart';
+import '../../domain/value_objects/money.dart';
 import '../../domain/value_objects/ph_date.dart';
 import '../auth/auth_controller.dart';
 import '../common/failure_banner.dart';
@@ -50,7 +51,11 @@ class CurrentBillScreen extends ConsumerWidget {
                   state.failure == null)
                 _NoCurrentBill(history: state.history)
               else if (state.currentBill case final Bill bill) ...<Widget>[
-                _CurrentAmountPanel(bill: bill, today: today),
+                _CurrentAmountPanel(
+                  bill: bill,
+                  today: today,
+                  earlier: _earlierUnpaid(bill, state.history),
+                ),
                 if (bill.isOverdueOn(today)) ...<Widget>[
                   const SizedBox(height: 14),
                   _PastDueNotice(bill: bill),
@@ -113,11 +118,61 @@ class _GreetingHeader extends StatelessWidget {
   }
 }
 
+/// The bills behind this one that are still owed.
+///
+/// The headline on this screen used to be one month's balance, which is not
+/// what a household owes: a July bill left unpaid does not stop being owed
+/// when August arrives, and it was only visible by scrolling History. The
+/// panel adds them up instead, and shows the parts underneath so the total
+/// is never a figure nobody can account for.
+///
+/// Sorted oldest first, which is the order a cashier settles them in.
+/// Unpriced bills contribute nothing — `Bill.balance` is zero until the
+/// cooperative posts an amount, so a reading with no peso figure can never
+/// inflate what a household is told it owes.
+///
+/// Drawn from the loaded history, which is the most recent twelve cycles.
+/// A debt older than that is not counted here; `v_consumer_outstanding` is
+/// the server's own total and is what the Cashier's screen trusts.
+List<Bill> _earlierUnpaid(Bill current, List<Bill> history) {
+  final List<Bill> earlier =
+      history
+          .where(
+            (Bill other) =>
+                other.id != current.id && other.isPayable && !other.isSettled,
+          )
+          .toList()
+        ..sort((Bill a, Bill b) => a.cycle.compareTo(b.cycle));
+  return earlier;
+}
+
 class _CurrentAmountPanel extends StatelessWidget {
   final Bill bill;
   final PhDate today;
+  final List<Bill> earlier;
 
-  const _CurrentAmountPanel({required this.bill, required this.today});
+  const _CurrentAmountPanel({
+    required this.bill,
+    required this.today,
+    required this.earlier,
+  });
+
+  /// Everything the household still owes, this month and before.
+  Money get _totalUnpaid => earlier.fold<Money>(
+    bill.balance,
+    (Money running, Bill other) => running + other.balance,
+  );
+
+  /// "Amount pending" belongs on a screen with nothing owed on it. Once an
+  /// older bill is outstanding there is a real figure to show, and an
+  /// unpriced current month must not hide it behind the word "pending".
+  bool get _showsPending => bill.isUnpriced && earlier.isEmpty;
+
+  String get _headline {
+    if (_showsPending) return 'Current billing month';
+    if (earlier.isEmpty) return 'Amount due';
+    return 'Total amount unpaid';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -135,20 +190,41 @@ class _CurrentAmountPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(
-            bill.isUnpriced ? 'Current billing month' : 'Amount due',
-            style: text.bodyMedium,
-          ),
+          // "Amount due" was the balance of one month. It is only the whole
+          // truth when nothing older is outstanding, so the label says which
+          // of the two it is rather than quietly meaning both.
+          Text(_headline, style: text.bodyMedium),
           const SizedBox(height: 4),
           Text(
-            bill.isUnpriced ? 'Amount pending' : bill.balance.format(),
+            _showsPending ? 'Amount pending' : _totalUnpaid.format(),
             style: text.headlineMedium?.copyWith(
-              fontSize: bill.isUnpriced ? 28 : 42,
+              fontSize: _showsPending ? 28 : 42,
               height: 1.15,
               letterSpacing: -1,
               fontWeight: FontWeight.w700,
             ),
           ),
+          // The total broken into the months it came from. Shown only when
+          // there is something older, because with one bill the breakdown
+          // would just repeat the figure above it.
+          if (earlier.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 14),
+            _UnpaidLine(
+              label: bill.isUnpriced
+                  ? '${bill.cycle.displayName} (awaiting amount)'
+                  : '${bill.cycle.displayName} (this bill)',
+              value: bill.isUnpriced ? null : bill.balance,
+            ),
+            const SizedBox(height: 6),
+            for (final Bill other in earlier) ...<Widget>[
+              _UnpaidLine(
+                label: '${other.cycle.displayName} (unpaid)',
+                value: other.balance,
+                overdue: other.isOverdueOn(today),
+              ),
+              const SizedBox(height: 6),
+            ],
+          ],
           const SizedBox(height: 12),
           _BillStatusLine(bill: bill, today: today),
           const SizedBox(height: 18),
@@ -261,6 +337,51 @@ class _BillStatusLine extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// One month's share of the total, as a label and a figure.
+class _UnpaidLine extends StatelessWidget {
+  final String label;
+
+  /// Null for a bill the cooperative has not priced, which is owed nothing
+  /// yet and must not be printed as a zero peso debt.
+  final Money? value;
+  final bool overdue;
+
+  const _UnpaidLine({
+    required this.label,
+    required this.value,
+    this.overdue = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme text = Theme.of(context).textTheme;
+    final ColorScheme colours = Theme.of(context).colorScheme;
+    final Money? amount = value;
+
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: Text(
+            label,
+            style: text.bodySmall?.copyWith(
+              color: overdue ? colours.error : null,
+              fontWeight: overdue ? FontWeight.w600 : null,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          amount == null ? 'Not posted yet' : amount.format(),
+          style: text.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: overdue ? colours.error : null,
+          ),
+        ),
+      ],
     );
   }
 }
