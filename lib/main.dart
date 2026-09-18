@@ -6,7 +6,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/config/app_config.dart';
 import 'data/network/fail_fast_http_client.dart';
 import 'data/network/network_status.dart';
-import 'demo/demo_environment.dart';
 import 'presentation/app.dart';
 import 'presentation/providers.dart';
 
@@ -24,32 +23,28 @@ Future<void> main() async {
   // offline indicator that shows it.
   final NetworkStatus networkStatus = NetworkStatus();
 
-  if (!AppConfig.demoMode) {
-    final FailFastHttpClient httpClient = FailFastHttpClient(networkStatus);
-    await Supabase.initialize(
-      url: AppConfig.supabaseUrl,
-      // Supabase now calls this the publishable key; the dashboard and every
-      // tutorial still label it "anon key", so the dart-define keeps that
-      // name.
-      publishableKey: AppConfig.supabaseAnonKey,
-      // Fails at once with no signal and gives up on a stalled server, so
-      // screens fall back to the phone's cache without a long spinner.
-      httpClient: httpClient,
-    );
-    // "Retry" on the offline bar asks the server directly. Any HTTP answer at
-    // all, even a refusal, proves it can be reached.
-    networkStatus.pingServer = () async {
-      try {
-        await httpClient.head(Uri.parse('${AppConfig.supabaseUrl}/rest/v1/'));
-      } catch (_) {}
-    };
-  }
-
+  final FailFastHttpClient httpClient = FailFastHttpClient(networkStatus);
+  await Supabase.initialize(
+    url: AppConfig.supabaseUrl,
+    // Supabase now calls this the publishable key; the dashboard and every
+    // tutorial still label it "anon key", so the dart-define keeps that
+    // name.
+    publishableKey: AppConfig.supabaseAnonKey,
+    // Fails at once with no signal and gives up on a stalled server, so
+    // screens fall back to the phone's cache without a long spinner.
+    httpClient: httpClient,
+  );
+  // "Retry" on the offline bar asks the server directly. Any HTTP answer at
+  // all, even a refusal, proves it can be reached.
+  networkStatus.pingServer = () async {
+    try {
+      await httpClient.head(Uri.parse('${AppConfig.supabaseUrl}/rest/v1/'));
+    } catch (_) {}
+  };
   runApp(
     ProviderScope(
       overrides: <Override>[
         networkStatusProvider.overrideWith((Ref ref) => networkStatus),
-        if (AppConfig.demoMode) ...demoProviderOverrides(),
       ],
       child: const BillAlertApp(),
     ),

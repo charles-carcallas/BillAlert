@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../core/config/app_config.dart';
 import 'appearance_controller.dart';
 import 'router.dart';
 import 'theme.dart';
@@ -20,13 +19,6 @@ class BillAlertApp extends ConsumerWidget {
       themeMode:
           ref.watch(appearanceControllerProvider).value ?? ThemeMode.system,
       routerConfig: ref.watch(routerProvider),
-      builder: (BuildContext context, Widget? child) => AppConfig.demoMode
-          ? Banner(
-              message: 'DEMO DATA',
-              location: BannerLocation.topEnd,
-              child: child ?? const SizedBox.shrink(),
-            )
-          : child ?? const SizedBox.shrink(),
     );
   }
 }

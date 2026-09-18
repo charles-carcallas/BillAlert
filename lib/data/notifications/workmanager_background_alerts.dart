@@ -29,7 +29,7 @@ void phoneAlertsCallbackDispatcher() {
       // this is called.
       DartPluginRegistrant.ensureInitialized();
 
-      if (!AppConfig.isConfigured || AppConfig.demoMode) return true;
+      if (!AppConfig.isConfigured) return true;
 
       await Supabase.initialize(
         url: AppConfig.supabaseUrl,

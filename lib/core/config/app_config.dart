@@ -15,16 +15,6 @@
 class AppConfig {
   const AppConfig._();
 
-  /// A self-contained rehearsal build with controlled in-memory data.
-  ///
-  /// This is compile-time on purpose: a demo APK cannot be switched over to
-  /// the live project by somebody tapping the wrong control. The ordinary
-  /// build defaults to false and behaves exactly as before.
-  static const bool demoMode = bool.fromEnvironment(
-    'DEMO_MODE',
-    defaultValue: false,
-  );
-
   /// The Supabase project URL, e.g. https://abcdefgh.supabase.co
   static const String supabaseUrl = String.fromEnvironment('SUPABASE_URL');
 
@@ -48,7 +38,7 @@ class AppConfig {
 
   /// True when the app was built with both Supabase values supplied.
   static bool get isConfigured =>
-      demoMode || (supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty);
+      supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
 
   /// Shown instead of the login screen when someone runs a build without the
   /// dart-defines, which is the most common first-run mistake.

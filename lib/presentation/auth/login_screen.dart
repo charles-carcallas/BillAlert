@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/config/app_config.dart';
 import '../../core/errors/app_failure.dart';
 import '../../domain/entities/app_user.dart';
 import '../common/failure_banner.dart';
@@ -198,23 +197,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     textAlign: TextAlign.center,
                     style: textTheme.bodyMedium,
                   ),
-                  if (AppConfig.demoMode) ...<Widget>[
-                    const SizedBox(height: 16),
-                    Card(
-                      color: colorScheme.secondaryContainer,
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Text(
-                          'Demo data · Username: admin, reader, cashier, or '
-                          'consumer · Password: demo',
-                          textAlign: TextAlign.center,
-                          style: textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSecondaryContainer,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
                   const SizedBox(height: 24),
                   if (locked && signedIn != null)
                     ..._unlockPanel(signedIn, textTheme, colorScheme)
