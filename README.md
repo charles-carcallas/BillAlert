@@ -7,6 +7,63 @@ CS 312 Mobile Application Development · Bohol Island State University
 Team: Carcallas (Admin, lead) · Busalanan (Meter Reader) · Obiso (Cashier) ·
 Basio (Consumer)
 
+BillAlert brings meter readings, cooperative bill amounts, cash collections,
+receipts, and household alerts into one role-based Flutter application.
+Android is the supported platform; the web build is available for development
+and screen previews.
+
+## Features by role
+
+| Role | Main screens | Purpose |
+|---|---|---|
+| Admin / Area President | Amounts, Notices, Accounts, Profile | Post cooperative-provided amounts, manage disconnection notices, and create staff and household accounts within the assigned area. |
+| Meter Reader | Readings, Consumers, Remit, Profile | Browse the household roster, enter meter readings, view reading sheets, and review remittance information. |
+| Cashier | Consumers, Receipts, Remit, Profile | Find a household, record a cash payment, review receipts, and record remittance handovers. |
+| Consumer | Bill, History, Inbox, Profile | View the current bill, previous bills and receipts, and billing notifications. |
+
+These screens are implemented in the current source. Availability of data,
+account-management actions, and SMS delivery depends on the configured backend.
+See [backend setup](supabase/README.md) for the migration order and Edge Functions.
+
+---
+
+## App previews
+
+Mobile-sized captures (390 × 844 CSS viewport @ 2× scale, 780 × 1688 px resolution) taken from the web build in Microsoft Edge. Sensitive personal data, account numbers, meter IDs, receipt identifiers, and financial amounts are solidly masked with opaque overlays for privacy.
+
+> [!NOTE]
+> Web previews demonstrate responsive mobile UI layouts and navigation. Platform-specific security features — such as biometric fingerprint authentication and SQLCipher hardware keystore encryption — run exclusively on Android hardware.
+
+### Sign-in
+
+| Sign-in screen |
+| :---: |
+| <img src="docs/screenshots/login.png" width="280" alt="Sign-in screen" /><br><sub>_Role-agnostic authentication with automatic `@billalert.local` domain resolution_</sub> |
+
+### Admin / Area President
+
+| Post bill amount | Disconnection notices | Account management |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/admin_amounts.png" width="240" alt="Post bill amount" /><br><sub>_Post cooperative-provided amounts_</sub> | <img src="docs/screenshots/admin_notices.png" width="240" alt="Disconnection notices" /><br><sub>_Review overdue disconnection notices_</sub> | <img src="docs/screenshots/admin_accounts.png" width="240" alt="Account management" /><br><sub>_Create staff and consumer accounts_</sub> |
+
+### Meter Reader
+
+| Readings & route progress | Household roster |
+| :---: | :---: |
+| <img src="docs/screenshots/reader_readings.png" width="250" alt="Readings and route progress" /><br><sub>_Monthly cycle reading tracker & queue_</sub> | <img src="docs/screenshots/reader_consumers.png" width="250" alt="Household roster" /><br><sub>_Assigned area household directory_</sub> |
+
+### Cashier
+
+| Payable consumer bills | Receipts & collection ledger |
+| :---: | :---: |
+| <img src="docs/screenshots/cashier_consumers.png" width="250" alt="Payable consumer bills" /><br><sub>_Outstanding consumer balance directory_</sub> | <img src="docs/screenshots/cashier_receipts.png" width="250" alt="Receipts and collection ledger" /><br><sub>_Recorded payment receipts and daily totals_</sub> |
+
+### Consumer
+
+| Current bill status | Billing & payment history | Alerts & notification inbox |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/consumer_bill.png" width="240" alt="Current bill status" /><br><sub>_Bill status and payment breakdown_</sub> | <img src="docs/screenshots/consumer_history.png" width="240" alt="Billing and payment history" /><br><sub>_Settled receipts & invoice archive_</sub> | <img src="docs/screenshots/consumer_inbox.png" width="240" alt="Alerts and notification inbox" /><br><sub>_SMS bill notices & payment reminders_</sub> |
+
 ---
 
 ## The one rule to read before anything else
@@ -57,8 +114,13 @@ development convenience. The `ios/` and `windows/` folders are as
 ### Running in a browser
 
 ```bash
-flutter run -d chrome --dart-define=SUPABASE_URL=https://YOUR-PROJECT.supabase.co --dart-define=SUPABASE_ANON_KEY=YOUR-ANON-KEY
+flutter run -d edge --dart-define=SUPABASE_URL=https://YOUR-PROJECT.supabase.co --dart-define=SUPABASE_ANON_KEY=YOUR-ANON-KEY
 ```
+
+On Windows, this opens Microsoft Edge. Use `-d chrome` for Chrome instead.
+For portrait phone previews in Edge, open Developer Tools, enable the device
+toolbar, and select a responsive viewport of **390 × 844 CSS pixels** at 100%
+page zoom. Browser previews do not verify Android-specific functionality.
 
 Useful when you want to iterate on a screen without waiting for the emulator.
 Two things are committed under `web/` to make it work, and both must stay:
@@ -97,7 +159,7 @@ dart run build_runner build
 The second command generates `lib/data/local/app_database.g.dart` from the
 Drift table definitions.
 
-That file **is** committed, so a fresh clone runs without it and CI needs no
+That file **is** committed, so a fresh clone needs no code-generation step and CI needs no
 codegen step. The cost is that it is 200 KB of generated code in your diffs:
 whenever you change `lib/data/local/tables.dart`, re-run `build_runner` and
 commit the regenerated file in the same commit, or the next person's build
@@ -110,15 +172,35 @@ the generated file.
 The app reads its backend settings from `--dart-define` compile-time variables,
 through the single `AppConfig` class in `lib/core/config/app_config.dart`.
 
-**No key or URL is committed to this repository, and none may be.** This is a
-graded criterion. `.gitignore` already excludes `.env`, `dart_define.json` and
-`run_local.*` so a local convenience file cannot be committed by accident.
+Keep backend configuration and account credentials out of tracked files.
+`.gitignore` excludes `.env`, `env.json`, `dart_define.json`, and local
+`run_local.ps1` / `run_local.sh` files.
 
 | Variable | Required | What it is |
 |---|---|---|
 | `SUPABASE_URL` | yes | `https://<project>.supabase.co` |
 | `SUPABASE_ANON_KEY` | yes | the project's anon / publishable key |
 | `LOGIN_EMAIL_DOMAIN` | no | defaults to `billalert.local` |
+
+For a new backend, follow [the Supabase setup guide](supabase/README.md),
+including its explicit migration order, authentication profiles, and required
+Edge Functions. An existing configured backend does not need to be recreated.
+Never use a Supabase service-role key in the Flutter application.
+
+Alternatively, put the two required settings in a local, ignored `env.json`:
+
+```json
+{
+  "SUPABASE_URL": "https://YOUR-PROJECT.supabase.co",
+  "SUPABASE_ANON_KEY": "YOUR-ANON-KEY"
+}
+```
+
+Then run the browser preview:
+
+```bash
+flutter run -d edge --web-port=5187 --dart-define-from-file=env.json
+```
 
 Run it:
 
@@ -155,9 +237,13 @@ Supabase Auth signs in with an email, but the login screen asks for a username,
 which is what staff are given. The app appends `@billalert.local`:
 
 ```
-username  ledesman.dormal
-sends     ledesman.dormal@billalert.local
+username  demo.reader
+sends     demo.reader@billalert.local
 ```
+
+This is an illustrative username, not a supplied login. Obtain an account
+privately from the project administrator. Enter only the username before `@`
+and your password; credentials are intentionally not published in this README.
 
 So every account in Supabase Auth must be created with that synthetic email,
 and `profiles.username` must match the part before the `@`. Bridging the two is
@@ -172,7 +258,8 @@ login later is a one-file change.
 flutter test
 ```
 
-45 tests, no network and no emulator needed. What they cover:
+The automated suite includes domain, repository, architecture, and widget
+tests. Examples of its coverage:
 
 | File | What it pins down |
 |---|---|
@@ -193,7 +280,7 @@ which the brief requires. Zero warnings is the standard, not a target.
 
 ---
 
-## What is built, and what is not
+## Implementation and platform limits
 
 ### Built — the meter reader's flow, end to end
 
@@ -201,23 +288,19 @@ Sign in → roster (from the encrypted cache, works offline) → reading entry �
 outbox write → sync → `fn_record_meter_reading` → an unpriced bill on the
 server.
 
-### Not built — deliberately
+The Admin, Cashier, and Consumer sections also have implemented screens and
+repository integrations. Role routing is defined in
+[router.dart](lib/presentation/router.dart), with permitted tabs defined by
+[AppUser](lib/domain/entities/app_user.dart). Supabase Row-Level Security
+enforces access to backend records.
 
-The other three roles have their **folder structure, abstract repositories and
-use cases** written, plus a placeholder home screen that routes correctly. The
-screens and the repository implementations are for the people who own them:
-
-| Role | Owner | Write these |
-|---|---|---|
-| Admin | Carcallas | `BillRepositoryImpl`, `NoticeRepositoryImpl`, Post Bill Amount screen |
-| Cashier | Obiso | `PaymentRepositoryImpl`, Collect Payment screen |
-| Consumer | Basio | `NotificationRepositoryImpl`, My Bill / History / Alerts |
-
-The use cases (`PostBillAmount`, `RecordCashPayment`,
-`IssueDisconnectionNotice`) are written rather than left empty, because they
-are where the offline decision lives, and four people each inventing their own
-queueing pattern is exactly what this scaffold exists to prevent. Read
-`RecordMeterReading` first — the others follow it.
+- Existing-account editing is deferred; the Accounts screen provides account
+  creation and forgotten-password recovery.
+- Native phone notifications, fingerprint sign-in, and Android cache encryption
+  must be tested on Android. Edge screenshots only document the visible UI.
+- SMS delivery requires the server functions, scheduler, and gateway described
+  in [the backend guide](supabase/README.md).
+- iOS and Windows desktop targets are not configured product releases.
 
 ---
 

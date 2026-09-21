@@ -77,6 +77,7 @@ final class PostBillAmount {
       capturedAt: clock.nowUtc(),
       billId: bill.id,
       amount: amount.roundUpToWholePeso(),
+      cooperativeAmount: amount,
       dueDate: dueDate,
       billLabel: bill.billNo.value,
     );

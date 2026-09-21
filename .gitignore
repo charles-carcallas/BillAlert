@@ -86,3 +86,8 @@ supabase/.temp/
 # and are not part of the BillAlert application or its project documentation.
 /.agents/
 /AGENTS.md
+
+# Private Android signing material, including copies outside android/.
+key.properties
+*.jks
+*.keystore

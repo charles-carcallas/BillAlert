@@ -19,6 +19,8 @@ void main() {
     'fn_record_payment',
     'fn_issue_disconnection_notice',
     'fn_close_disconnection_notice',
+    'fn_rounding_fund',
+    'fn_record_remit_handover',
   ];
 
   final viewRegex = RegExp(r'create\s+(?:or\s+replace\s+)?view\s+(?:[a-z0-9_]+\.)?([a-z0-9_]+)', caseSensitive: false);

@@ -8,6 +8,8 @@ import 'package:billalert/domain/outbox/outbox_operation.dart';
 import 'package:billalert/domain/value_objects/cycle_label.dart';
 import 'package:billalert/domain/value_objects/ids.dart';
 import 'package:billalert/domain/value_objects/kwh.dart';
+import 'package:billalert/domain/value_objects/money.dart';
+import 'package:billalert/domain/value_objects/ph_date.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -163,6 +165,63 @@ void main() {
     final all = (await outbox.all() as Ok<List<OutboxEntry>>).value;
     expect(all.single.status, OutboxStatus.synced);
     expect(all.single.serverId, 'bill-uuid-from-server');
+  });
+
+  test('an item cut off mid-send is picked up again by the next sync',
+      () async {
+    // Found in review: the app marks an item 'syncing' before sending it. If
+    // Android killed the app at that moment, the item used to stay 'syncing'
+    // forever and never reached the server.
+    await outbox.enqueue(reading());
+    await outbox.markSyncing(const ClientUuid('uuid-1'));
+
+    final entries = (await outbox.pending() as Ok<List<OutboxEntry>>).value;
+
+    expect(entries.single.operation.clientUuid, const ClientUuid('uuid-1'));
+    expect(entries.single.attempts, 1);
+  });
+
+  test('a posted amount keeps BOHECO\'s own figure beside the rounded one',
+      () async {
+    await outbox.enqueue(PostAmountOperation(
+      clientUuid: const ClientUuid('uuid-amount'),
+      capturedAt: capturedAt,
+      billId: const BillId('bill-1'),
+      amount: Money.parse('530.00'),
+      cooperativeAmount: Money.parse('529.40'),
+      dueDate: const PhDate(2026, 9, 28),
+      billLabel: 'BA-202609-000001',
+    ));
+
+    final entries = (await outbox.pending() as Ok<List<OutboxEntry>>).value;
+    final posted = entries.single.operation as PostAmountOperation;
+
+    expect(posted.amount, Money.parse('530.00'));
+    expect(posted.cooperativeAmount, Money.parse('529.40'));
+  });
+
+  test('a synced reading is no longer waiting, and does not block a new one',
+      () async {
+    // Found on a phone: after a September reading synced and was then
+    // deleted on the server, the roster still said "1 reading waiting to
+    // sync" and would not let the household be read again.
+    await outbox.enqueue(reading());
+    await outbox.markSynced(const ClientUuid('uuid-1'), 'bill-1');
+
+    final queued = await readings.queuedConsumerIdsFor(cycle);
+    expect((queued as Ok<Set<ConsumerId>>).value, isEmpty);
+    final isQueued = await readings.isReadingQueuedFor(
+      consumerId: const ConsumerId('consumer-1'),
+      cycle: cycle,
+    );
+    expect((isQueued as Ok<bool>).value, isFalse);
+
+    expect(await outbox.enqueue(reading(uuid: 'uuid-2')), isA<Ok<void>>());
+    final again = await readings.queuedConsumerIdsFor(cycle);
+    expect(
+      (again as Ok<Set<ConsumerId>>).value,
+      <ConsumerId>{const ConsumerId('consumer-1')},
+    );
   });
 
   test('the queue drains oldest capture first', () async {

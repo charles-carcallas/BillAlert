@@ -18,15 +18,34 @@ class ReadingRepositoryImpl implements ReadingRepository {
 
   const ReadingRepositoryImpl(this._db);
 
+  /// Only readings not yet on the server. A key stays behind after its
+  /// reading syncs, and counting it kept a synced reading "waiting to sync"
+  /// forever, and blocked a new reading after the server's was deleted. Once
+  /// synced, the server's own duplicate check is the one that applies.
+  static const String _unsent = '''
+    select k.consumer_id
+      from outbox_reading_keys k
+      join outbox o on o.client_uuid = k.client_uuid
+     where k.cycle_label = ?
+       and o.status <> 'synced'
+  ''';
+
   @override
   Future<Result<Set<ConsumerId>>> queuedConsumerIdsFor(CycleLabel cycle) async {
     try {
-      final query = _db.select(_db.outboxReadingKeys)
-        ..where(($OutboxReadingKeysTable t) => t.cycleLabel.equals(cycle.value));
-      final rows = await query.get();
+      final rows = await _db
+          .customSelect(
+            _unsent,
+            variables: <Variable<Object>>[Variable<String>(cycle.value)],
+            readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+              _db.outboxReadingKeys,
+              _db.outboxRows,
+            },
+          )
+          .get();
       return Ok<Set<ConsumerId>>(
         rows
-            .map((OutboxReadingKeyRow r) => ConsumerId(r.consumerId))
+            .map((QueryRow r) => ConsumerId(r.read<String>('consumer_id')))
             .toSet(),
       );
     } catch (error) {
@@ -43,12 +62,20 @@ class ReadingRepositoryImpl implements ReadingRepository {
     required CycleLabel cycle,
   }) async {
     try {
-      final query = _db.select(_db.outboxReadingKeys)
-        ..where(($OutboxReadingKeysTable t) =>
-            t.consumerId.equals(consumerId.value) &
-            t.cycleLabel.equals(cycle.value));
-      final row = await query.getSingleOrNull();
-      return Ok<bool>(row != null);
+      final rows = await _db
+          .customSelect(
+            '$_unsent and k.consumer_id = ?',
+            variables: <Variable<Object>>[
+              Variable<String>(cycle.value),
+              Variable<String>(consumerId.value),
+            ],
+            readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+              _db.outboxReadingKeys,
+              _db.outboxRows,
+            },
+          )
+          .get();
+      return Ok<bool>(rows.isNotEmpty);
     } catch (error) {
       return Err<bool>(ServerFailure(
         'Could not check whether this household is already recorded.',

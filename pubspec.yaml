@@ -1,7 +1,7 @@
 name: billalert
 description: "BillAlert - electricity billing notifications for Barangay Tubod, Clarin, Bohol."
 publish_to: 'none'
-version: 0.1.0+1
+version: 0.2.0+2
 
 environment:
   sdk: ^3.12.0
@@ -11,6 +11,8 @@ dependencies:
   crypto: ^3.0.7
   device_info_plus: ^13.2.0
   drift: ^2.34.4
+  firebase_analytics: ^12.6.0
+  firebase_core: ^4.15.0
   flutter:
     sdk: flutter
   flutter_local_notifications: ^22.3.1

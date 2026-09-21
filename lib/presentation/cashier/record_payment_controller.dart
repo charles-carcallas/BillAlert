@@ -111,9 +111,9 @@ final class RecordPaymentState {
   /// it. This is not deriving a bill - every figure being added was decided by
   /// the cooperative and typed in by the Admin.
   Money get total => selectedBills.fold(
-        Money.zero,
-        (Money running, Bill bill) => running + bill.balance,
-      );
+    Money.zero,
+    (Money running, Bill bill) => running + bill.balance,
+  );
 
   /// Null when the box is empty or does not read as an amount.
   Money? get cashTendered => Money.tryParse(cashTenderedText);
@@ -152,8 +152,9 @@ class RecordPaymentController extends Notifier<RecordPaymentState> {
     final Future<void>? existing = _inFlightHouseholds;
     if (existing != null) return existing;
 
-    final Future<void> load =
-        _doLoadHouseholds().whenComplete(() => _inFlightHouseholds = null);
+    final Future<void> load = _doLoadHouseholds().whenComplete(
+      () => _inFlightHouseholds = null,
+    );
     _inFlightHouseholds = load;
     return load;
   }
@@ -197,7 +198,9 @@ class RecordPaymentController extends Notifier<RecordPaymentState> {
       isLoadingBills: true,
     );
 
-    switch (await ref.read(billRepositoryProvider).payableFor(household.consumerId)) {
+    switch (await ref
+        .read(billRepositoryProvider)
+        .payableFor(household.consumerId)) {
       case Ok(:final value):
         state = state.copyWith(payableBills: value, isLoadingBills: false);
       case Err(:final failure):
@@ -218,9 +221,8 @@ class RecordPaymentController extends Notifier<RecordPaymentState> {
   /// Selects every month at once, which is what "settle everything" means and
   /// is the common case at the counter.
   void selectAll() => state = state.copyWith(
-        selectedBillIds:
-            state.payableBills.map((Bill b) => b.id.value).toSet(),
-      );
+    selectedBillIds: state.payableBills.map((Bill b) => b.id.value).toSet(),
+  );
 
   void setCashTendered(String text) =>
       state = state.copyWith(cashTenderedText: text);
@@ -259,8 +261,9 @@ class RecordPaymentController extends Notifier<RecordPaymentState> {
 
     // Empty box means the cashier did not record the cash. That is allowed -
     // the column is nullable - and is not the same as zero.
-    final Money? tendered =
-        state.cashTenderedText.trim().isEmpty ? null : state.cashTendered;
+    final Money? tendered = state.cashTenderedText.trim().isEmpty
+        ? null
+        : state.cashTendered;
     if (state.cashTenderedText.trim().isNotEmpty && tendered == null) {
       state = state.copyWith(
         failure: const ValidationFailure(
@@ -317,5 +320,5 @@ class RecordPaymentController extends Notifier<RecordPaymentState> {
 
 final recordPaymentControllerProvider =
     NotifierProvider<RecordPaymentController, RecordPaymentState>(
-  RecordPaymentController.new,
-);
+      RecordPaymentController.new,
+    );

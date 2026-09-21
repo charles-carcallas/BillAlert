@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "173426818421",
+    "project_id": "billalert-e039f",
+    "storage_bucket": "billalert-e039f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:173426818421:android:1cddb6c188e96faef6273c",
+        "android_client_info": {
+          "package_name": "ph.edu.bisu.billalert"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAhZqxgXx4tcGOvrN07qrfsG2TkRw7MPns"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

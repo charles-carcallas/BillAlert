@@ -100,7 +100,15 @@ final class RecordReadingOperation extends OutboxOperation {
 /// FR-21b — the Admin posted the amount the cooperative returned.
 final class PostAmountOperation extends OutboxOperation {
   final BillId billId;
+
+  /// What the household is billed: BOHECO's figure rounded up to the peso.
   final Money amount;
+
+  /// BOHECO's own figure, before rounding. The difference is the Meter
+  /// Reader's share. Null only for an item queued by an older app build,
+  /// which stored the rounded amount alone.
+  final Money? cooperativeAmount;
+
   final PhDate dueDate;
   final String billLabel;
 
@@ -111,6 +119,7 @@ final class PostAmountOperation extends OutboxOperation {
     required this.amount,
     required this.dueDate,
     required this.billLabel,
+    this.cooperativeAmount,
   });
 
   @override
@@ -120,6 +129,7 @@ final class PostAmountOperation extends OutboxOperation {
   Map<String, Object?> toPayloadJson() => <String, Object?>{
         'bill_id': billId.value,
         'amount': amount.toDatabaseString(),
+        'cooperative_amount': cooperativeAmount?.toDatabaseString(),
         'due_date': dueDate.toIso(),
         'bill_label': billLabel,
       };

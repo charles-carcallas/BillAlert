@@ -53,14 +53,57 @@ class SupabaseOutboxGateway implements OutboxGateway {
         'fn_post_bill_amount',
         params: <String, dynamic>{
           'p_bill_id': operation.billId.value,
-          'p_amount': operation.amount.toDatabaseString(),
+          // BOHECO's figure: the server rounds it up for the bill and keeps
+          // it as cooperative_amount. An older queued item has only the
+          // rounded amount, which rounds to itself.
+          'p_amount': (operation.cooperativeAmount ?? operation.amount)
+              .toDatabaseString(),
           'p_due_date': operation.dueDate.toIso(),
           'p_posted_at': operation.capturedAt.toIso8601String(),
         },
       );
       return Ok<String>(notificationId.toString());
     } catch (error, stackTrace) {
+      final String? alreadyPosted = await _samePostOnServer(operation, error);
+      if (alreadyPosted != null) return Ok<String>(alreadyPosted);
       return Err<String>(FailureMapper.from(error, stackTrace));
+    }
+  }
+
+  /// Posting an amount has no client_uuid, so unlike the others a repeat is
+  /// refused with "already has an amount". That happens when the app was
+  /// killed after the first attempt reached the server. If the bill now holds
+  /// exactly this amount and due date, the post did go through: report it as
+  /// done rather than as a failure the Admin cannot fix. A different amount
+  /// is a real conflict and stays an error.
+  Future<String?> _samePostOnServer(
+    PostAmountOperation operation,
+    Object error,
+  ) async {
+    if (!error.toString().contains('already has an amount')) return null;
+    try {
+      final Map<String, dynamic>? bill = await _client
+          .from('bills')
+          .select('total_amount, due_date')
+          .eq('id', operation.billId.value)
+          .maybeSingle();
+      if (bill == null) return null;
+      final Object? amount = bill['total_amount'];
+      if (amount == null ||
+          Money.parse(amount.toString()) != operation.amount ||
+          bill['due_date'] != operation.dueDate.toIso()) {
+        return null;
+      }
+      final Map<String, dynamic>? notice = await _client
+          .from('notifications')
+          .select('id')
+          .eq('bill_id', operation.billId.value)
+          .eq('notif_type', 'bill_ready')
+          .eq('channel', 'push')
+          .maybeSingle();
+      return (notice?['id'] ?? operation.billId.value).toString();
+    } catch (_) {
+      return null;
     }
   }
 

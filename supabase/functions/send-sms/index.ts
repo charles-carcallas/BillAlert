@@ -9,7 +9,7 @@ function reply(body: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 
-// Keeps phone numbers out of the function log: "+639171234567" -> "…4567".
+// Keeps phone numbers out of the function log, retaining only the last four digits.
 function maskPhoneNumbers(text: string): string {
   return text.replace(/\+?\d{6,}(\d{4})/g, "…$1");
 }
@@ -186,4 +186,4 @@ export const handler = async (request: Request) => {
 
   return reply({ ok: true, summary });
 };
-Deno.serve(handler);
+if (import.meta.main) Deno.serve(handler);

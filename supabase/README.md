@@ -26,6 +26,11 @@ Apply to a fresh database in this order:
 | `migrations/12_household_logins.sql` | server-only rules for an Area President giving a household in their own area a sign-in (MTR-04) |
 | `migrations/13_sms_delivery.sql` | SMS delivery tracking: the number each text goes to, claim/accept/sent states, and the server-only functions `send-sms` and `httpsms-webhook` call |
 | `migrations/14_bill_sms.sql` | bill-ready alerts also go out as a text, next to the app alert, so keypad phones are not left out |
+| `migrations/15_bill_meter_readings.sql` | appends meter readings to bill details; preserves view RLS |
+| `migrations/15_sms_event_ordering.sql` | reconciles early webhooks by request ID and prevents late acceptance from resetting final delivery states |
+| `migrations/16_cycle_named_by_reading_month.sql` | files each reading and bill under the month it was read |
+| `migrations/17_bill_cooperative_amount.sql` | keeps BOHECO's own amount beside the rounded bill (`bills.cooperative_amount`) and adds `boheco_share` to `v_payment_history`, so Remit can split the money collected into BOHECO's part and the Meter Reader's rounding share |
+| `migrations/18_remit_handovers.sql` | the Cashier records handing BOHECO's part of the month's money to the Meter Reader (`remit_handovers`, `fn_record_remit_handover`); amounts frozen at the handover |
 | `scheduling/sms_cron.sql` | runs `send-sms` every 15 minutes with `pg_cron` — apply last, see below |
 
 `07` is not optional. Every policy calls a helper in the `app` schema, and
@@ -71,6 +76,20 @@ supabase functions deploy create-household-login
 ```
 
 ### SMS delivery (httpSMS)
+
+**Existing installations:** the user must run the whole
+`migrations/15_sms_event_ordering.sql` file, then redeploy **both**
+`httpsms-webhook` and `send-sms` with the commands below. Do SQL first: the new
+webhook passes a fifth RPC argument. The old four-argument signature remains
+for compatibility. Keep the separate `15_bill_meter_readings.sql`; neither
+file replaces the other. This repository uses the explicit manual run order
+above, not automatic migration discovery by numeric prefix.
+
+The webhook matches an established gateway ID first, then the notification
+ID in `request_id`, and saves the binding under a row lock. An unmatched
+event returns an error rather than silently acknowledging it. Non-final
+expiry events are still ignored by the webhook. Existing lost events are
+not automatically recovered; replay them through the signed provider webhook.
 
 Texts go out through [httpSMS](https://httpsms.com), which sends them from an
 Android phone running its app. Nothing in the Flutter app sends a text: the
@@ -163,6 +182,16 @@ places.
 | `tests/fn_update_own_contact_number_test.sql` | local Postgres — own-household, validation, and staff-denial checks; rolls back |
 | `tests/fn_check_household_login_test.sql` | the Supabase SQL editor is fine here — the rules take the caller as a parameter, so RLS plays no part; rolls back |
 | `tests/sms_delivery_test.sql` | Supabase — it looks up live households by `consumer_no`; queueing, claiming and gateway events; rolls back |
+| `tests/sms_event_ordering_test.sql` | local Postgres after migration 15, with a local household fixture; both delivery orders, final states, replay, binding precedence and grants; rolls back |
+
+Run the isolated HTTP-mocked Edge Function suite (Deno installed):
+
+```sh
+deno test --allow-env supabase/functions/tests/sms_delivery.test.ts
+```
+
+Run that command from the repository root. No network permission is granted
+to the tests, and no real credentials or destination numbers are used.
 
 Run them against a **local Postgres**, not the Supabase SQL editor. The editor
 connects as the table owner, which bypasses every RLS policy, so a suite run

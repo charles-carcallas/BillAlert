@@ -10,29 +10,65 @@ The current `android/app/build.gradle.kts` has:
 
 ```kotlin
 namespace = "ph.edu.bisu.billalert"
-applicationId = "com.example.billalert"
+applicationId = "ph.edu.bisu.billalert"
 ```
 
-These are different settings. Changing `namespace` did not change the installed
-app's identity. Choose the application ID before registering the Firebase app.
-If adopting `ph.edu.bisu.billalert`, finish that change and verify the Android
-manifest and MainActivity package resolve correctly, then build and launch it.
-Otherwise register the existing `com.example.billalert` ID.
+Both settings now agree. Register/select **ph.edu.bisu.billalert** in Firebase.
+The Android manifest and MainActivity package must continue to resolve together.
 
 Changing application ID installs a separate app. Sync pending work in the old
 app first; its session, cached records and outbox do not transfer automatically.
-Do not uninstall an app with work waiting to sync.
+Testers must uninstall the old example-package BillAlert build before installing
+this beta, but **only after all pending work has synced and been verified**.
+Do not uninstall an app with work waiting to sync. If it cannot sync, stop and
+contact the coordinator; uninstalling removes its local queue and cache.
 
 ## 2. Decide signing and versioning
 
-The current release configuration uses `signingConfigs.getByName("debug")`.
-Firebase accepts a signed APK using either a debug key or an app signing key.
-For a stable beta, configure a dedicated release keystore before the first
-distribution and retain that key for subsequent builds. Keep the keystore and
-passwords private and backed up. Changing signatures later can prevent an
-in-place update. See [Flutter Android signing instructions](https://docs.flutter.dev/deployment/android).
+Release builds read `android/key.properties` when it exists. Without that file,
+they fall back to debug signing so other developers can build locally. An
+incomplete properties file fails explicitly; it does not silently fall back.
+**Use the release key for every tester build.**
 
-Current version: `0.1.0+1` in `pubspec.yaml`. Suggested first beta:
+1. From the repository root, run this once (not on every build):
+
+   ```powershell
+   keytool -genkeypair -v -keystore "$env:USERPROFILE\billalert-release.jks" -storetype JKS -keyalg RSA -keysize 2048 -validity 10000 -alias billalert
+   ```
+
+   Choose strong passwords at the prompts, never as command-line arguments.
+   If `keytool` is not on PATH, use the `keytool.exe` in your JDK's `bin`
+   directory (Android Studio's bundled JDK is another option).
+   If this keystore already exists, do not replace it; reuse the original key.
+
+2. Create `android/key.properties` privately in your editor:
+
+   ```properties
+   storeFile=C:/Users/Charles Carcallas/billalert-release.jks
+   storePassword=REPLACE_LOCALLY
+   keyAlias=billalert
+   keyPassword=REPLACE_LOCALLY
+   ```
+
+   Replace placeholders with your chosen passwords. Use forward slashes in
+   Windows paths; relative paths resolve from `android/`. Do not paste the
+   completed file into chat, screenshots, documentation or GitHub.
+
+3. Confirm exclusions without displaying the file contents:
+
+   ```powershell
+   git check-ignore android/key.properties
+   ```
+
+   `key.properties`, `*.jks` and `*.keystore` are ignored. Keep an encrypted
+   backup of the keystore and its passwords outside the repository, and record
+   who holds it. Sign every tester update with this same key and application ID.
+   A previously debug-signed install cannot be updated with the new release key:
+   sync and verify its queued work first, then uninstall it and install the beta.
+
+See [Flutter's signing guide](https://docs.flutter.dev/deployment/android).
+
+Current beta version in `pubspec.yaml`:
 
 ```yaml
 version: 0.2.0+2
@@ -102,6 +138,23 @@ Use the APK workflow for this assignment. Follow the
 if labels differ in your console.
 
 ## 5. Upload and invite testers
+
+### Privacy note to share with testers
+
+BillAlert uses **Google Analytics for Firebase** to understand beta usage and
+engagement. The SDK sends Google automatic events such as first open, sessions
+and engagement, an app-instance identifier, and app/device information such as
+app version, device model, operating system and language. Approximate location
+can be derived from IP addresses; advertising identifiers may also be collected
+where available and permitted by the device and SDK configuration. Do not
+describe this as collecting no personal data. See Google's
+[Analytics data collection description](https://support.google.com/analytics/answer/11593727?hl=en).
+
+Our integration does not deliberately attach household names, mobile numbers,
+passwords, bill amounts or Supabase user IDs to Analytics events. Billing and
+authentication remain in Supabase. Analytics is optional for Firebase App
+Distribution itself, but enabled in this build. Give testers this notice before
+installation; there is currently no in-app Analytics opt-out control.
 
 1. On **Releases**, upload `app-release.apk`.
 2. Add at least three tester email addresses or a tester group.

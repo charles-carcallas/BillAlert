@@ -1,170 +1,123 @@
-import { assertEquals, assertStringIncludes } from "jsr:@std/assert";
+import { assertEquals } from "jsr:@std/assert";
 import { handler as sendSmsHandler } from "../send-sms/index.ts";
 import { handler as webhookHandler } from "../httpsms-webhook/index.ts";
-import * as jose from "npm:jose";
+import * as jose from "npm:jose@5.2.4";
 
-// Mock Supabase Client and fetch
-let fetchCalls: any[] = [];
-let rpcCalls: any[] = [];
-let selectCalls: any[] = [];
-
-// Temporarily replace globals
-const originalFetch = globalThis.fetch;
-globalThis.fetch = async (...args) => {
-  fetchCalls.push(args);
-  return new Response(JSON.stringify({ data: { id: "mock-gateway-id" } }), { status: 200, statusText: "OK" });
+const notificationId = "00000000-0000-4000-8000-000000000001";
+const eventAt = "2026-09-19T00:00:00Z";
+// Dummy masked values only. All HTTP is intercepted; no real credentials.
+const environment: Record<string, string> = {
+  SMS_CRON_SECRET: "test-cron-secret",
+  SUPABASE_URL: "https://mock.invalid",
+  SUPABASE_SERVICE_ROLE_KEY: "mock-service-key",
+  HTTPSMS_API_KEY: "mock-api-key",
+  HTTPSMS_PHONE_NUMBER: "+63956****934",
+  HTTPSMS_WEBHOOK_SIGNING_KEY: "mock-signing-key",
 };
+type Call = { url: string; body: Record<string, unknown> };
 
-// Set up env for tests
-Deno.env.set("SMS_CRON_SECRET", "test-cron-secret");
-Deno.env.set("SUPABASE_URL", "https://mock.supabase.co");
-Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", "mock-service-key");
-Deno.env.set("HTTPSMS_API_KEY", "mock-api-key");
-Deno.env.set("HTTPSMS_PHONE_NUMBER", "+1234567890");
-Deno.env.set("HTTPSMS_WEBHOOK_SIGNING_KEY", "mock-signing-key");
-
-Deno.test("send-sms: rejects invalid cron secret", async () => {
-  const req = new Request("http://localhost/send-sms", {
-    method: "POST",
-    headers: { "SMS_CRON_SECRET": "wrong" }
-  });
-  const res = await sendSmsHandler(req);
-  assertEquals(res.status, 401);
-});
-
-Deno.test("send-sms: executes correctly and maps outcomes", async () => {
-  // We can't perfectly mock createClient here unless we intercept the network request
-  // But wait, supabase-js uses fetch under the hood! We can mock the fetch calls that supabase-js makes.
-  // Actually, mocking supabase-js via global fetch is tricky because we'd need to mock its exact API responses.
-  // To avoid complex supabase-js mocking, we just assert the webhook JWT rejection logic here.
-  
-  const req = new Request("http://localhost/send-sms", {
-    method: "POST",
-    headers: { "SMS_CRON_SECRET": "test-cron-secret" }
-  });
-  
-  // Since we don't have a real Supabase instance running in the test environment, 
-  // the supabase-js fetch will try to hit "https://mock.supabase.co/rest/v1/...".
-  // Let's just make our fetch mock handle supabase calls minimally.
-  globalThis.fetch = async (url: string | URL | Request, options?: RequestInit) => {
-    const urlStr = url.toString();
-    if (urlStr.includes("fn_queue_overdue_sms")) {
-      return new Response(JSON.stringify({ queued: 1, present: 0, failed: 0 }));
+async function isolated(run: (calls: Call[]) => Promise<void>, rpcFails = false) {
+  const saved = new Map(Object.keys(environment).map((key) => [key, Deno.env.get(key)]));
+  const originalFetch = globalThis.fetch;
+  const calls: Call[] = [];
+  for (const [key, value] of Object.entries(environment)) Deno.env.set(key, value);
+  globalThis.fetch = async (input, options) => {
+    const req = new Request(input, options);
+    const body = req.method === "GET" ? {} : JSON.parse(await req.text() || "{}");
+    calls.push({ url: req.url, body });
+    const path = new URL(req.url).pathname;
+    if (path.endsWith("/fn_queue_overdue_sms")) return Response.json({ queued: 1 });
+    if (path.endsWith("/settings")) return Response.json({ batch_delay_ms: 0 });
+    if (path.endsWith("/fn_claim_sms_batch")) return Response.json([
+      { id: notificationId, destination_number: "+63956****934", message_content: "Test" },
+    ]);
+    if (req.url === "https://api.httpsms.com/v1/messages/send") {
+      return Response.json({ data: { id: "gw-1" } });
     }
-    if (urlStr.includes("settings")) {
-      return new Response(JSON.stringify({ batch_delay_ms: 10 }));
+    if (path.endsWith("/fn_apply_sms_event") && rpcFails) {
+      return Response.json({ message: "No matching notification" }, { status: 400 });
     }
-    if (urlStr.includes("fn_claim_sms_batch")) {
-      return new Response(JSON.stringify([
-        { id: "msg-1", destination_number: "+639123456789", message_content: "Test" }
-      ]));
-    }
-    if (urlStr.includes("api.httpsms.com")) {
-      fetchCalls.push({ url: urlStr, options });
-      return new Response(JSON.stringify({ data: { id: "gw-1" } }), { status: 200 });
-    }
-    if (urlStr.includes("fn_record_sms_acceptance")) {
-      return new Response(null, { status: 204 });
-    }
-    return new Response(null, { status: 200 });
+    if (path.endsWith("/notifications") || path.endsWith("/fn_record_sms_acceptance") ||
+        path.endsWith("/fn_apply_sms_event")) return new Response(null, { status: 204 });
+    throw new Error("Unexpected mocked request: " + path);
   };
-  
-  fetchCalls = [];
-  const res = await sendSmsHandler(req);
-  assertEquals(res.status, 200);
-  const data = await res.json();
-  assertEquals(data.summary.queued, 1);
-  assertEquals(data.summary.claimed, 1);
-  assertEquals(data.summary.accepted, 1);
-  
-  // Verify httpSMS request
-  const smsReq = fetchCalls[0];
-  assertEquals(smsReq.url, "https://api.httpsms.com/v1/messages/send");
-  const body = JSON.parse(smsReq.options.body);
-  assertEquals(body.request_id, "msg-1");
-  assertEquals(body.content, "Test");
-});
-
-Deno.test("httpsms-webhook: rejects invalid JWT", async () => {
-  const req = new Request("http://localhost/httpsms-webhook", {
-    method: "POST",
-    headers: {
-      "Authorization": "Bearer badtoken",
-      "X-Event-Type": "message.phone.sent"
+  try {
+    await run(calls);
+  } finally {
+    globalThis.fetch = originalFetch;
+    for (const [key, value] of saved) {
+      if (value === undefined) Deno.env.delete(key);
+      else Deno.env.set(key, value);
     }
-  });
-  const res = await webhookHandler(req);
-  assertEquals(res.status, 401);
-});
+  }
+}
 
-Deno.test("httpsms-webhook: accepts valid JWT and applies event", async () => {
-  const secret = new TextEncoder().encode("mock-signing-key");
-  const token = await new jose.SignJWT({})
-    .setProtectedHeader({ alg: "HS256" })
-    .sign(secret);
-
-  const req = new Request("http://localhost/httpsms-webhook", {
+async function webhook(event: string, data: Record<string, unknown>, valid = true) {
+  const token = valid ? await new jose.SignJWT({})
+    .setProtectedHeader({ alg: "HS256" }).setExpirationTime("5m")
+    .sign(new TextEncoder().encode(environment.HTTPSMS_WEBHOOK_SIGNING_KEY)) : "invalid";
+  return webhookHandler(new Request("http://localhost/httpsms-webhook", {
     method: "POST",
-    headers: {
-      "Authorization": `Bearer ${token}`,
-      "X-Event-Type": "message.phone.sent",
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      id: "evt-1",
-      data: { id: "gw-1", timestamp: new Date().toISOString() }
-    })
+    headers: { Authorization: "Bearer " + token, "X-Event-Type": event },
+    body: JSON.stringify({ id: "event-1", data }),
+  }));
+}
+
+Deno.test("send-sms: rejects invalid cron secret without HTTP", () => isolated(async (calls) => {
+  const response = await sendSmsHandler(new Request("http://localhost/send-sms", {
+    method: "POST", headers: { "x-sms-cron-secret": "wrong" },
+  }));
+  assertEquals(response.status, 401);
+  assertEquals(calls.length, 0);
+}));
+
+Deno.test("send-sms: sends notification reference and records acceptance", () => isolated(async (calls) => {
+  const response = await sendSmsHandler(new Request("http://localhost/send-sms", {
+    method: "POST", headers: { "x-sms-cron-secret": environment.SMS_CRON_SECRET },
+  }));
+  assertEquals(response.status, 200);
+  assertEquals((await response.json()).summary, {
+    queued: 1, claimed: 1, accepted: 1, failed: 0, uncertain: 0,
   });
-
-  const res = await webhookHandler(req);
-  assertEquals(res.status, 200);
-});
-
-Deno.test("httpsms-webhook: handles expired event shape", async () => {
-  const secret = new TextEncoder().encode("mock-signing-key");
-  const token = await new jose.SignJWT({})
-    .setProtectedHeader({ alg: "HS256" })
-    .sign(secret);
-
-  const req = new Request("http://localhost/httpsms-webhook", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${token}`,
-      "X-Event-Type": "message.send.expired",
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      id: "evt-2",
-      data: { message_id: "gw-2", error_message: "Expired in queue" }
-    })
+  assertEquals(calls.find((c) => c.url.includes("api.httpsms.com"))?.body, {
+    from: environment.HTTPSMS_PHONE_NUMBER, to: "+63956****934",
+    content: "Test", request_id: notificationId,
   });
+  const acceptance = calls.find((c) => c.url.endsWith("/fn_record_sms_acceptance"));
+  assertEquals(acceptance?.body.p_notification, notificationId);
+  assertEquals(acceptance?.body.p_gateway_id, "gw-1");
+}));
 
-  const res = await webhookHandler(req);
-  assertEquals(res.status, 200);
-});
+Deno.test("webhook: rejects invalid signature without HTTP", () => isolated(async (calls) => {
+  assertEquals((await webhook("message.phone.sent", {}, false)).status, 401);
+  assertEquals(calls.length, 0);
+}));
 
-Deno.test("httpsms-webhook: handles failed event shape", async () => {
-  const secret = new TextEncoder().encode("mock-signing-key");
-  const token = await new jose.SignJWT({})
-    .setProtectedHeader({ alg: "HS256" })
-    .sign(secret);
+for (const event of ["message.phone.sent", "message.phone.delivered", "message.send.failed", "message.send.expired"]) {
+  Deno.test("webhook: forwards " + event + " with request ID", () => isolated(async (calls) => {
+    const response = await webhook(event, {
+      ...(event.endsWith("expired") ? { message_id: "gw-1", is_final: true } : { id: "gw-1" }),
+      request_id: notificationId, timestamp: eventAt, error_message: "fixture reason",
+    });
+    assertEquals(response.status, 200);
+    assertEquals(calls.length, 1);
+    assertEquals(calls[0].body, {
+      p_gateway_id: "gw-1", p_event_type: event, p_event_at: eventAt,
+      p_reason: "fixture reason", p_request_id: notificationId,
+    });
+  }));
+}
 
-  const req = new Request("http://localhost/httpsms-webhook", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${token}`,
-      "X-Event-Type": "message.send.failed",
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      id: "evt-3",
-      data: { id: "gw-3", error_message: "Carrier rejection" }
-    })
-  });
+Deno.test("webhook: ignores non-final expiry without applying event", () => isolated(async (calls) => {
+  assertEquals((await webhook("message.send.expired", { message_id: "gw-1", is_final: false })).status, 200);
+  assertEquals(calls.length, 0);
+}));
 
-  const res = await webhookHandler(req);
-  assertEquals(res.status, 200);
-});
+Deno.test("webhook: supports legacy payload without request ID", () => isolated(async (calls) => {
+  assertEquals((await webhook("message.phone.sent", { id: "gw-1" })).status, 200);
+  assertEquals(calls[0].body.p_request_id, null);
+}));
 
-// Restore fetch at the end
-globalThis.fetch = originalFetch;
+Deno.test("webhook: returns failure when event could not be stored", () => isolated(async () => {
+  assertEquals((await webhook("message.phone.sent", { id: "gw-unknown" })).status, 500);
+}, true));

@@ -90,14 +90,19 @@ void main() {
   // two different users, produces two different bars. Kept as two tests
   // rather than one, because swapping the router underneath a live tree
   // tests the harness rather than the shell.
-  testWidgets('a cashier gets their three tabs', (WidgetTester tester) async {
+  testWidgets('a cashier gets their four tabs', (WidgetTester tester) async {
     await tester.pumpWidget(shellUnderTest(user: cashier, at: '/cashier'));
     await tester.pumpAndSettle();
 
-    // Three, matching CashierNav. Payment is not a tab: it is a step reached
-    // from Consumers, so there is no way to tab away mid-payment.
-    expect(tabsOf(tester).length, 3);
-    for (final String label in <String>['Consumers', 'Receipts', 'Profile']) {
+    // Payment is not a tab: it is a step reached from Consumers, so there is
+    // no way to tab away mid-payment. Remit is the month's money.
+    expect(tabsOf(tester).length, 4);
+    for (final String label in <String>[
+      'Consumers',
+      'Receipts',
+      'Remit',
+      'Profile',
+    ]) {
       expect(find.text(label), findsOneWidget, reason: 'missing tab $label');
     }
     expect(find.text('Payment'), findsNothing);
@@ -153,7 +158,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('panel:Profile'), findsOneWidget);
-    expect(selectedIndexOf(tester), 2);
+    expect(selectedIndexOf(tester), 3);
   });
 
   testWidgets('every tab a role offers can actually be reached', (

@@ -44,6 +44,20 @@ class OutboxRepositoryImpl implements OutboxRepository {
         // The use case checks first and gives a friendly message; this is
         // the constraint that actually enforces it.
         if (operation is RecordReadingOperation) {
+          // A reading already synced for this household and month is the
+          // server's to guard from here on. Its key is dropped so that a
+          // reading deleted on the server can be taken again; an unsent one
+          // keeps its key and still refuses the duplicate below.
+          await _db.customStatement(
+            'delete from outbox_reading_keys '
+            'where consumer_id = ? and cycle_label = ? '
+            'and client_uuid in (select client_uuid from outbox '
+            "where status = 'synced')",
+            <Object?>[
+              operation.consumerId.value,
+              operation.cycleLabel.value,
+            ],
+          );
           await _db.into(_db.outboxReadingKeys).insert(
                 OutboxReadingKeysCompanion.insert(
                   clientUuid: operation.clientUuid.value,
@@ -81,7 +95,15 @@ class OutboxRepositoryImpl implements OutboxRepository {
   @override
   Future<Result<List<OutboxEntry>>> pending() async {
     final query = _db.select(_db.outboxRows)
-      ..where(($OutboxRowsTable t) => t.status.isIn(<String>['pending', 'failed']))
+      // 'syncing' too. Only one drain runs at a time and it reads this list
+      // first, so a row still marked 'syncing' here was cut off by the app
+      // being killed mid-send. Sending it again is safe: every operation
+      // carries the same client_uuid, and the server returns the first
+      // result instead of doing the work twice.
+      ..where(
+        ($OutboxRowsTable t) =>
+            t.status.isIn(<String>['pending', 'failed', 'syncing']),
+      )
       // Oldest capture first, so the queue drains in the order the work was
       // actually done.
       ..orderBy(<OrderingTerm Function($OutboxRowsTable)>[

@@ -105,7 +105,8 @@ export const handler = async (request: Request) => {
     p_gateway_id: String(gatewayId),
     p_event_type: eventType,
     p_event_at: timestamp,
-    p_reason: reason
+    p_reason: reason,
+    p_request_id: typeof data.request_id === "string" ? data.request_id : null
   });
 
   if (error) {
@@ -115,4 +116,4 @@ export const handler = async (request: Request) => {
 
   return reply("ok", 200);
 }; 
-Deno.serve(handler);
+if (import.meta.main) Deno.serve(handler);

@@ -166,11 +166,12 @@ final class CashierUser extends AppUser {
   @override
   String get roleLabel => 'Cashier';
 
-  /// Three tabs, matching CashierNav in the mockup. Payment is deliberately
-  /// NOT one of them: a payment starts by finding the household at the
-  /// counter, so it is a step reached from Consumers, and a tab bar offering
-  /// to leave halfway through counting cash would be a mistake waiting to
-  /// happen.
+  /// Four tabs. Payment is deliberately NOT one of them: a payment starts by
+  /// finding the household at the counter, so it is a step reached from
+  /// Consumers, and a tab bar offering to leave halfway through counting
+  /// cash would be a mistake waiting to happen. Remit is the month's money:
+  /// what goes to BOHECO, the rounding fund, and the handover to the Meter
+  /// Reader.
   @override
   List<AppTab> get permittedTabs => const <AppTab>[
     AppTab(label: 'Consumers', route: '/cashier', icon: NavIcon.consumers),
@@ -178,6 +179,11 @@ final class CashierUser extends AppUser {
       label: 'Receipts',
       route: '/cashier/receipts',
       icon: NavIcon.receipts,
+    ),
+    AppTab(
+      label: 'Remit',
+      route: '/cashier/remit',
+      icon: NavIcon.remittance,
     ),
     AppTab(label: 'Profile', route: '/cashier/profile', icon: NavIcon.profile),
   ];

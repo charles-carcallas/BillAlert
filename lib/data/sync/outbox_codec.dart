@@ -54,6 +54,9 @@ class OutboxCodec {
           capturedAt: captured,
           billId: BillId(payload['bill_id'] as String),
           amount: Money.parse(payload['amount'] as String),
+          cooperativeAmount: payload['cooperative_amount'] == null
+              ? null
+              : Money.parse(payload['cooperative_amount'] as String),
           dueDate: PhDate.tryParse(payload['due_date'] as String) ??
               PhDate.at(captured),
           billLabel: payload['bill_label'] as String? ?? '',

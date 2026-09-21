@@ -1,4 +1,4 @@
-package com.example.billalert
+package ph.edu.bisu.billalert
 
 import android.app.KeyguardManager
 import android.content.Intent

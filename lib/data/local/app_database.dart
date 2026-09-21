@@ -35,7 +35,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   /// v1 -> v2: the CHECK constraints and the five indexes that the retired
   /// `local_cache_schema.sql` had and this port had lost.
@@ -143,6 +143,12 @@ class AppDatabase extends _$AppDatabase {
         // the Admin's and Cashier's lists still open without signal. A new,
         // empty table: nothing existing is touched.
         await m.createTable(cachedQueries);
+      }
+      if (from < 8) {
+        // Remit splits the money collected into BOHECO's part and the Meter
+        // Reader's rounding share. Nullable: receipts saved before v8 show
+        // the split as not recorded until the next online read.
+        await m.addColumn(cachedPayments, cachedPayments.bohecoShareCentavos);
       }
     },
   );

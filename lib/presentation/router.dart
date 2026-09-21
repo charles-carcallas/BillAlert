@@ -225,6 +225,10 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
             builder: (_, _) => const ReceiptsScreen(),
           ),
           GoRoute(
+            path: '/cashier/remit',
+            builder: (_, _) => const RemittanceScreen(forCashier: true),
+          ),
+          GoRoute(
             path: '/cashier/profile',
             builder: (_, _) => const ProfileScreen(),
           ),

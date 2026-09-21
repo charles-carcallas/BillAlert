@@ -4,11 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/errors/app_failure.dart';
 import '../../core/result/result.dart';
+import '../../domain/entities/bill.dart';
 import '../../domain/repositories/payment_repository.dart';
 import '../../domain/value_objects/cycle_label.dart';
 import '../../domain/value_objects/money.dart';
 import '../../domain/value_objects/ph_date.dart';
 import '../auth/auth_controller.dart';
+import '../cashier/cashier_remit_panel.dart';
 import '../cashier/receipt_details_sheet.dart';
 import '../common/failure_banner.dart';
 import '../providers.dart';
@@ -41,6 +43,107 @@ final monthCollectionsProvider = FutureProvider.autoDispose
         Err(:final failure) => throw failure,
       };
     });
+
+/// The area's bills for [month] that are still not fully paid: the money
+/// still to come in before this month's handover is complete.
+final monthUnpaidProvider = FutureProvider.autoDispose
+    .family<MonthUnpaid, CycleLabel>((Ref ref, CycleLabel month) async {
+      final user = await ref.watch(authControllerProvider.future);
+      final areaId = user?.areaId;
+      if (areaId == null) return MonthUnpaid.none;
+      final result = await ref
+          .read(billRepositoryProvider)
+          .readingsForCycle(areaId, month);
+      return switch (result) {
+        Ok(:final value) => MonthUnpaid.of(value),
+        Err(:final failure) => throw failure,
+      };
+    });
+
+/// What is still lacking for one month's bills in the area.
+final class MonthUnpaid {
+  /// Unpaid balances of the bills that have an amount.
+  final Money amount;
+
+  /// Households with a priced bill not yet fully paid.
+  final int households;
+
+  /// Bills read but not yet given an amount by the Area President, so their
+  /// money cannot be counted yet.
+  final int notPriced;
+
+  const MonthUnpaid({
+    required this.amount,
+    required this.households,
+    required this.notPriced,
+  });
+
+  static const MonthUnpaid none = MonthUnpaid(
+    amount: Money.zero,
+    households: 0,
+    notPriced: 0,
+  );
+
+  factory MonthUnpaid.of(Iterable<Bill> bills) {
+    Money amount = Money.zero;
+    final Set<String> households = <String>{};
+    int notPriced = 0;
+    for (final Bill bill in bills) {
+      if (bill.isUnpriced) {
+        notPriced++;
+      } else if (!bill.isSettled) {
+        amount = amount + bill.balance;
+        households.add(bill.consumerId.value);
+      }
+    }
+    return MonthUnpaid(
+      amount: amount,
+      households: households.length,
+      notPriced: notPriced,
+    );
+  }
+}
+
+/// How the cash collected divides between BOHECO and the rounding.
+///
+/// Bills are billed rounded up to the peso, so not every peso collected goes
+/// to the BOHECO office. The rounding stays with the Cashier (see
+/// fn_rounding_fund). The Meter Reader is shown only [handOver], never the
+/// rounding. [unsplit] is money for bills posted before BillAlert kept
+/// BOHECO's own figure: it is handed over whole, because the split for it
+/// was never recorded.
+final class RemitSplit {
+  final Money toBoheco;
+  final Money readerShare;
+  final Money unsplit;
+
+  const RemitSplit({
+    required this.toBoheco,
+    required this.readerShare,
+    required this.unsplit,
+  });
+
+  /// What goes in the envelope for the BOHECO office.
+  Money get handOver => toBoheco + unsplit;
+
+  factory RemitSplit.of(Iterable<PaymentSummary> receipts) {
+    Money boheco = Money.zero;
+    Money reader = Money.zero;
+    Money unsplit = Money.zero;
+    for (final PaymentSummary receipt in receipts) {
+      for (final SettledBill line in receipt.bills) {
+        final Money? share = line.bohecoShare;
+        if (share == null) {
+          unsplit = unsplit + line.amountPaid;
+        } else {
+          boheco = boheco + share;
+          reader = reader + (line.amountPaid - share);
+        }
+      }
+    }
+    return RemitSplit(toBoheco: boheco, readerShare: reader, unsplit: unsplit);
+  }
+}
 
 /// When the collections handed over in [month] were last saved on this phone.
 final monthCollectionsSavedAtProvider = FutureProvider.autoDispose
@@ -98,8 +201,14 @@ CycleLabel _nextMonth(CycleLabel month) => month.month == 12
 /// envelope can be matched before leaving rather than argued over at the
 /// counter. Nothing here is worked out on the phone beyond adding up the
 /// receipts the server issued.
+///
+/// [forCashier] is the Cashier's Remit tab: the same month, plus what the
+/// Meter Reader is not shown - the rounding fund, the reader's pay - and
+/// the record of handing the money over.
 class RemittanceScreen extends ConsumerStatefulWidget {
-  const RemittanceScreen({super.key});
+  final bool forCashier;
+
+  const RemittanceScreen({this.forCashier = false, super.key});
 
   @override
   ConsumerState<RemittanceScreen> createState() => _RemittanceScreenState();
@@ -119,12 +228,20 @@ class _RemittanceScreenState extends ConsumerState<RemittanceScreen> {
     final AsyncValue<List<PaymentSummary>> receipts = ref.watch(
       monthCollectionsProvider(month),
     );
+    final AsyncValue<MonthUnpaid> unpaid = ref.watch(
+      monthUnpaidProvider(month),
+    );
 
     return Scaffold(
       appBar: AppBar(title: const Text('Remittance')),
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: () => ref.refresh(monthCollectionsProvider(month).future),
+          onRefresh: () async {
+            ref.invalidate(monthUnpaidProvider(month));
+            if (widget.forCashier) refreshCashierRemit(ref);
+            ref.invalidate(monthCollectionsProvider(month));
+            await ref.read(monthCollectionsProvider(month).future);
+          },
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: <Widget>[
@@ -134,14 +251,20 @@ class _RemittanceScreenState extends ConsumerState<RemittanceScreen> {
                 isCurrentMonth: month == current,
                 savedAt: savedAt,
                 receipts: receipts.value,
+                unpaid: unpaid,
                 onPrevious: () => setState(() => _month = _shift(month, -1)),
                 onNext: month == current
                     ? null
                     : () => setState(() => _month = _shift(month, 1)),
                 onCopy: receipts.value == null
                     ? null
-                    : () => _copy(context, month, receipts.value!),
+                    : () =>
+                          _copy(context, month, receipts.value!, unpaid.value),
               ),
+              if (widget.forCashier) ...<Widget>[
+                const SizedBox(height: 12),
+                CashierRemitPanel(month: month),
+              ],
               ...receipts.when(
                 loading: () => const <Widget>[
                   Padding(
@@ -194,11 +317,14 @@ class _RemittanceScreenState extends ConsumerState<RemittanceScreen> {
     BuildContext context,
     CycleLabel month,
     List<PaymentSummary> receipts,
+    MonthUnpaid? unpaid,
   ) async {
     final String reader =
         ref.read(authControllerProvider).value?.fullName ?? '';
     await Clipboard.setData(
-      ClipboardData(text: remittanceText(month, receipts, reader: reader)),
+      ClipboardData(
+        text: remittanceText(month, receipts, reader: reader, unpaid: unpaid),
+      ),
     );
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -215,13 +341,26 @@ String remittanceText(
   CycleLabel month,
   List<PaymentSummary> receipts, {
   String reader = '',
+  MonthUnpaid? unpaid,
 }) {
-  final Money total = _totalOf(receipts);
+  final RemitSplit split = RemitSplit.of(receipts);
   final StringBuffer out = StringBuffer()
     ..writeln('BillAlert remittance — ${month.displayName}')
     ..writeln(_periodLabel(month));
   if (reader.isNotEmpty) out.writeln('Meter reader: $reader');
-  out.writeln('Receipts: ${receipts.length}   Total: ${total.format()}');
+  out
+    ..writeln('Receipts: ${receipts.length}')
+    ..writeln('Hand over to BOHECO: ${split.handOver.format()}');
+  if (unpaid != null) {
+    final String who = unpaid.households == 1 ? 'household' : 'households';
+    out.writeln(
+      'Still unpaid for ${month.displayName}: ${unpaid.amount.format()} '
+      '(${unpaid.households} $who)',
+    );
+    if (unpaid.notPriced > 0) {
+      out.writeln('Bills with no amount yet: ${unpaid.notPriced}');
+    }
+  }
   PhDate? day;
   // Oldest first on paper, so it reads in the order the money came in.
   for (final PaymentSummary receipt in receipts.reversed) {
@@ -255,6 +394,7 @@ class _SummaryPanel extends StatelessWidget {
   final bool isCurrentMonth;
   final DateTime? savedAt;
   final List<PaymentSummary>? receipts;
+  final AsyncValue<MonthUnpaid> unpaid;
   final VoidCallback onPrevious;
   final VoidCallback? onNext;
   final VoidCallback? onCopy;
@@ -265,6 +405,7 @@ class _SummaryPanel extends StatelessWidget {
     required this.isCurrentMonth,
     required this.savedAt,
     required this.receipts,
+    required this.unpaid,
     required this.onPrevious,
     required this.onNext,
     required this.onCopy,
@@ -278,6 +419,7 @@ class _SummaryPanel extends StatelessWidget {
     final int households = list == null
         ? 0
         : list.map((PaymentSummary r) => r.consumerId).toSet().length;
+    final RemitSplit? split = list == null ? null : RemitSplit.of(list);
 
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 16),
@@ -320,7 +462,7 @@ class _SummaryPanel extends StatelessWidget {
               children: <Widget>[
                 const SizedBox(height: 6),
                 Text(
-                  'Cash to hand over',
+                  'Hand over to BOHECO',
                   textAlign: TextAlign.center,
                   style: text.labelLarge?.copyWith(
                     color: colours.onSurfaceVariant,
@@ -328,7 +470,7 @@ class _SummaryPanel extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  list == null ? '—' : _totalOf(list).format(),
+                  split == null ? '—' : split.handOver.format(),
                   textAlign: TextAlign.center,
                   style: text.displaySmall?.copyWith(
                     fontWeight: FontWeight.w700,
@@ -339,6 +481,9 @@ class _SummaryPanel extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 14),
+                const SizedBox(height: 8),
+                _UnpaidLine(month: month, unpaid: unpaid),
+                const SizedBox(height: 8),
                 Row(
                   children: <Widget>[
                     Expanded(
@@ -405,6 +550,79 @@ class _SummaryPanel extends StatelessWidget {
                   label: const Text('Copy remittance summary'),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The money still lacking for the month: bills not yet paid in full.
+class _UnpaidLine extends StatelessWidget {
+  final CycleLabel month;
+  final AsyncValue<MonthUnpaid> unpaid;
+
+  const _UnpaidLine({required this.month, required this.unpaid});
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme text = Theme.of(context).textTheme;
+    final ColorScheme colours = Theme.of(context).colorScheme;
+    final MonthUnpaid? value = unpaid.value;
+    final bool lacking = value != null && value.amount > Money.zero;
+    final Color tone = lacking ? colours.error : colours.onSurfaceVariant;
+
+    final String detail;
+    if (value == null) {
+      detail = unpaid.hasError
+          ? 'Could not load the unpaid bills. Pull down to try again.'
+          : 'Checking unpaid bills…';
+    } else {
+      final String who = value.households == 1
+          ? '1 household'
+          : '${value.households} households';
+      final String priced = value.notPriced == 0
+          ? ''
+          : ' · ${value.notPriced} with no amount yet';
+      detail = lacking ? '$who still to pay$priced' : 'All paid$priced';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+      decoration: BoxDecoration(
+        color: colours.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: <Widget>[
+          Icon(Icons.hourglass_bottom_outlined, size: 18, color: tone),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Still unpaid for ${month.displayName}',
+                  style: text.labelMedium?.copyWith(
+                    color: colours.onSurfaceVariant,
+                  ),
+                ),
+                Text(
+                  detail,
+                  style: text.bodySmall?.copyWith(
+                    color: colours.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            value == null ? '—' : value.amount.format(),
+            style: text.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: tone,
+              fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
             ),
           ),
         ],

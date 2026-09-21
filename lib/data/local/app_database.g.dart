@@ -1742,6 +1742,16 @@ class $CachedPaymentsTable extends CachedPayments
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _bohecoShareCentavosMeta =
+      const VerificationMeta('bohecoShareCentavos');
+  @override
+  late final GeneratedColumn<int> bohecoShareCentavos = GeneratedColumn<int>(
+    'boheco_share_centavos',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1757,6 +1767,7 @@ class $CachedPaymentsTable extends CachedPayments
     cashTenderedCentavos,
     changeDueCentavos,
     paidAt,
+    bohecoShareCentavos,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1871,6 +1882,15 @@ class $CachedPaymentsTable extends CachedPayments
     } else if (isInserting) {
       context.missing(_paidAtMeta);
     }
+    if (data.containsKey('boheco_share_centavos')) {
+      context.handle(
+        _bohecoShareCentavosMeta,
+        bohecoShareCentavos.isAcceptableOrUnknown(
+          data['boheco_share_centavos']!,
+          _bohecoShareCentavosMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1932,6 +1952,10 @@ class $CachedPaymentsTable extends CachedPayments
         DriftSqlType.string,
         data['${effectivePrefix}paid_at'],
       )!,
+      bohecoShareCentavos: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}boheco_share_centavos'],
+      ),
     );
   }
 
@@ -1959,6 +1983,10 @@ class CachedPaymentRow extends DataClass
   final int? cashTenderedCentavos;
   final int? changeDueCentavos;
   final String paidAt;
+
+  /// The part of the payment owed to BOHECO. Null when the bill was posted
+  /// before BillAlert kept BOHECO's own figure, or cached before v8.
+  final int? bohecoShareCentavos;
   const CachedPaymentRow({
     required this.id,
     this.consumerId,
@@ -1973,6 +2001,7 @@ class CachedPaymentRow extends DataClass
     this.cashTenderedCentavos,
     this.changeDueCentavos,
     required this.paidAt,
+    this.bohecoShareCentavos,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2010,6 +2039,9 @@ class CachedPaymentRow extends DataClass
       map['change_due_centavos'] = Variable<int>(changeDueCentavos);
     }
     map['paid_at'] = Variable<String>(paidAt);
+    if (!nullToAbsent || bohecoShareCentavos != null) {
+      map['boheco_share_centavos'] = Variable<int>(bohecoShareCentavos);
+    }
     return map;
   }
 
@@ -2046,6 +2078,9 @@ class CachedPaymentRow extends DataClass
           ? const Value.absent()
           : Value(changeDueCentavos),
       paidAt: Value(paidAt),
+      bohecoShareCentavos: bohecoShareCentavos == null && nullToAbsent
+          ? const Value.absent()
+          : Value(bohecoShareCentavos),
     );
   }
 
@@ -2072,6 +2107,9 @@ class CachedPaymentRow extends DataClass
       ),
       changeDueCentavos: serializer.fromJson<int?>(json['changeDueCentavos']),
       paidAt: serializer.fromJson<String>(json['paidAt']),
+      bohecoShareCentavos: serializer.fromJson<int?>(
+        json['bohecoShareCentavos'],
+      ),
     );
   }
   @override
@@ -2093,6 +2131,7 @@ class CachedPaymentRow extends DataClass
       'cashTenderedCentavos': serializer.toJson<int?>(cashTenderedCentavos),
       'changeDueCentavos': serializer.toJson<int?>(changeDueCentavos),
       'paidAt': serializer.toJson<String>(paidAt),
+      'bohecoShareCentavos': serializer.toJson<int?>(bohecoShareCentavos),
     };
   }
 
@@ -2110,6 +2149,7 @@ class CachedPaymentRow extends DataClass
     Value<int?> cashTenderedCentavos = const Value.absent(),
     Value<int?> changeDueCentavos = const Value.absent(),
     String? paidAt,
+    Value<int?> bohecoShareCentavos = const Value.absent(),
   }) => CachedPaymentRow(
     id: id ?? this.id,
     consumerId: consumerId.present ? consumerId.value : this.consumerId,
@@ -2132,6 +2172,9 @@ class CachedPaymentRow extends DataClass
         ? changeDueCentavos.value
         : this.changeDueCentavos,
     paidAt: paidAt ?? this.paidAt,
+    bohecoShareCentavos: bohecoShareCentavos.present
+        ? bohecoShareCentavos.value
+        : this.bohecoShareCentavos,
   );
   CachedPaymentRow copyWithCompanion(CachedPaymentsCompanion data) {
     return CachedPaymentRow(
@@ -2164,6 +2207,9 @@ class CachedPaymentRow extends DataClass
           ? data.changeDueCentavos.value
           : this.changeDueCentavos,
       paidAt: data.paidAt.present ? data.paidAt.value : this.paidAt,
+      bohecoShareCentavos: data.bohecoShareCentavos.present
+          ? data.bohecoShareCentavos.value
+          : this.bohecoShareCentavos,
     );
   }
 
@@ -2182,7 +2228,8 @@ class CachedPaymentRow extends DataClass
           ..write('transactionTotalCentavos: $transactionTotalCentavos, ')
           ..write('cashTenderedCentavos: $cashTenderedCentavos, ')
           ..write('changeDueCentavos: $changeDueCentavos, ')
-          ..write('paidAt: $paidAt')
+          ..write('paidAt: $paidAt, ')
+          ..write('bohecoShareCentavos: $bohecoShareCentavos')
           ..write(')'))
         .toString();
   }
@@ -2202,6 +2249,7 @@ class CachedPaymentRow extends DataClass
     cashTenderedCentavos,
     changeDueCentavos,
     paidAt,
+    bohecoShareCentavos,
   );
   @override
   bool operator ==(Object other) =>
@@ -2219,7 +2267,8 @@ class CachedPaymentRow extends DataClass
           other.transactionTotalCentavos == this.transactionTotalCentavos &&
           other.cashTenderedCentavos == this.cashTenderedCentavos &&
           other.changeDueCentavos == this.changeDueCentavos &&
-          other.paidAt == this.paidAt);
+          other.paidAt == this.paidAt &&
+          other.bohecoShareCentavos == this.bohecoShareCentavos);
 }
 
 class CachedPaymentsCompanion extends UpdateCompanion<CachedPaymentRow> {
@@ -2236,6 +2285,7 @@ class CachedPaymentsCompanion extends UpdateCompanion<CachedPaymentRow> {
   final Value<int?> cashTenderedCentavos;
   final Value<int?> changeDueCentavos;
   final Value<String> paidAt;
+  final Value<int?> bohecoShareCentavos;
   final Value<int> rowid;
   const CachedPaymentsCompanion({
     this.id = const Value.absent(),
@@ -2251,6 +2301,7 @@ class CachedPaymentsCompanion extends UpdateCompanion<CachedPaymentRow> {
     this.cashTenderedCentavos = const Value.absent(),
     this.changeDueCentavos = const Value.absent(),
     this.paidAt = const Value.absent(),
+    this.bohecoShareCentavos = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   CachedPaymentsCompanion.insert({
@@ -2267,6 +2318,7 @@ class CachedPaymentsCompanion extends UpdateCompanion<CachedPaymentRow> {
     this.cashTenderedCentavos = const Value.absent(),
     this.changeDueCentavos = const Value.absent(),
     required String paidAt,
+    this.bohecoShareCentavos = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        receiptNo = Value(receiptNo),
@@ -2286,6 +2338,7 @@ class CachedPaymentsCompanion extends UpdateCompanion<CachedPaymentRow> {
     Expression<int>? cashTenderedCentavos,
     Expression<int>? changeDueCentavos,
     Expression<String>? paidAt,
+    Expression<int>? bohecoShareCentavos,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2305,6 +2358,8 @@ class CachedPaymentsCompanion extends UpdateCompanion<CachedPaymentRow> {
         'cash_tendered_centavos': cashTenderedCentavos,
       if (changeDueCentavos != null) 'change_due_centavos': changeDueCentavos,
       if (paidAt != null) 'paid_at': paidAt,
+      if (bohecoShareCentavos != null)
+        'boheco_share_centavos': bohecoShareCentavos,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2323,6 +2378,7 @@ class CachedPaymentsCompanion extends UpdateCompanion<CachedPaymentRow> {
     Value<int?>? cashTenderedCentavos,
     Value<int?>? changeDueCentavos,
     Value<String>? paidAt,
+    Value<int?>? bohecoShareCentavos,
     Value<int>? rowid,
   }) {
     return CachedPaymentsCompanion(
@@ -2340,6 +2396,7 @@ class CachedPaymentsCompanion extends UpdateCompanion<CachedPaymentRow> {
       cashTenderedCentavos: cashTenderedCentavos ?? this.cashTenderedCentavos,
       changeDueCentavos: changeDueCentavos ?? this.changeDueCentavos,
       paidAt: paidAt ?? this.paidAt,
+      bohecoShareCentavos: bohecoShareCentavos ?? this.bohecoShareCentavos,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2388,6 +2445,9 @@ class CachedPaymentsCompanion extends UpdateCompanion<CachedPaymentRow> {
     if (paidAt.present) {
       map['paid_at'] = Variable<String>(paidAt.value);
     }
+    if (bohecoShareCentavos.present) {
+      map['boheco_share_centavos'] = Variable<int>(bohecoShareCentavos.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2410,6 +2470,7 @@ class CachedPaymentsCompanion extends UpdateCompanion<CachedPaymentRow> {
           ..write('cashTenderedCentavos: $cashTenderedCentavos, ')
           ..write('changeDueCentavos: $changeDueCentavos, ')
           ..write('paidAt: $paidAt, ')
+          ..write('bohecoShareCentavos: $bohecoShareCentavos, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -6070,6 +6131,7 @@ typedef $$CachedPaymentsTableCreateCompanionBuilder =
       Value<int?> cashTenderedCentavos,
       Value<int?> changeDueCentavos,
       required String paidAt,
+      Value<int?> bohecoShareCentavos,
       Value<int> rowid,
     });
 typedef $$CachedPaymentsTableUpdateCompanionBuilder =
@@ -6087,6 +6149,7 @@ typedef $$CachedPaymentsTableUpdateCompanionBuilder =
       Value<int?> cashTenderedCentavos,
       Value<int?> changeDueCentavos,
       Value<String> paidAt,
+      Value<int?> bohecoShareCentavos,
       Value<int> rowid,
     });
 
@@ -6161,6 +6224,11 @@ class $$CachedPaymentsTableFilterComposer
 
   ColumnFilters<String> get paidAt => $composableBuilder(
     column: $table.paidAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get bohecoShareCentavos => $composableBuilder(
+    column: $table.bohecoShareCentavos,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -6238,6 +6306,11 @@ class $$CachedPaymentsTableOrderingComposer
     column: $table.paidAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get bohecoShareCentavos => $composableBuilder(
+    column: $table.bohecoShareCentavos,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$CachedPaymentsTableAnnotationComposer
@@ -6303,6 +6376,11 @@ class $$CachedPaymentsTableAnnotationComposer
 
   GeneratedColumn<String> get paidAt =>
       $composableBuilder(column: $table.paidAt, builder: (column) => column);
+
+  GeneratedColumn<int> get bohecoShareCentavos => $composableBuilder(
+    column: $table.bohecoShareCentavos,
+    builder: (column) => column,
+  );
 }
 
 class $$CachedPaymentsTableTableManager
@@ -6355,6 +6433,7 @@ class $$CachedPaymentsTableTableManager
                 Value<int?> cashTenderedCentavos = const Value.absent(),
                 Value<int?> changeDueCentavos = const Value.absent(),
                 Value<String> paidAt = const Value.absent(),
+                Value<int?> bohecoShareCentavos = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CachedPaymentsCompanion(
                 id: id,
@@ -6370,6 +6449,7 @@ class $$CachedPaymentsTableTableManager
                 cashTenderedCentavos: cashTenderedCentavos,
                 changeDueCentavos: changeDueCentavos,
                 paidAt: paidAt,
+                bohecoShareCentavos: bohecoShareCentavos,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6387,6 +6467,7 @@ class $$CachedPaymentsTableTableManager
                 Value<int?> cashTenderedCentavos = const Value.absent(),
                 Value<int?> changeDueCentavos = const Value.absent(),
                 required String paidAt,
+                Value<int?> bohecoShareCentavos = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CachedPaymentsCompanion.insert(
                 id: id,
@@ -6402,6 +6483,7 @@ class $$CachedPaymentsTableTableManager
                 cashTenderedCentavos: cashTenderedCentavos,
                 changeDueCentavos: changeDueCentavos,
                 paidAt: paidAt,
+                bohecoShareCentavos: bohecoShareCentavos,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

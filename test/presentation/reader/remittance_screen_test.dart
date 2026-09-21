@@ -1,8 +1,10 @@
 import 'package:billalert/core/result/result.dart';
 import 'package:billalert/domain/entities/app_user.dart';
+import 'package:billalert/domain/entities/bill.dart';
 import 'package:billalert/domain/repositories/payment_repository.dart';
 import 'package:billalert/domain/value_objects/cycle_label.dart';
 import 'package:billalert/domain/value_objects/ids.dart';
+import 'package:billalert/domain/value_objects/kwh.dart';
 import 'package:billalert/domain/value_objects/money.dart';
 import 'package:billalert/domain/value_objects/ph_date.dart';
 import 'package:billalert/presentation/auth/auth_controller.dart';
@@ -203,7 +205,10 @@ void main() {
     ]);
 
     expect(find.text('September 2026'), findsOneWidget);
+    // Bills posted before the split was kept: all of it goes to BOHECO.
     expect(find.text('₱1,271.00'), findsOneWidget);
+    // The Meter Reader is never shown the rounding.
+    expect(find.textContaining('share'), findsNothing);
     expect(find.text('Late August'), findsOneWidget);
     expect(find.text('Next Envelope'), findsNothing);
     expect(find.text('Collected 29 Aug – 28 Sep 2026'), findsOneWidget);
@@ -244,5 +249,92 @@ void main() {
       find.text('No payments collected in September 2026.'),
       findsOneWidget,
     );
+  });
+
+  group('the rounding share', () {
+    SettledBill line(int paid, int? boheco) => SettledBill(
+      billId: const BillId('b'),
+      billNo: const BillNumber('BA-1'),
+      cycleLabel: 'September 2026',
+      amountPaid: Money.fromCentavos(paid),
+      bohecoShare: boheco == null ? null : Money.fromCentavos(boheco),
+    );
+
+    PaymentSummary paid(List<SettledBill> bills) => PaymentSummary(
+      receiptNo: 'R',
+      consumerId: const ConsumerId('c1'),
+      consumerName: 'Test',
+      verificationCode: 'V',
+      paidAt: DateTime.utc(2026, 9, 10),
+      totalCollected: bills.fold(
+        Money.zero,
+        (Money sum, SettledBill b) => sum + b.amountPaid,
+      ),
+      bills: bills,
+    );
+
+    test('BOHECO gets its figure, the reader keeps the rounding', () {
+      // BOHECO said 529.40; the household paid 530.00.
+      final split = RemitSplit.of(<PaymentSummary>[
+        paid(<SettledBill>[line(53000, 52940)]),
+      ]);
+
+      expect(split.toBoheco, const Money.fromCentavos(52940));
+      expect(split.readerShare, const Money.fromCentavos(60));
+      expect(split.handOver, const Money.fromCentavos(52940));
+    });
+
+    test('a bill posted before the split was kept is handed over whole', () {
+      final split = RemitSplit.of(<PaymentSummary>[
+        paid(<SettledBill>[line(53000, 52940), line(70400, null)]),
+      ]);
+
+      expect(split.readerShare, const Money.fromCentavos(60));
+      expect(split.unsplit, const Money.fromCentavos(70400));
+      expect(split.handOver, const Money.fromCentavos(52940 + 70400));
+    });
+
+    test('the copied summary says what goes to BOHECO and what is lacking', () {
+      final copied = remittanceText(
+        const CycleLabel(2026, 9),
+        <PaymentSummary>[
+          paid(<SettledBill>[line(53000, 52940)]),
+        ],
+        unpaid: const MonthUnpaid(
+          amount: Money.fromCentavos(104000),
+          households: 2,
+          notPriced: 1,
+        ),
+      );
+
+      expect(copied, contains('Hand over to BOHECO: ₱529.40'));
+      expect(copied, isNot(contains('share')));
+      expect(copied, contains('Still unpaid for September 2026: ₱1,040.00'));
+      expect(copied, contains('Bills with no amount yet: 1'));
+    });
+  });
+
+  test('still unpaid: balances of priced bills, and unpriced ones counted', () {
+    Bill bill(String consumer, int? total, {int paid = 0}) => Bill(
+      id: BillId('b-$consumer'),
+      billNo: BillNumber('BA-$consumer'),
+      consumerId: ConsumerId(consumer),
+      cycle: const CycleLabel(2026, 9),
+      consumption: Kwh.parse('100'),
+      totalAmount: total == null ? null : Money.fromCentavos(total),
+      dueDate: total == null ? null : const PhDate(2026, 9, 28),
+      amountPaid: Money.fromCentavos(paid),
+    );
+
+    final unpaid = MonthUnpaid.of(<Bill>[
+      bill('paid', 53000, paid: 53000),
+      bill('partly', 53000, paid: 20000),
+      bill('none', 70400),
+      bill('unpriced', null),
+    ]);
+
+    expect(unpaid.amount, const Money.fromCentavos(33000 + 70400));
+    expect(unpaid.households, 2);
+    expect(unpaid.notPriced, 1);
   });
 }

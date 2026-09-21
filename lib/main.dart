@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/config/app_config.dart';
+import 'data/analytics/firebase_startup.dart';
 import 'data/network/fail_fast_http_client.dart';
 import 'data/network/network_status.dart';
 import 'presentation/app.dart';
@@ -49,4 +52,6 @@ Future<void> main() async {
       child: const BillAlertApp(),
     ),
   );
+  // Never await telemetry on the critical startup path, especially offline.
+  unawaited(initializeOptionalFirebase());
 }

@@ -25,6 +25,7 @@
     "payments",
     "ph_holidays",
     "profiles",
+    "remit_handovers",
     "settings",
     "sms_providers"
   ],
@@ -34,6 +35,8 @@
     "fn_post_bill_amount",
     "fn_record_meter_reading",
     "fn_record_payment",
+    "fn_record_remit_handover",
+    "fn_rounding_fund",
     "fn_update_own_contact_number"
   ],
   "rpc_internal": [

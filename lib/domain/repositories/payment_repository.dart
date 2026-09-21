@@ -40,6 +40,88 @@ abstract class PaymentRepository {
     AreaId areaId, {
     required DateTime from,
   });
+
+  /// The rounding fund month by month, oldest first: the rounding collected,
+  /// the Meter Reader's pay from it and what is saved. Backed by
+  /// `fn_rounding_fund`, which only the Cashier and the Area President may
+  /// call.
+  Future<Result<List<RoundingFundMonth>>> roundingFund(AreaId areaId);
+
+  /// Every handover of BOHECO's money to the Meter Reader recorded in this
+  /// area. Cashier and Area President only.
+  Future<Result<List<RemitHandover>>> remitHandovers(AreaId areaId);
+
+  /// The Cashier records handing [year]/[month]'s BOHECO money to the Meter
+  /// Reader. The server freezes the amounts. Needs signal.
+  Future<Result<RemitHandover>> recordRemitHandover({
+    required int year,
+    required int month,
+  });
+}
+
+/// The Cashier handing one month's BOHECO money to the Meter Reader, as
+/// recorded at that moment.
+final class RemitHandover {
+  final int year;
+  final int month;
+  final Money toBoheco;
+  final Money readerPay;
+  final Money gap;
+  final String? handedToName;
+  final DateTime handedAt;
+
+  const RemitHandover({
+    required this.year,
+    required this.month,
+    required this.toBoheco,
+    required this.readerPay,
+    required this.gap,
+    required this.handedAt,
+    this.handedToName,
+  });
+}
+
+/// One remittance month of the rounding fund.
+///
+/// Bills are rounded up to the peso. That rounding pays the Meter Reader, at
+/// most 300 pesos a month, after enough is kept back to cover what the
+/// month's bills still owe BOHECO. The rest is saved and carries over.
+final class RoundingFundMonth {
+  /// The month handed over on its 28th.
+  final int year;
+  final int month;
+
+  final Money collected;
+  final Money toBoheco;
+  final Money rounding;
+
+  /// What the month's bills still owed BOHECO at the handover.
+  final Money gap;
+
+  final Money fundBefore;
+
+  /// Held back from the fund to cover [gap]. Not handed over by itself: the
+  /// Cashier decides.
+  final Money keptForGap;
+
+  final Money readerPay;
+  final Money fundAfter;
+
+  const RoundingFundMonth({
+    required this.year,
+    required this.month,
+    required this.collected,
+    required this.toBoheco,
+    required this.rounding,
+    required this.gap,
+    required this.fundBefore,
+    required this.keptForGap,
+    required this.readerPay,
+    required this.fundAfter,
+  });
+
+  /// The most the Meter Reader is paid in a month.
+  static const Money payCap = Money.fromCentavos(30000);
 }
 
 /// One cash handover: one receipt, however many bills it settled.
@@ -105,12 +187,21 @@ final class SettledBill {
 
   final Money amountPaid;
 
+  /// How much of [amountPaid] is owed to BOHECO. The rest is the Meter
+  /// Reader's share from rounding the bill up to the peso. Null for a bill
+  /// posted before BillAlert kept BOHECO's own figure.
+  final Money? bohecoShare;
+
   const SettledBill({
     required this.billId,
     required this.billNo,
     required this.cycleLabel,
     required this.amountPaid,
+    this.bohecoShare,
   });
+
+  /// The Meter Reader's share of this line, or null when it is not known.
+  Money? get readerShare => bohecoShare == null ? null : amountPaid - bohecoShare!;
 }
 
 /// One cashier's takings for one day.

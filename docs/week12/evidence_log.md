@@ -174,6 +174,20 @@ that background check, never while the app stays open.
 
 ---
 
+### After the review fixes: bill text and app alert (Carcallas, 19 Sep)
+
+Run after `15_sms_event_ordering.sql` was applied and `httpsms-webhook` and
+`send-sms` were redeployed. The household was Test tset3 (`1234567891011`),
+with the number ending 3934. The app build was the new
+`ph.edu.bisu.billalert` on a TECNO CL8.
+
+- The Area President posted the September amount at 14:23:42 UTC. The SMS row
+  reached `status = sent` via the webhook at 14:24:03 (21 s later), with
+  `failed_reason` null. The text arrived once on the 3934 phone.
+- The app alert (push row) stayed `pending` while BillAlert was in the
+  background, then went to `sent` at 14:35:21 UTC (11 min 39 s after posting)
+  on the background check. The notification appeared on the CL8.
+
 ### Automated checks
 
 | Check | Evidence | Date |

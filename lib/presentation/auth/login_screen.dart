@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/errors/app_failure.dart';
 import '../../domain/entities/app_user.dart';
+import '../common/billalert_logo.dart';
 import '../common/failure_banner.dart';
 import '../providers.dart';
 import 'app_lock_controller.dart';
@@ -170,21 +171,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  Center(
-                    child: Container(
-                      width: 64,
-                      height: 64,
-                      decoration: BoxDecoration(
-                        color: colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      alignment: Alignment.center,
-                      child: const Text(
-                        '⚡',
-                        style: TextStyle(fontSize: 30, height: 1),
-                      ),
-                    ),
-                  ),
+                  const Center(child: BillAlertLogo()),
                   const SizedBox(height: 16),
                   Text(
                     'BillAlert',

@@ -124,6 +124,11 @@ class CachedPayments extends Table {
       integer().named('change_due_centavos').nullable()();
   TextColumn get paidAt => text().named('paid_at')();
 
+  /// The part of the payment owed to BOHECO. Null when the bill was posted
+  /// before BillAlert kept BOHECO's own figure, or cached before v8.
+  IntColumn get bohecoShareCentavos =>
+      integer().named('boheco_share_centavos').nullable()();
+
   @override
   Set<Column<Object>> get primaryKey => <Column<Object>>{id};
 }

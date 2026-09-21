@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Approved BillAlert Figma logo, node 253:2. Keep the house, bolt and bell together. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="512" android:viewportHeight="512">
+    <!-- Center the visible artwork (about 251,244.5), not its SVG canvas.
+         Extra padding compensates for launcher masking and foreground zoom. -->
+    <group android:scaleX="0.60" android:scaleY="0.60" android:translateX="105.4" android:translateY="109.3">
+    <path android:fillColor="#FAFCF5" android:strokeColor="#FAFCF5" android:strokeWidth="10" android:strokeLineJoin="round" android:pathData="M354,145V84H388V175" />
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#FAFCF5" android:strokeWidth="30" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M64,225L243,67L423,225" />
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#FAFCF5" android:strokeWidth="30" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M104,259V412H273" />
+    <path android:fillColor="#FAFCF5" android:pathData="M261,174Q267,168 266,177L239,252H288Q296,252 291,259L220,366Q213,376 216,364L234,291H185Q178,291 183,284Z" />
+    <path android:fillColor="#FFC928" android:pathData="M369,279V269C369,253 393,253 393,269V279Z" />
+    <path android:fillColor="#FFC928" android:pathData="M362,415C362,444 400,444 400,415Z" />
+    <path android:fillColor="#FFC928" android:pathData="M313,390C325,377 326,362 326,340V326C326,298 349,278 381,278C413,278 436,298 436,326V340C436,362 437,377 449,390C455,397 452,405 442,405H320C310,405 307,397 313,390Z" />
+    </group>
+</vector>

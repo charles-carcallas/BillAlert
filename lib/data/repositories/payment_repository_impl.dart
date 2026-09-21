@@ -196,6 +196,96 @@ class PaymentRepositoryImpl implements PaymentRepository {
     }
   }
 
+  @override
+  Future<Result<List<RoundingFundMonth>>> roundingFund(AreaId areaId) async {
+    try {
+      final rows = await QueryCache(_db).rows(
+        'rounding_fund:${areaId.value}',
+        () async {
+          final dynamic result = await _client.rpc<dynamic>(
+            'fn_rounding_fund',
+            params: <String, dynamic>{'p_area': areaId.value},
+          );
+          return (result as List<dynamic>).cast<Map<String, dynamic>>();
+        },
+      );
+      return Ok<List<RoundingFundMonth>>(
+        rows.map((Map<String, dynamic> row) {
+          final DateTime month = DateTime.parse(row['remit_month'] as String);
+          return RoundingFundMonth(
+            year: month.year,
+            month: month.month,
+            collected: _money(row['collected']),
+            toBoheco: _money(row['to_boheco']),
+            rounding: _money(row['rounding']),
+            gap: _money(row['gap']),
+            fundBefore: _money(row['fund_before']),
+            keptForGap: _money(row['kept_for_gap']),
+            readerPay: _money(row['reader_pay']),
+            fundAfter: _money(row['fund_after']),
+          );
+        }).toList(),
+      );
+    } catch (error, stackTrace) {
+      return Err<List<RoundingFundMonth>>(
+        FailureMapper.from(error, stackTrace),
+      );
+    }
+  }
+
+  @override
+  Future<Result<List<RemitHandover>>> remitHandovers(AreaId areaId) async {
+    try {
+      final rows = await QueryCache(_db).rows(
+        'remit_handovers:${areaId.value}',
+        () => _client
+            .from('remit_handovers')
+            .select()
+            .eq('area_id', areaId.value)
+            .order('remit_month', ascending: false),
+      );
+      return Ok<List<RemitHandover>>(rows.map(_handover).toList());
+    } catch (error, stackTrace) {
+      return Err<List<RemitHandover>>(FailureMapper.from(error, stackTrace));
+    }
+  }
+
+  @override
+  Future<Result<RemitHandover>> recordRemitHandover({
+    required int year,
+    required int month,
+  }) async {
+    try {
+      final dynamic row = await _client.rpc<dynamic>(
+        'fn_record_remit_handover',
+        params: <String, dynamic>{
+          'p_month': '$year-${month.toString().padLeft(2, '0')}-01',
+        },
+      );
+      return Ok<RemitHandover>(_handover(row as Map<String, dynamic>));
+    } catch (error, stackTrace) {
+      return Err<RemitHandover>(
+        FailureMapper.from(error, stackTrace),
+      ).ifOffline(
+        'Recording the handover needs signal. Nothing was recorded. '
+        'Try again when you are back online.',
+      );
+    }
+  }
+
+  static RemitHandover _handover(Map<String, dynamic> row) {
+    final DateTime month = DateTime.parse(row['remit_month'] as String);
+    return RemitHandover(
+      year: month.year,
+      month: month.month,
+      toBoheco: _money(row['to_boheco']),
+      readerPay: _money(row['reader_pay']),
+      gap: _money(row['gap']),
+      handedToName: row['handed_to_name'] as String?,
+      handedAt: DateTime.parse(row['handed_at'] as String),
+    );
+  }
+
   static String _areaRangeCacheKey(AreaId areaId, DateTime from) =>
       'area_payments:${areaId.value}:${from.toUtc().toIso8601String()}';
 
@@ -260,6 +350,7 @@ class PaymentRepositoryImpl implements PaymentRepository {
                 billNo: BillNumber(row['bill_no'] as String),
                 cycleLabel: row['cycle_label'] as String? ?? '',
                 amountPaid: _money(row['amount_paid']),
+                bohecoShare: _moneyOrNull(row['boheco_share']),
               ),
             )
             .toList(),
@@ -318,6 +409,9 @@ class PaymentRepositoryImpl implements PaymentRepository {
               cashTenderedCentavos: Value<int?>(cashTendered?.centavos),
               changeDueCentavos: Value<int?>(changeDue?.centavos),
               paidAt: row['paid_at'] as String,
+              bohecoShareCentavos: Value<int?>(
+                _moneyOrNull(row['boheco_share'])?.centavos,
+              ),
             ),
           );
     }
@@ -385,6 +479,9 @@ class PaymentRepositoryImpl implements PaymentRepository {
                     billNo: BillNumber(row.billNo!),
                     cycleLabel: row.cycleLabel!,
                     amountPaid: Money.fromCentavos(row.amountPaidCentavos),
+                    bohecoShare: row.bohecoShareCentavos == null
+                        ? null
+                        : Money.fromCentavos(row.bohecoShareCentavos!),
                   ),
                 )
                 .toList(),
