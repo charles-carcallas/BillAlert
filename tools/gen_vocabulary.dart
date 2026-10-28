@@ -12,35 +12,79 @@ void main() {
   final views = <String>[];
   final tables = <String>[];
   final rpcInternal = <String>[];
-  
+
   final rpcCallable = [
+    'fn_get_billing_schedule',
+    'fn_save_billing_schedule',
+    'fn_settlement_snapshot',
+    'fn_close_boheco_trip',
+    'fn_pondo_entry',
+    'fn_allocate_boheco_trip',
+    'fn_confirm_boheco_referral',
+    'fn_confirm_boheco_payment',
+    'fn_correct_settlement',
+    'fn_record_supply_status',
     'fn_record_meter_reading',
     'fn_post_bill_amount',
     'fn_record_payment',
     'fn_issue_disconnection_notice',
     'fn_close_disconnection_notice',
+    'fn_notice_review',
+    'fn_update_own_contact_number',
     'fn_rounding_fund',
     'fn_record_remit_handover',
+    'fn_overdue_decision',
+    'fn_check_collection',
+    'fn_claim_staff_alerts',
+    'fn_staff_alert_shown',
+    'fn_read_staff_alert',
+    'fn_account_workspace',
+    'fn_manage_account',
+    'fn_link_household',
+    'fn_household_handover',
+    'fn_my_president_transfers',
+    'fn_accept_president_transfer',
+    'fn_complete_president_transfer',
+    'fn_cancel_president_transfer',
+    'fn_assign_reader_waiver',
+    'fn_end_reader_waiver',
+    'fn_reader_waiver_history',
   ];
 
-  final viewRegex = RegExp(r'create\s+(?:or\s+replace\s+)?view\s+(?:[a-z0-9_]+\.)?([a-z0-9_]+)', caseSensitive: false);
-  final tableRegex = RegExp(r'create\s+table\s+(?:if\s+not\s+exists\s+)?(?:[a-z0-9_]+\.)?([a-z0-9_]+)', caseSensitive: false);
-  final functionRegex = RegExp(r'create\s+(?:or\s+replace\s+)?function\s+(?:[a-z0-9_]+\.)?([a-z0-9_]+)', caseSensitive: false);
-  final triggerBoundRegex = RegExp(r'create\s+trigger\s+.*?\s+execute\s+function\s+([a-z0-9_]+)', caseSensitive: false);
+  final viewRegex = RegExp(
+    r'create\s+(?:or\s+replace\s+)?view\s+(?:[a-z0-9_]+\.)?([a-z0-9_]+)',
+    caseSensitive: false,
+  );
+  final tableRegex = RegExp(
+    r'create\s+table\s+(?:if\s+not\s+exists\s+)?(?:[a-z0-9_]+\.)?([a-z0-9_]+)',
+    caseSensitive: false,
+  );
+  final functionRegex = RegExp(
+    r'create\s+(?:or\s+replace\s+)?function\s+(?:[a-z0-9_]+\.)?([a-z0-9_]+)',
+    caseSensitive: false,
+  );
+  final triggerBoundRegex = RegExp(
+    r'create\s+trigger\s+.*?\s+execute\s+function\s+([a-z0-9_]+)',
+    caseSensitive: false,
+  );
 
   final triggerFunctions = <String>{};
-  
-  for (final file in sqlDir.listSync().whereType<File>().where((f) => f.path.endsWith('.sql'))) {
+
+  for (final file in sqlDir.listSync().whereType<File>().where(
+    (f) => f.path.endsWith('.sql'),
+  )) {
     final content = file.readAsStringSync();
-    
+
     for (final match in triggerBoundRegex.allMatches(content)) {
       triggerFunctions.add(match.group(1)!.toLowerCase());
     }
   }
 
-  for (final file in sqlDir.listSync().whereType<File>().where((f) => f.path.endsWith('.sql'))) {
+  for (final file in sqlDir.listSync().whereType<File>().where(
+    (f) => f.path.endsWith('.sql'),
+  )) {
     final content = file.readAsStringSync();
-    
+
     for (final match in viewRegex.allMatches(content)) {
       views.add(match.group(1)!);
     }
@@ -51,7 +95,9 @@ void main() {
       final fn = match.group(1)!.toLowerCase();
       if (!rpcCallable.contains(fn) && !triggerFunctions.contains(fn)) {
         if (!rpcInternal.contains(fn)) {
-          print('WARNING: Unknown callable function $fn found. Not in allowlist and not trigger-bound. Treating as internal.');
+          print(
+            'WARNING: Unknown callable function $fn found. Not in allowlist and not trigger-bound. Treating as internal.',
+          );
           rpcInternal.add(fn);
         }
       } else if (triggerFunctions.contains(fn)) {

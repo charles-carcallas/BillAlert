@@ -63,9 +63,7 @@ void main() {
             ]),
           ),
         ],
-        child: const MaterialApp(
-          home: Scaffold(body: RoundingFundCard()),
-        ),
+        child: const MaterialApp(home: Scaffold(body: RoundingFundCard())),
       ),
     );
     await tester.pumpAndSettle();

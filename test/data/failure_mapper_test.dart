@@ -7,6 +7,17 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// are decided. These tests exist because one wrong branch here told a
 /// signed-in user they had been signed out.
 void main() {
+  test('banned login has an explicit disabled-account message', () {
+    final failure = FailureMapper.from(
+      const AuthException(
+        'User is banned',
+        statusCode: '403',
+        code: 'user_banned',
+      ),
+    );
+    expect(failure, isA<AuthFailure>());
+    expect(failure.message, AuthFailure.disabledMessage);
+  });
   group('changing a password', () {
     test('a session ended by a password reset says so', () {
       // Found on a phone: an Area President reset the password, then the

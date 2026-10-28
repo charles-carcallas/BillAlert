@@ -155,8 +155,8 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.ensureVisible(find.text('Use username and password'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Use username and password'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Use username and password'));
       await tester.pumpAndSettle();
 
       expect(auth.signOutCalls, 0);
@@ -176,16 +176,16 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.ensureVisible(find.text('Use username and password'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Use username and password'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Use username and password'));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey<String>('unlock-password')),
         'correct-horse',
       );
       await tester.ensureVisible(find.text('Unlock'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Unlock'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Unlock'));
       await tester.pumpAndSettle();
 
       final container = ProviderScope.containerOf(
@@ -202,8 +202,8 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.ensureVisible(find.text('Sign in with a different account'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Sign in with a different account'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sign in with a different account'));
       await tester.pumpAndSettle();
 
       expect(auth.signOutCalls, 1);

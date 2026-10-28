@@ -1,7 +1,10 @@
 import 'package:billalert/domain/entities/app_user.dart';
 import 'package:billalert/domain/value_objects/ids.dart';
 import 'package:billalert/presentation/auth/auth_controller.dart';
+import 'package:billalert/presentation/auth/linked_household_provider.dart';
+import 'package:billalert/presentation/common/account_view_menu.dart';
 import 'package:billalert/presentation/common/role_shell.dart';
+import 'package:billalert/presentation/providers.dart';
 import 'package:billalert/presentation/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -43,11 +46,16 @@ void main() {
         ShellRoute(
           builder: (_, _, Widget child) => RoleShell(child: child),
           routes: <RouteBase>[
-            for (final AppTab tab in user.permittedTabs)
+            for (final AppTab tab in [
+              ...user.permittedTabs,
+              ...user.householdTabs,
+            ])
               GoRoute(
                 path: tab.route,
-                builder: (_, _) =>
-                    Scaffold(body: Center(child: Text('panel:${tab.label}'))),
+                builder: (_, _) => Scaffold(
+                  appBar: AppBar(actions: const [AccountViewMenu()]),
+                  body: Center(child: Text('panel:${tab.label}')),
+                ),
               ),
           ],
         ),
@@ -56,6 +64,10 @@ void main() {
 
     return ProviderScope(
       overrides: [
+        consumerRepositoryProvider.overrideWithValue(
+          FakeConsumerRepository([]),
+        ),
+        linkedHouseholdProvider.overrideWith((ref) async => household()),
         authControllerProvider.overrideWith(
           () => FakeAuthController(signedInUser: user),
         ),
@@ -72,6 +84,31 @@ void main() {
   List<RoleTab> tabsOf(WidgetTester tester) =>
       tester.widgetList<RoleTab>(find.byType(RoleTab)).toList();
 
+  testWidgets('staff switches household and work without changing identity', (
+    tester,
+  ) async {
+    await tester.pumpWidget(shellUnderTest(user: cashier, at: '/cashier'));
+    await tester.pumpAndSettle();
+    expect(find.byType(SegmentedButton<bool>), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('account-view-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('My household'));
+    await tester.pumpAndSettle();
+    expect(tabsOf(tester).map((t) => t.tab.label), [
+      'Bill',
+      'History',
+      'Inbox',
+      'Profile',
+    ]);
+    expect(find.text('panel:Bill'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('account-view-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Work'));
+    await tester.pumpAndSettle();
+    expect(find.text('panel:Consumers'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   /// The index of the tab that reports itself selected, or -1.
   int selectedIndexOf(WidgetTester tester) {
     final List<RoleTab> tabs = tabsOf(tester);
@@ -85,6 +122,30 @@ void main() {
     );
     return index;
   }
+
+  testWidgets('laptop navigation stays selected when resizing to phone', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1366, 768);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(shellUnderTest(user: cashier, at: '/cashier'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('desktop-navigation')), findsOneWidget);
+    expect(tabsOf(tester).every((tab) => tab.horizontal), isTrue);
+    expect(tester.getSize(find.text('panel:Consumers')).width, greaterThan(0));
+    await tester.tap(find.text('Receipts'));
+    await tester.pumpAndSettle();
+    expect(selectedIndexOf(tester), 1);
+    tester.view.physicalSize = const Size(390, 844);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('desktop-navigation')), findsNothing);
+    expect(tabsOf(tester).every((tab) => !tab.horizontal), isTrue);
+    expect(selectedIndexOf(tester), 1);
+    expect(find.text('panel:Receipts'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   // The pair below is the point of the whole class: the same widget, given
   // two different users, produces two different bars. Kept as two tests

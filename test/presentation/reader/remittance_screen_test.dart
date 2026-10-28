@@ -1,4 +1,5 @@
 import 'package:billalert/core/result/result.dart';
+import 'package:billalert/data/repositories/settlement_repository.dart';
 import 'package:billalert/domain/entities/app_user.dart';
 import 'package:billalert/domain/entities/bill.dart';
 import 'package:billalert/domain/repositories/payment_repository.dart';
@@ -8,6 +9,7 @@ import 'package:billalert/domain/value_objects/kwh.dart';
 import 'package:billalert/domain/value_objects/money.dart';
 import 'package:billalert/domain/value_objects/ph_date.dart';
 import 'package:billalert/presentation/auth/auth_controller.dart';
+import 'package:billalert/presentation/common/settlement_panel.dart';
 import 'package:billalert/presentation/providers.dart';
 import 'package:billalert/presentation/reader/remittance_screen.dart';
 import 'package:flutter/material.dart';
@@ -156,6 +158,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          settlementSnapshotProvider.overrideWith(
+            (ref) async => SettlementSnapshot({}),
+          ),
           authControllerProvider.overrideWith(
             () => FakeAuthController(signedInUser: reader),
           ),
@@ -168,6 +173,9 @@ void main() {
         child: const MaterialApp(home: RemittanceScreen()),
       ),
     );
+    await tester.pumpAndSettle();
+    expect(find.text('Elena Ravelo'), findsNothing);
+    await tester.tap(find.text('Collections'));
     await tester.pumpAndSettle();
     return payments;
   }
@@ -216,7 +224,7 @@ void main() {
     expect(find.text('Rosalinda Amistad'), findsOneWidget);
     expect(find.text('Old Payment'), findsNothing);
     expect(
-      find.text('Hand over to the BOHECO office in 8 days'),
+      find.text('Receipt reporting period ends in 8 days'),
       findsOneWidget,
     );
   });

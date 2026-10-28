@@ -1,4 +1,3 @@
-import 'package:billalert/core/errors/app_failure.dart';
 import 'package:billalert/domain/entities/app_user.dart';
 import 'package:billalert/domain/entities/consumer.dart';
 import 'package:billalert/domain/value_objects/ids.dart';
@@ -56,7 +55,7 @@ void main() {
     },
   );
 
-  test('controller refuses a staff account before repository access', () async {
+  test('staff can request an update to their own household number', () async {
     final consumers = FakeConsumerRepository(<Consumer>[]);
     final container = ProviderContainer(
       overrides: [
@@ -72,10 +71,10 @@ void main() {
         .read(consumerContactNumberControllerProvider.notifier)
         .update('0917 555 0999');
 
-    expect(consumers.updateContactCount, 0);
+    expect(consumers.updateContactCount, 1);
     expect(
       container.read(consumerContactNumberControllerProvider).failure,
-      isA<PermissionFailure>(),
+      isNull,
     );
   });
 

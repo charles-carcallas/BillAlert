@@ -8,6 +8,7 @@ import 'package:billalert/domain/value_objects/money.dart';
 import 'package:billalert/domain/value_objects/ph_date.dart';
 import 'package:billalert/presentation/auth/auth_controller.dart';
 import 'package:billalert/presentation/cashier/record_payment_screen.dart';
+import 'package:billalert/presentation/common/saved_list_time.dart';
 import 'package:billalert/presentation/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -54,6 +55,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          savedListTimeProvider.overrideWith((ref, key) => Stream.value(null)),
           authControllerProvider.overrideWith(
             () => FakeAuthController(signedInUser: cashier),
           ),

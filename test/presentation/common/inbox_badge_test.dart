@@ -31,7 +31,10 @@ void main() {
 
     await showCount(3);
     expect(find.text('3'), findsOneWidget);
-    expect(tester.widget<Badge>(find.byType(Badge)).alignment, Alignment.topRight);
+    expect(
+      tester.widget<Badge>(find.byType(Badge)).alignment,
+      Alignment.topRight,
+    );
     await showCount(2, dark: true);
     expect(find.text('2'), findsOneWidget);
     expect(find.text('3'), findsNothing);

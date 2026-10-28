@@ -205,7 +205,7 @@ void main() {
 
   group('whose phone this is', () {
     test(
-      'signed out, or staff: everything of a household is removed',
+      'unlinked household removes reminders without clearing staff alerts',
       () async {
         feed.unpaid = <Bill>[bill('b-1')];
         await refresh()();
@@ -214,7 +214,7 @@ void main() {
         feed.household = const Ok<ConsumerId?>(null);
         await refresh()();
 
-        expect(phone.cancelAllCalls, 1);
+        expect(phone.cancelAllCalls, 0);
         expect(phone.scheduled, isEmpty);
       },
     );

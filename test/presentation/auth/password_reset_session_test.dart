@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:billalert/core/errors/app_failure.dart';
 import 'package:billalert/core/result/result.dart';
 import 'package:billalert/domain/entities/app_user.dart';
@@ -87,6 +89,42 @@ void main() {
   });
 
   group('checking the session when the app opens or comes back', () {
+    test('late successful session check cannot undo sign-out', () async {
+      await container.read(authControllerProvider.future);
+      final wait = Completer<void>();
+      auth.sessionCheckDelay = wait.future;
+      final pending = container
+          .read(authControllerProvider.notifier)
+          .confirmSession();
+      await container.read(authControllerProvider.notifier).signOut();
+      wait.complete();
+      await pending;
+      expect(signedIn(), isNull);
+    });
+    test('same account loses work access without a new login', () async {
+      auth.user = const AdminUser(
+        id: ProfileId('staff'),
+        username: 'staff',
+        firstName: 'Staff',
+        lastName: 'Member',
+        areaId: AreaId('area'),
+        mustChangePassword: false,
+      );
+      await container.read(authControllerProvider.future);
+      auth.user = const ConsumerUser(
+        id: ProfileId('staff'),
+        username: 'staff',
+        firstName: 'Staff',
+        lastName: 'Member',
+        mustChangePassword: false,
+        historicalRole: 'admin',
+        accessVersion: 1,
+      );
+      await container.read(authControllerProvider.notifier).confirmSession();
+      expect(signedIn(), isA<ConsumerUser>());
+      expect(signedIn()!.accessVersion, 1);
+      expect(signedIn()!.historicalRole, 'admin');
+    });
     test('the server says it ended: signs out and says why', () async {
       await container.read(authControllerProvider.future);
       auth.sessionCheck = const Err<void>(AuthFailure());
@@ -107,6 +145,15 @@ void main() {
 
       expect(signedIn(), isNotNull);
       expect(notice(), isNull);
+    });
+    test('disabled login signs out with the disable explanation', () async {
+      await container.read(authControllerProvider.future);
+      auth.sessionCheck = const Err<void>(
+        AuthFailure(AuthFailure.disabledMessage),
+      );
+      await container.read(authControllerProvider.notifier).confirmSession();
+      expect(signedIn(), isNull);
+      expect(notice(), AuthFailure.disabledMessage);
     });
   });
 

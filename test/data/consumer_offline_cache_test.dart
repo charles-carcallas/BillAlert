@@ -180,6 +180,28 @@ void main() {
         (_) async => throw const SocketException('offline'),
       ),
     );
+    final expiry =
+        DateTime.now().add(const Duration(hours: 1)).millisecondsSinceEpoch ~/
+        1000;
+    String part(Object value) =>
+        base64Url.encode(utf8.encode(jsonEncode(value))).replaceAll('=', '');
+    final session = jsonEncode(
+      Session(
+        accessToken: '${part({'alg': 'none'})}.${part({'exp': expiry})}.sig',
+        refreshToken: 'refresh',
+        tokenType: 'bearer',
+        expiresIn: 3600,
+        user: const User(
+          id: 'profile-virgilio',
+          appMetadata: {},
+          userMetadata: {},
+          aud: 'authenticated',
+          createdAt: '2026-01-01T00:00:00Z',
+        ),
+      ).toJson(),
+    );
+    await online.auth.recoverSession(session);
+    await offline.auth.recoverSession(session);
   });
 
   tearDown(() async {

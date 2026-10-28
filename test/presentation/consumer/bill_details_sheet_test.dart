@@ -4,8 +4,10 @@ import 'package:billalert/domain/value_objects/ids.dart';
 import 'package:billalert/domain/value_objects/kwh.dart';
 import 'package:billalert/domain/value_objects/money.dart';
 import 'package:billalert/domain/value_objects/ph_date.dart';
+import 'package:billalert/presentation/common/settlement_panel.dart';
 import 'package:billalert/presentation/consumer/bill_details_sheet.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -225,12 +227,15 @@ void main() {
   });
 }
 
-Widget _testApp({required ValueChanged<BuildContext> onOpen}) => MaterialApp(
-  home: Scaffold(
-    body: Builder(
-      builder: (BuildContext context) => TextButton(
-        onPressed: () => onOpen(context),
-        child: const Text('Open bill'),
+Widget _testApp({required ValueChanged<BuildContext> onOpen}) => ProviderScope(
+  overrides: [householdSettlementsProvider.overrideWith((ref, id) async => [])],
+  child: MaterialApp(
+    home: Scaffold(
+      body: Builder(
+        builder: (BuildContext context) => TextButton(
+          onPressed: () => onOpen(context),
+          child: const Text('Open bill'),
+        ),
       ),
     ),
   ),

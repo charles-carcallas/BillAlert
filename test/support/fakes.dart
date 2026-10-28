@@ -54,6 +54,15 @@ final class FixedPhClock implements PhClock {
 
 /// An outbox that remembers what it was given, in a list.
 final class FakeOutboxRepository implements OutboxRepository {
+  @override
+  int sessionGeneration = 0;
+  @override
+  Future<Result<int>> quarantinedCount() async => const Ok(0);
+  @override
+  Future<Result<void>> reviseRejectedDueDate(
+    ClientUuid uuid,
+    PhDate dueDate,
+  ) async => const Err(ValidationFailure('No rejected post in this fake.'));
   final List<OutboxOperation> enqueued = <OutboxOperation>[];
 
   /// Set this to make the next enqueue fail, for testing the unhappy path.
@@ -349,10 +358,12 @@ final class FakeAuthRepository implements AuthRepository {
   /// What the server says about this phone's session when asked.
   Result<void> sessionCheck = const Ok<void>(null);
   int sessionChecks = 0;
+  Future<void>? sessionCheckDelay;
 
   @override
   Future<Result<void>> confirmSession() async {
     sessionChecks++;
+    await sessionCheckDelay;
     return sessionCheck;
   }
 
@@ -546,7 +557,7 @@ final class FakeBillRepository implements BillRepository {
   AppFailure? byIdFailure;
 
   @override
-  Future<Result<Bill?>> byId(BillId id) async {
+  Future<Result<Bill?>> byId(BillId id, {ConsumerId? consumerId}) async {
     final AppFailure? failure = byIdFailure;
     if (failure != null) return Err<Bill?>(failure);
     return Ok<Bill?>(billsById[id.value]);
@@ -586,6 +597,12 @@ final class FakeBillRepository implements BillRepository {
     if (failure != null) return Err<List<ConsumerOutstanding>>(failure);
     return Ok<List<ConsumerOutstanding>>(outstanding);
   }
+
+  @override
+  Future<Result<List<ConsumerOutstanding>>> currentCollectionsInArea(
+    AreaId areaId,
+    PhDate today,
+  ) => outstandingInArea(areaId);
 }
 
 /// A sync service that counts calls instead of touching the network.

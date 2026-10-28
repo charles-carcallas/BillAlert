@@ -3,6 +3,7 @@ import 'package:billalert/core/result/result.dart';
 import 'package:billalert/data/local/app_database.dart';
 import 'package:billalert/data/repositories/outbox_repository_impl.dart';
 import 'package:billalert/data/repositories/reading_repository_impl.dart';
+import 'package:billalert/data/sync/outbox_session.dart';
 import 'package:billalert/domain/outbox/outbox_entry.dart';
 import 'package:billalert/domain/outbox/outbox_operation.dart';
 import 'package:billalert/domain/value_objects/cycle_label.dart';
@@ -33,19 +34,22 @@ void main() {
     String uuid = 'uuid-1',
     String consumerId = 'consumer-1',
     String value = '1392.50',
-  }) =>
-      RecordReadingOperation(
-        clientUuid: ClientUuid(uuid),
-        capturedAt: capturedAt,
-        consumerId: ConsumerId(consumerId),
-        currentReading: Kwh.parse(value),
-        cycleLabel: cycle,
-        consumerLabel: 'Elena Ravelo',
-      );
+  }) => RecordReadingOperation(
+    clientUuid: ClientUuid(uuid),
+    capturedAt: capturedAt,
+    consumerId: ConsumerId(consumerId),
+    currentReading: Kwh.parse(value),
+    cycleLabel: cycle,
+    consumerLabel: 'Elena Ravelo',
+  );
 
   setUp(() {
     db = AppDatabase.forTesting(NativeDatabase.memory());
-    outbox = OutboxRepositoryImpl(db);
+    outbox = OutboxRepositoryImpl(
+      db,
+      session: OutboxSession()
+        ..scope = const OutboxScope('reader', 'meter_reader', 'area'),
+    );
     readings = ReadingRepositoryImpl(db);
   });
 
@@ -71,22 +75,24 @@ void main() {
     expect(entries.single.status, OutboxStatus.pending);
   });
 
-  test('FR-23: a second reading for the same household and cycle is refused',
-      () async {
-    expect(await outbox.enqueue(reading()), isA<Ok<void>>());
+  test(
+    'FR-23: a second reading for the same household and cycle is refused',
+    () async {
+      expect(await outbox.enqueue(reading()), isA<Ok<void>>());
 
-    // Same household, same month, different client uuid — which is exactly
-    // what a reader tapping save twice would produce.
-    final second = await outbox.enqueue(reading(uuid: 'uuid-2'));
+      // Same household, same month, different client uuid — which is exactly
+      // what a reader tapping save twice would produce.
+      final second = await outbox.enqueue(reading(uuid: 'uuid-2'));
 
-    expect(second, isA<Err<void>>());
-    expect((second as Err<void>).failure, isA<ConflictFailure>());
+      expect(second, isA<Err<void>>());
+      expect((second as Err<void>).failure, isA<ConflictFailure>());
 
-    // And the first one is still there, untouched.
-    final entries = (await outbox.pending() as Ok<List<OutboxEntry>>).value;
-    expect(entries, hasLength(1));
-    expect(entries.single.operation.clientUuid, const ClientUuid('uuid-1'));
-  });
+      // And the first one is still there, untouched.
+      final entries = (await outbox.pending() as Ok<List<OutboxEntry>>).value;
+      expect(entries, hasLength(1));
+      expect(entries.single.operation.clientUuid, const ClientUuid('uuid-1'));
+    },
+  );
 
   test('the same household in a different cycle is allowed', () async {
     await outbox.enqueue(reading());
@@ -131,8 +137,9 @@ void main() {
     expect((other as Ok<bool>).value, isFalse);
 
     final ids = await readings.queuedConsumerIdsFor(cycle);
-    expect((ids as Ok<Set<ConsumerId>>).value,
-        <ConsumerId>{const ConsumerId('consumer-1')});
+    expect((ids as Ok<Set<ConsumerId>>).value, <ConsumerId>{
+      const ConsumerId('consumer-1'),
+    });
   });
 
   test('a rejected item stays in the queue with its reason', () async {
@@ -152,77 +159,92 @@ void main() {
     expect(entries.single.lastError, contains('already been read'));
 
     // And it is still offered to the next sync attempt.
-    expect((await outbox.pending() as Ok<List<OutboxEntry>>).value, hasLength(1));
-  });
-
-  test('a synced item leaves the pending queue but keeps its server id',
-      () async {
-    await outbox.enqueue(reading());
-    await outbox.markSynced(const ClientUuid('uuid-1'), 'bill-uuid-from-server');
-
-    expect((await outbox.pending() as Ok<List<OutboxEntry>>).value, isEmpty);
-
-    final all = (await outbox.all() as Ok<List<OutboxEntry>>).value;
-    expect(all.single.status, OutboxStatus.synced);
-    expect(all.single.serverId, 'bill-uuid-from-server');
-  });
-
-  test('an item cut off mid-send is picked up again by the next sync',
-      () async {
-    // Found in review: the app marks an item 'syncing' before sending it. If
-    // Android killed the app at that moment, the item used to stay 'syncing'
-    // forever and never reached the server.
-    await outbox.enqueue(reading());
-    await outbox.markSyncing(const ClientUuid('uuid-1'));
-
-    final entries = (await outbox.pending() as Ok<List<OutboxEntry>>).value;
-
-    expect(entries.single.operation.clientUuid, const ClientUuid('uuid-1'));
-    expect(entries.single.attempts, 1);
-  });
-
-  test('a posted amount keeps BOHECO\'s own figure beside the rounded one',
-      () async {
-    await outbox.enqueue(PostAmountOperation(
-      clientUuid: const ClientUuid('uuid-amount'),
-      capturedAt: capturedAt,
-      billId: const BillId('bill-1'),
-      amount: Money.parse('530.00'),
-      cooperativeAmount: Money.parse('529.40'),
-      dueDate: const PhDate(2026, 9, 28),
-      billLabel: 'BA-202609-000001',
-    ));
-
-    final entries = (await outbox.pending() as Ok<List<OutboxEntry>>).value;
-    final posted = entries.single.operation as PostAmountOperation;
-
-    expect(posted.amount, Money.parse('530.00'));
-    expect(posted.cooperativeAmount, Money.parse('529.40'));
-  });
-
-  test('a synced reading is no longer waiting, and does not block a new one',
-      () async {
-    // Found on a phone: after a September reading synced and was then
-    // deleted on the server, the roster still said "1 reading waiting to
-    // sync" and would not let the household be read again.
-    await outbox.enqueue(reading());
-    await outbox.markSynced(const ClientUuid('uuid-1'), 'bill-1');
-
-    final queued = await readings.queuedConsumerIdsFor(cycle);
-    expect((queued as Ok<Set<ConsumerId>>).value, isEmpty);
-    final isQueued = await readings.isReadingQueuedFor(
-      consumerId: const ConsumerId('consumer-1'),
-      cycle: cycle,
-    );
-    expect((isQueued as Ok<bool>).value, isFalse);
-
-    expect(await outbox.enqueue(reading(uuid: 'uuid-2')), isA<Ok<void>>());
-    final again = await readings.queuedConsumerIdsFor(cycle);
     expect(
-      (again as Ok<Set<ConsumerId>>).value,
-      <ConsumerId>{const ConsumerId('consumer-1')},
+      (await outbox.pending() as Ok<List<OutboxEntry>>).value,
+      hasLength(1),
     );
   });
+
+  test(
+    'a synced item leaves the pending queue but keeps its server id',
+    () async {
+      await outbox.enqueue(reading());
+      await outbox.markSynced(
+        const ClientUuid('uuid-1'),
+        'bill-uuid-from-server',
+      );
+
+      expect((await outbox.pending() as Ok<List<OutboxEntry>>).value, isEmpty);
+
+      final all = (await outbox.all() as Ok<List<OutboxEntry>>).value;
+      expect(all.single.status, OutboxStatus.synced);
+      expect(all.single.serverId, 'bill-uuid-from-server');
+    },
+  );
+
+  test(
+    'an item cut off mid-send is picked up again by the next sync',
+    () async {
+      // Found in review: the app marks an item 'syncing' before sending it. If
+      // Android killed the app at that moment, the item used to stay 'syncing'
+      // forever and never reached the server.
+      await outbox.enqueue(reading());
+      await outbox.markSyncing(const ClientUuid('uuid-1'));
+
+      final entries = (await outbox.pending() as Ok<List<OutboxEntry>>).value;
+
+      expect(entries.single.operation.clientUuid, const ClientUuid('uuid-1'));
+      expect(entries.single.attempts, 1);
+    },
+  );
+
+  test(
+    'a posted amount keeps BOHECO\'s own figure beside the rounded one',
+    () async {
+      await outbox.enqueue(
+        PostAmountOperation(
+          clientUuid: const ClientUuid('uuid-amount'),
+          capturedAt: capturedAt,
+          billId: const BillId('bill-1'),
+          amount: Money.parse('530.00'),
+          cooperativeAmount: Money.parse('529.40'),
+          dueDate: const PhDate(2026, 9, 28),
+          billLabel: 'BA-202609-000001',
+        ),
+      );
+
+      final entries = (await outbox.pending() as Ok<List<OutboxEntry>>).value;
+      final posted = entries.single.operation as PostAmountOperation;
+
+      expect(posted.amount, Money.parse('530.00'));
+      expect(posted.cooperativeAmount, Money.parse('529.40'));
+    },
+  );
+
+  test(
+    'a synced reading is no longer waiting, and does not block a new one',
+    () async {
+      // Found on a phone: after a September reading synced and was then
+      // deleted on the server, the roster still said "1 reading waiting to
+      // sync" and would not let the household be read again.
+      await outbox.enqueue(reading());
+      await outbox.markSynced(const ClientUuid('uuid-1'), 'bill-1');
+
+      final queued = await readings.queuedConsumerIdsFor(cycle);
+      expect((queued as Ok<Set<ConsumerId>>).value, isEmpty);
+      final isQueued = await readings.isReadingQueuedFor(
+        consumerId: const ConsumerId('consumer-1'),
+        cycle: cycle,
+      );
+      expect((isQueued as Ok<bool>).value, isFalse);
+
+      expect(await outbox.enqueue(reading(uuid: 'uuid-2')), isA<Ok<void>>());
+      final again = await readings.queuedConsumerIdsFor(cycle);
+      expect((again as Ok<Set<ConsumerId>>).value, <ConsumerId>{
+        const ConsumerId('consumer-1'),
+      });
+    },
+  );
 
   test('the queue drains oldest capture first', () async {
     final later = RecordReadingOperation(
@@ -250,6 +272,9 @@ void main() {
     // has not synced.
     await db.clearCachedData();
 
-    expect((await outbox.pending() as Ok<List<OutboxEntry>>).value, hasLength(1));
+    expect(
+      (await outbox.pending() as Ok<List<OutboxEntry>>).value,
+      hasLength(1),
+    );
   });
 }

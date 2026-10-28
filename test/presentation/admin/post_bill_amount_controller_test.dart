@@ -2,6 +2,7 @@ import 'package:billalert/core/errors/app_failure.dart';
 import 'package:billalert/data/sync/sync_service.dart';
 import 'package:billalert/domain/entities/app_user.dart';
 import 'package:billalert/domain/entities/bill.dart';
+import 'package:billalert/domain/entities/billing_schedule.dart';
 import 'package:billalert/domain/outbox/outbox_operation.dart';
 import 'package:billalert/domain/repositories/bill_repository.dart';
 import 'package:billalert/domain/value_objects/cycle_label.dart';
@@ -9,9 +10,11 @@ import 'package:billalert/domain/value_objects/ids.dart';
 import 'package:billalert/domain/value_objects/kwh.dart';
 import 'package:billalert/domain/value_objects/money.dart';
 import 'package:billalert/domain/value_objects/ph_date.dart';
+import 'package:billalert/presentation/admin/billing_schedule_screen.dart';
 import 'package:billalert/presentation/admin/post_bill_amount_controller.dart';
 import 'package:billalert/presentation/admin/post_bill_amount_screen.dart';
 import 'package:billalert/presentation/auth/auth_controller.dart';
+import 'package:billalert/presentation/common/saved_list_time.dart';
 import 'package:billalert/presentation/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -83,13 +86,17 @@ void main() {
   late FakeOutboxRepository outbox;
   late FakeSyncService sync;
 
-  ProviderContainer harness() {
+  ProviderContainer harness({int dueDay = 28}) {
     bills = FakeBillRepository()..queue = <AwaitingAmountEntry>[sarigumba()];
     outbox = FakeOutboxRepository();
     sync = FakeSyncService();
 
     final container = ProviderContainer(
       overrides: [
+        billingScheduleProvider.overrideWith(
+          (ref) async => BillingSchedule(dueDay: dueDay),
+        ),
+        savedListTimeProvider.overrideWith((ref, key) => Stream.value(null)),
         authControllerProvider.overrideWith(
           () => FakeAuthController(signedInUser: admin),
         ),
@@ -115,6 +122,57 @@ void main() {
   PostBillAmountState stateOf(ProviderContainer c) =>
       c.read(postBillAmountControllerProvider);
 
+  testWidgets(
+    'amount form uses the area due day and preserves a statement override',
+    (tester) async {
+      final container = harness(dueDay: 25);
+      bills.queue = [
+        const AwaitingAmountEntry(
+          bill: Bill(
+            id: BillId('scheduled'),
+            billNo: BillNumber('SCHEDULED'),
+            consumerId: ConsumerId('house'),
+            cycle: CycleLabel(2026, 9),
+            consumption: Kwh.zero,
+            totalAmount: null,
+            dueDate: null,
+          ),
+          consumerName: 'Scheduled household',
+          consumerNo: ConsumerNumber('SCHEDULED'),
+          previousReading: Kwh.zero,
+          currentReading: Kwh.zero,
+          readingDate: PhDate(2026, 9, 1),
+          daysWaiting: 0,
+        ),
+      ];
+      await loaded(container);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: PostBillAmountScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Scheduled household'));
+      await tester.pumpAndSettle();
+      final due = find.text('25 Sep 2026');
+      await tester.scrollUntilVisible(
+        due,
+        150,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      expect(due, findsOneWidget);
+      await tester.tap(due);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('27').last);
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+      container.invalidate(billingScheduleProvider);
+      await tester.pumpAndSettle();
+      expect(find.text('27 Sep 2026'), findsOneWidget);
+    },
+  );
   test('loads the queue for the area the Admin presides over', () async {
     final container = harness();
     await loaded(container);

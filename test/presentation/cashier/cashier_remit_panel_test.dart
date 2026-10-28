@@ -101,7 +101,8 @@ void main() {
     final payments = await open(tester);
 
     expect(find.text('₱529.40'), findsOneWidget);
-    expect(find.text('Meter Reader pay (max ₱300)'), findsOneWidget);
+    expect(find.text('Regular collections to remit'), findsOneWidget);
+    expect(find.text('Meter Reader pay (max ₱300)'), findsNothing);
 
     await tester.tap(find.text('Mark as handed over'));
     await tester.pumpAndSettle();

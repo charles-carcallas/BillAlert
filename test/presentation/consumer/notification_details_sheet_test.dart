@@ -2,6 +2,7 @@ import 'package:billalert/core/errors/app_failure.dart';
 import 'package:billalert/core/result/result.dart';
 import 'package:billalert/domain/entities/app_user.dart';
 import 'package:billalert/domain/entities/bill.dart';
+import 'package:billalert/domain/entities/consumer.dart' as domain;
 import 'package:billalert/domain/notifications/phone_alerts.dart';
 import 'package:billalert/domain/repositories/notice_repository.dart';
 import 'package:billalert/domain/repositories/notification_repository.dart';
@@ -57,8 +58,16 @@ final class _Notices implements NoticeRepository {
       Ok<List<ActiveNotice>>(active.values.toList());
 
   @override
-  Future<Result<ActiveNotice?>> byId(NoticeId id) async =>
-      Ok<ActiveNotice?>(active[id.value]);
+  Future<Result<ActiveNotice?>> byId(
+    NoticeId id, {
+    ConsumerId? consumerId,
+  }) async => Ok<ActiveNotice?>(active[id.value]);
+
+  @override
+  Future<Result<NoticeReview?>> review(NoticeId id) async => const Ok(null);
+  @override
+  Future<Result<List<ClosedNotice>>> historyFor(AreaId areaId) async =>
+      const Ok([]);
 
   @override
   Future<Result<void>> closeNotice({
@@ -155,6 +164,18 @@ void main() {
           inboxControllerProvider.overrideWith(() => inbox),
           notificationPermissionProvider.overrideWithValue(_NotificationsOn()),
           billRepositoryProvider.overrideWithValue(bills),
+          consumerRepositoryProvider.overrideWithValue(
+            FakeConsumerRepository([])
+              ..me = const domain.Consumer(
+                id: ConsumerId('consumer-1'),
+                consumerNo: ConsumerNumber('H1'),
+                firstName: 'Virgilio',
+                lastName: 'Busalanan',
+                areaId: AreaId('area'),
+                accountStatus: domain.AccountStatus.active,
+                previousReading: Kwh.zero,
+              ),
+          ),
           noticeRepositoryProvider.overrideWithValue(_Notices(notices)),
           phClockProvider.overrideWithValue(
             FixedPhClock.onPhDate(const PhDate(2026, 9, 20)),

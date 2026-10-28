@@ -36,6 +36,38 @@ void main() {
   double sheetHeight(WidgetTester tester) =>
       tester.getSize(find.byType(ListView)).height;
 
+  testWidgets('laptop opens a centered scrollable dialog', (tester) async {
+    tester.view.physicalSize = const Size(1366, 768);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await open(tester);
+    expect(find.byType(Dialog), findsOneWidget);
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(tester.getSize(find.byType(ListView)).width, 760);
+    await tester.drag(find.byType(ListView), const Offset(0, -1200));
+    await tester.pumpAndSettle();
+    expect(find.text('Row 0'), findsNothing);
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+    expect(find.byType(Dialog), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('desktop draft cannot be dismissed by clicking outside', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1366, 768);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await open(tester, dismissible: false);
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+    expect(find.byType(Dialog), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('dragging the grip up makes the sheet full screen', (
     WidgetTester tester,
   ) async {

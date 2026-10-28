@@ -58,6 +58,31 @@ void main() {
     ),
   ];
 
+  test(
+    'one login can visit household routes but only its own work section',
+    () {
+      for (final user in users) {
+        expect(mayVisit(user, '/consumer'), true);
+        expect(mayVisit(user, '/consumer/history'), true);
+        expect(mayVisit(user, '/consumer/receipt/OR-1'), true);
+        expect(mayVisit(user, '/account/transfer'), true);
+        for (final section in ['/admin', '/reader', '/cashier']) {
+          expect(mayVisit(user, '$section/profile'), user.homeRoute == section);
+        }
+      }
+      const candidate = ConsumerUser(
+        id: ProfileId('candidate'),
+        username: 'candidate',
+        firstName: 'Next',
+        lastName: 'President',
+        mustChangePassword: true,
+        historicalRole: 'admin',
+      );
+      expect(mayVisit(candidate, '/admin/accounts/manage'), false);
+      expect(mayVisit(candidate, '/account/transfer'), true);
+    },
+  );
+
   /// Every path the router declares, including inside the [ShellRoute].
   ///
   /// Each route in this app is declared with its full path rather than a

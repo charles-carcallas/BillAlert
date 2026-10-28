@@ -45,11 +45,15 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          consumerRepositoryProvider.overrideWithValue(
+            FakeConsumerRepository([]),
+          ),
           authControllerProvider.overrideWith(
             () => FakeAuthController(signedInUser: household),
           ),
+          quarantinedOutboxProvider.overrideWith((ref) async => 0),
           pendingOutboxProvider.overrideWith(
-            (Ref ref) async => const <OutboxEntry>[],
+            (Ref ref) => Stream.value(const <OutboxEntry>[]),
           ),
           profileConsumerProvider.overrideWith((Ref ref) async => null),
           fingerprintStatusProvider.overrideWith(

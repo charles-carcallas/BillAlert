@@ -9,6 +9,7 @@ import 'package:billalert/presentation/auth/auth_controller.dart';
 import 'package:billalert/presentation/consumer/current_bill_controller.dart';
 import 'package:billalert/presentation/consumer/current_bill_screen.dart';
 import 'package:billalert/presentation/consumer/inbox_controller.dart';
+import 'package:billalert/presentation/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -64,6 +65,9 @@ void main() {
   Future<void> pumpState(WidgetTester tester, CurrentBillState state) async {
     final container = ProviderContainer(
       overrides: [
+        phClockProvider.overrideWithValue(
+          FixedPhClock.onPhDate(const PhDate(2026, 9, 13)),
+        ),
         authControllerProvider.overrideWith(
           () => FakeAuthController(signedInUser: consumer),
         ),

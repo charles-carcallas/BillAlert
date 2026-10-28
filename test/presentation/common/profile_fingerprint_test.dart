@@ -36,8 +36,9 @@ void main() {
           authControllerProvider.overrideWith(
             () => FakeAuthController(signedInUser: reader),
           ),
+          quarantinedOutboxProvider.overrideWith((ref) async => 0),
           pendingOutboxProvider.overrideWith(
-            (Ref ref) async => const <OutboxEntry>[],
+            (Ref ref) => Stream.value(const <OutboxEntry>[]),
           ),
           deviceUnlockProvider.overrideWithValue(phone),
           fingerprintSettingProvider.overrideWithValue(setting),

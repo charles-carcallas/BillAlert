@@ -23,12 +23,21 @@ final class _Notices implements NoticeRepository {
       Ok<List<ActiveNotice>>(active.values.toList());
 
   @override
-  Future<Result<ActiveNotice?>> byId(NoticeId id) async {
+  Future<Result<ActiveNotice?>> byId(
+    NoticeId id, {
+    ConsumerId? consumerId,
+  }) async {
     final AppFailure? failure = this.failure;
     return failure == null
         ? Ok<ActiveNotice?>(active[id.value])
         : Err<ActiveNotice?>(failure);
   }
+
+  @override
+  Future<Result<NoticeReview?>> review(NoticeId id) async => const Ok(null);
+  @override
+  Future<Result<List<ClosedNotice>>> historyFor(AreaId areaId) async =>
+      const Ok([]);
 
   @override
   Future<Result<void>> closeNotice({
