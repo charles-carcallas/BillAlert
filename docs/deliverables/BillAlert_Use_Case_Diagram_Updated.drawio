@@ -1,0 +1,827 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<mxfile host="app.diagrams.net" pages="9" modified="2026-10-24T00:00:00.000Z" agent="BillAlert documentation revision">
+  <diagram id="billalert-1" name="Context">
+    <mxGraphModel dx="1440" dy="840" grid="1" gridSize="10" page="1" pageScale="1" pageWidth="1440" pageHeight="840">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="boundary" value="BillAlert — BillAlert overview" style="rounded=0;whiteSpace=wrap;html=0;verticalAlign=top;align=left;spacingTop=10;spacingLeft=20;fillColor=#ffffff;strokeColor=#45596d;fontSize=24;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="330" y="25" width="1075" height="725" as="geometry"/>
+        </mxCell>
+        <mxCell id="actor-0" value="Registered user" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="125" y="85.0" width="40" height="62" as="geometry"/>
+        </mxCell>
+        <mxCell id="actor-1" value="Consumer" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="125" y="179.0" width="40" height="62" as="geometry"/>
+        </mxCell>
+        <mxCell id="actor-2" value="Meter Reader" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="125" y="273.0" width="40" height="62" as="geometry"/>
+        </mxCell>
+        <mxCell id="actor-3" value="Cashier" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="125" y="367.0" width="40" height="62" as="geometry"/>
+        </mxCell>
+        <mxCell id="actor-4" value="Area President" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="125" y="461.0" width="40" height="62" as="geometry"/>
+        </mxCell>
+        <mxCell id="actor-5" value="Android / scheduler" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="125" y="555.0" width="40" height="62" as="geometry"/>
+        </mxCell>
+        <mxCell id="actor-6" value="SMS gateway" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="125" y="649.0" width="40" height="62" as="geometry"/>
+        </mxCell>
+        <mxCell id="uc-0" value="Sign in, unlock and synchronize&#10;Shared capability group" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="90" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-0" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-0">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="116.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-1" value="View bills, payments and notices&#10;Shared capability group" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="184" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-1" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-1" target="uc-1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="210.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-2" value="Capture readings and complete trips&#10;Shared capability group" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="278" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-2" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-2" target="uc-2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="304.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-3" value="Collect cash and manage reserve activity&#10;Shared capability group" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="372" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-3" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-3" target="uc-3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="398.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-4" value="Manage accounts, bills and follow-up&#10;Shared capability group" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="466" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-4" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-4" target="uc-4">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="492.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-5" value="Present app and scheduled alerts&#10;Shared capability group" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="560" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-5" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-5" target="uc-5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="586.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-6" value="Dispatch and report SMS outcomes&#10;Shared capability group" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="654" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-6" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-6" target="uc-6">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="680.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="constraint" value="All staff access is restricted by area. Staff may also use their linked household view." style="text;whiteSpace=wrap;html=0;align=left;verticalAlign=top;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="30" y="765" width="1370" height="70" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="billalert-2" name="Shared – Authenticated User">
+    <mxGraphModel dx="1440" dy="840" grid="1" gridSize="10" page="1" pageScale="1" pageWidth="1440" pageHeight="840">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="boundary" value="BillAlert — Shared access and saved work" style="rounded=0;whiteSpace=wrap;html=0;verticalAlign=top;align=left;spacingTop=10;spacingLeft=20;fillColor=#ffffff;strokeColor=#45596d;fontSize=24;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="330" y="25" width="1075" height="725" as="geometry"/>
+        </mxCell>
+        <mxCell id="actor-0" value="Registered user" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="125" y="85.0" width="40" height="62" as="geometry"/>
+        </mxCell>
+        <mxCell id="actor-1" value="Field staff" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="125" y="367.0" width="40" height="62" as="geometry"/>
+        </mxCell>
+        <mxCell id="actor-2" value="Linked staff" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="125" y="649.0" width="40" height="62" as="geometry"/>
+        </mxCell>
+        <mxCell id="uc-0" value="Sign in / replace temporary password&#10;FR-01, FR-03" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="90" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-0" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-0">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="116.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-1" value="Change or recover password&#10;FR-04, FR-51" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="184" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-1" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="116.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-2" value="Unlock saved session / sign out&#10;FR-05, FR-06" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="278" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-2" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="116.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-3" value="Control alerts / maintain mobile number&#10;FR-07, FR-08" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="372" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-3" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="116.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-4" value="Read saved records / inspect pending state&#10;FR-09, FR-12" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="466" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-4" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-4">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="116.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-5" value="Save supported work / synchronize&#10;FR-10, FR-11" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="560" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-5" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-1" target="uc-5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="398.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-6" value="Switch household and work views&#10;FR-38" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="654" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-6" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-2" target="uc-6">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="680.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="constraint" value="Constraint FR-33: Philippine time. Cash collection and account/fund changes require online confirmation." style="text;whiteSpace=wrap;html=0;align=left;verticalAlign=top;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="30" y="765" width="1370" height="70" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="billalert-3" name="Consumer">
+    <mxGraphModel dx="1440" dy="840" grid="1" gridSize="10" page="1" pageScale="1" pageWidth="1440" pageHeight="840">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="boundary" value="BillAlert — Consumer billing and payment evidence" style="rounded=0;whiteSpace=wrap;html=0;verticalAlign=top;align=left;spacingTop=10;spacingLeft=20;fillColor=#ffffff;strokeColor=#45596d;fontSize=24;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="330" y="25" width="1075" height="725" as="geometry"/>
+        </mxCell>
+        <mxCell id="actor-0" value="Consumer" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="125" y="367.0" width="40" height="62" as="geometry"/>
+        </mxCell>
+        <mxCell id="uc-0" value="View current bill and payment route&#10;FR-23" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="90" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-0" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-0">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="398.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-1" value="Browse billing history&#10;FR-24" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="184" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-1" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="398.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-2" value="Filter receipts by payment date&#10;FR-25" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="278" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-2" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="398.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-3" value="Open receipt and reference QR&#10;FR-26, FR-29" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="372" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-3" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="398.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-4" value="View served notice and follow-up time&#10;FR-27" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="466" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-4" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-4">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="398.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-5" value="Read Inbox / open related record&#10;FR-17, FR-18" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="560" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-5" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="398.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-6" value="Read cached household information&#10;FR-09" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="654" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-6" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-6">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="398.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="constraint" value="Only the linked household is visible. QR contains a reference; it is not a public verification service." style="text;whiteSpace=wrap;html=0;align=left;verticalAlign=top;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="30" y="765" width="1370" height="70" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="billalert-4" name="Meter Reader">
+    <mxGraphModel dx="1440" dy="840" grid="1" gridSize="10" page="1" pageScale="1" pageWidth="1440" pageHeight="840">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="boundary" value="BillAlert — Meter Reader field work" style="rounded=0;whiteSpace=wrap;html=0;verticalAlign=top;align=left;spacingTop=10;spacingLeft=20;fillColor=#ffffff;strokeColor=#45596d;fontSize=24;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="330" y="25" width="1075" height="725" as="geometry"/>
+        </mxCell>
+        <mxCell id="actor-0" value="Meter Reader" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="125" y="320.0" width="40" height="62" as="geometry"/>
+        </mxCell>
+        <mxCell id="uc-0" value="Review reading roster and progress&#10;FR-19" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="90" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-0" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-0">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="351.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-1" value="Inspect previous reading&#10;FR-20" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="184" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-1" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="351.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-2" value="Capture a new cycle reading&#10;FR-21" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="278" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-2" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="351.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-3" value="Review the reading sheet&#10;FR-52" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="372" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-3" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="351.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-4" value="Save offline / synchronize readings&#10;FR-10, FR-11, FR-12" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="466" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-4" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-4">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="351.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-5" value="Open assigned work alerts&#10;FR-50" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="560" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-5" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="351.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="constraint" value="Constraint FR-22: one reading per household/meter cycle. Consumption does not determine the money due." style="text;whiteSpace=wrap;html=0;align=left;verticalAlign=top;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="30" y="765" width="1370" height="70" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="billalert-5" name="Cashier">
+    <mxGraphModel dx="1440" dy="840" grid="1" gridSize="10" page="1" pageScale="1" pageWidth="1440" pageHeight="840">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="boundary" value="BillAlert — Cashier collection and receipts" style="rounded=0;whiteSpace=wrap;html=0;verticalAlign=top;align=left;spacingTop=10;spacingLeft=20;fillColor=#ffffff;strokeColor=#45596d;fontSize=24;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="330" y="25" width="1075" height="725" as="geometry"/>
+        </mxCell>
+        <mxCell id="actor-0" value="Cashier" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="125" y="367.0" width="40" height="62" as="geometry"/>
+        </mxCell>
+        <mxCell id="uc-0" value="Find eligible household balances&#10;FR-34" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="90" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-0" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-0">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="398.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-1" value="Record confirmed cash payment&#10;FR-28" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="184" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-1" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="398.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-2" value="Issue itemized receipt with QR&#10;FR-29" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="278" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-2" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="398.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-3" value="Browse collections / reopen receipt&#10;FR-30, FR-35" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="372" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-3" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="398.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-4" value="Collect covered-bill repayment&#10;FR-47" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="466" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-4" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-4">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="398.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-5" value="Record reserve cash and Reader payout&#10;FR-43, FR-48" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="560" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-5" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="398.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-6" value="Open assigned work alerts&#10;FR-50" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="654" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-6" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-6">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="398.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="constraint" value="Online eligibility precedes collection. Repayments replenish the reserve and do not create another BOHECO remittance." style="text;whiteSpace=wrap;html=0;align=left;verticalAlign=top;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="30" y="765" width="1370" height="70" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="billalert-6" name="Admin">
+    <mxGraphModel dx="1440" dy="840" grid="1" gridSize="10" page="1" pageScale="1" pageWidth="1440" pageHeight="840">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="boundary" value="BillAlert — Area President billing and notices" style="rounded=0;whiteSpace=wrap;html=0;verticalAlign=top;align=left;spacingTop=10;spacingLeft=20;fillColor=#ffffff;strokeColor=#45596d;fontSize=24;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="330" y="25" width="1075" height="725" as="geometry"/>
+        </mxCell>
+        <mxCell id="actor-0" value="Area President" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="125" y="367.0" width="40" height="62" as="geometry"/>
+        </mxCell>
+        <mxCell id="uc-0" value="Post cooperative amount / due date&#10;FR-36, FR-13" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="90" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-0" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-0">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="398.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-1" value="Maintain billing and collection schedule&#10;FR-42" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="184" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-1" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="398.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-2" value="Record eligible notice service&#10;FR-37, FR-16" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="278" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-2" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="398.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-3" value="Review and close notice follow-up&#10;FR-32" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="372" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-3" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="398.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-4" value="Inspect reserve report / correct records&#10;FR-49" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="466" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-4" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-4">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="398.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-5" value="Create household-linked accounts&#10;FR-31" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="560" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-5" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="398.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-6" value="Open assigned work alerts&#10;FR-50" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="654" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-6" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-6">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="398.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="constraint" value="Notice eligibility requires confirmed direct referral and overdue unpaid debt. FR-37 replaces the source diagram’s erroneous FR-22 label." style="text;whiteSpace=wrap;html=0;align=left;verticalAlign=top;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="30" y="765" width="1370" height="70" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="billalert-7" name="Notification Engine">
+    <mxGraphModel dx="1440" dy="840" grid="1" gridSize="10" page="1" pageScale="1" pageWidth="1440" pageHeight="840">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="boundary" value="BillAlert — Notification channels and delivery" style="rounded=0;whiteSpace=wrap;html=0;verticalAlign=top;align=left;spacingTop=10;spacingLeft=20;fillColor=#ffffff;strokeColor=#45596d;fontSize=24;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="330" y="25" width="1075" height="725" as="geometry"/>
+        </mxCell>
+        <mxCell id="actor-0" value="Area President" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="125" y="85.0" width="40" height="62" as="geometry"/>
+        </mxCell>
+        <mxCell id="actor-1" value="Android phone" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="125" y="226.0" width="40" height="62" as="geometry"/>
+        </mxCell>
+        <mxCell id="actor-2" value="Scheduled worker" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="125" y="367.0" width="40" height="62" as="geometry"/>
+        </mxCell>
+        <mxCell id="actor-3" value="SMS gateway" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="125" y="508.0" width="40" height="62" as="geometry"/>
+        </mxCell>
+        <mxCell id="actor-4" value="Registered user" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="125" y="649.0" width="40" height="62" as="geometry"/>
+        </mxCell>
+        <mxCell id="uc-0" value="Queue priced-bill alert&#10;FR-13, FR-16" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="90" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-0" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-0">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="116.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-1" value="Queue notice SMS / retain Inbox record&#10;FR-16, FR-37" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="184" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-1" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="116.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-2" value="Refresh local app alerts&#10;FR-16" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="278" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-2" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-1" target="uc-2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="257.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-3" value="Schedule app-only pre-due reminder&#10;FR-14" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="372" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-3" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-1" target="uc-3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="257.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-4" value="Queue enabled overdue alert&#10;FR-15" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="466" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-4" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-2" target="uc-4">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="398.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-5" value="Dispatch text / report outcome&#10;FR-16" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="560" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-5" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-3" target="uc-5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="539.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-6" value="Read Inbox / open linked destination&#10;FR-17, FR-18, FR-50" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="654" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-6" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-4" target="uc-6">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="680.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="constraint" value="No remote Firebase push service. Overdue SMS defaults off; SMS acceptance, delivery and read state differ." style="text;whiteSpace=wrap;html=0;align=left;verticalAlign=top;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="30" y="765" width="1370" height="70" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="billalert-8" name="Account Lifecycle">
+    <mxGraphModel dx="1440" dy="840" grid="1" gridSize="10" page="1" pageScale="1" pageWidth="1440" pageHeight="840">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="boundary" value="BillAlert — Account, household and staff handovers" style="rounded=0;whiteSpace=wrap;html=0;verticalAlign=top;align=left;spacingTop=10;spacingLeft=20;fillColor=#ffffff;strokeColor=#45596d;fontSize=24;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="330" y="25" width="1075" height="725" as="geometry"/>
+        </mxCell>
+        <mxCell id="actor-0" value="Area President" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="125" y="85.0" width="40" height="62" as="geometry"/>
+        </mxCell>
+        <mxCell id="actor-1" value="Successor" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="125" y="367.0" width="40" height="62" as="geometry"/>
+        </mxCell>
+        <mxCell id="actor-2" value="Linked staff" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="125" y="649.0" width="40" height="62" as="geometry"/>
+        </mxCell>
+        <mxCell id="uc-0" value="Create identity and household link&#10;FR-31" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="90" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-0" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-0">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="116.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-1" value="End work access / disable login&#10;FR-39" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="184" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-1" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="116.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-2" value="Review occupant or identity handover&#10;FR-39" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="278" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-2" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="116.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-3" value="Appoint or replace Reader / Cashier&#10;FR-40" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="372" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-3" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="116.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-4" value="Prepare and complete succession&#10;FR-41" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="466" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-4" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-4">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="116.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-5" value="Accept President handover&#10;FR-41" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="560" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-5" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-1" target="uc-5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="398.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-6" value="Use personal household view&#10;FR-38" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="654" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-6" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-2" target="uc-6">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="680.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="constraint" value="Online changes preserve historical ownership. An already-unlocked offline phone requires device reconciliation." style="text;whiteSpace=wrap;html=0;align=left;verticalAlign=top;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="30" y="765" width="1370" height="70" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="billalert-9" name="Reserve and BOHECO">
+    <mxGraphModel dx="1440" dy="840" grid="1" gridSize="10" page="1" pageScale="1" pageWidth="1440" pageHeight="840">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="boundary" value="BillAlert — Reserve, cooperative trip and settlement" style="rounded=0;whiteSpace=wrap;html=0;verticalAlign=top;align=left;spacingTop=10;spacingLeft=20;fillColor=#ffffff;strokeColor=#45596d;fontSize=24;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="330" y="25" width="1075" height="725" as="geometry"/>
+        </mxCell>
+        <mxCell id="actor-0" value="Cashier" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="125" y="85.0" width="40" height="62" as="geometry"/>
+        </mxCell>
+        <mxCell id="actor-1" value="Meter Reader" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="125" y="273.0" width="40" height="62" as="geometry"/>
+        </mxCell>
+        <mxCell id="actor-2" value="Area President" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="125" y="461.0" width="40" height="62" as="geometry"/>
+        </mxCell>
+        <mxCell id="actor-3" value="Scheduled worker" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="125" y="649.0" width="40" height="62" as="geometry"/>
+        </mxCell>
+        <mxCell id="uc-0" value="Record actual reserve cash&#10;FR-43" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="90" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-0" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-0">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="116.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-1" value="Allocate eligible coverage / hand over cash&#10;FR-44" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="184" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-1" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="116.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-2" value="Collect repayment / pay monthly allowance&#10;FR-47, FR-48" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="278" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-2" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-0" target="uc-2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="116.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-3" value="Close collection / complete BOHECO trip&#10;FR-45" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="372" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-3" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-1" target="uc-3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="304.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-4" value="Verify cooperative payment and supply&#10;FR-46" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="466" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-4" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-1" target="uc-4">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="304.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-5" value="Review ledger / record justified correction&#10;FR-49" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="560" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-5" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-2" target="uc-5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="492.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="uc-6" value="Route uncovered or overdue obligations&#10;FR-44" style="ellipse;whiteSpace=wrap;html=0;fillColor=#f3f6fa;strokeColor=#45596d;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="440" y="654" width="900" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-6" style="endArrow=none;startArrow=none;html=0;strokeColor=#45596d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="actor-3" target="uc-6">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="680.0"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="constraint" value="BOHECO evidence is entered by authorized staff; no automated cooperative API or physical supply control is implied." style="text;whiteSpace=wrap;html=0;align=left;verticalAlign=top;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="30" y="765" width="1370" height="70" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
