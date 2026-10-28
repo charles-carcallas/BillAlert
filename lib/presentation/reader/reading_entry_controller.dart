@@ -20,11 +20,7 @@ final class ReadingEntryState {
   final AppFailure? failure;
   final RecordedReading? saved;
 
-  const ReadingEntryState({
-    this.isSaving = false,
-    this.failure,
-    this.saved,
-  });
+  const ReadingEntryState({this.isSaving = false, this.failure, this.saved});
 }
 
 /// Recording one reading.
@@ -69,7 +65,15 @@ class ReadingEntryController extends Notifier<ReadingEntryState> {
         // bonus, so it is not awaited and its failure is not shown: there is
         // nothing for the reader to do about it, and they have a next house
         // to get to.
-        unawaited(ref.read(syncServiceProvider).syncNow());
+        unawaited(
+          ref.read(syncServiceProvider).syncNow().then((_) async {
+            if (ref.mounted) {
+              await ref
+                  .read(rosterControllerProvider.notifier)
+                  .refreshFromServer();
+            }
+          }),
+        );
         // The roster's counters have to include this house immediately, even
         // though nothing has been uploaded.
         ref.invalidate(rosterControllerProvider);
@@ -86,13 +90,17 @@ class ReadingEntryController extends Notifier<ReadingEntryState> {
 
 final readingEntryControllerProvider =
     NotifierProvider<ReadingEntryController, ReadingEntryState>(
-  ReadingEntryController.new,
-);
+      ReadingEntryController.new,
+    );
 
 /// One household from the cache, for the entry screen.
-final consumerByIdProvider =
-    FutureProvider.family<Consumer?, String>((Ref ref, String id) async {
-  final result = await ref.watch(consumerRepositoryProvider).byId(ConsumerId(id));
+final consumerByIdProvider = FutureProvider.family<Consumer?, String>((
+  Ref ref,
+  String id,
+) async {
+  final result = await ref
+      .watch(consumerRepositoryProvider)
+      .byId(ConsumerId(id));
   return switch (result) {
     Ok(:final value) => value,
     Err(:final failure) => throw failure,

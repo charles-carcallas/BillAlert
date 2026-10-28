@@ -8,8 +8,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart' hide Consumer;
 import '../../core/errors/app_failure.dart';
 import '../../core/result/result.dart';
 import '../../domain/entities/bill.dart';
+import '../../domain/outbox/outbox_entry.dart';
 import '../../domain/repositories/bill_repository.dart';
 import '../../domain/repositories/payment_repository.dart';
+import '../../domain/value_objects/cycle_label.dart';
 import '../../domain/value_objects/ids.dart';
 import '../../domain/value_objects/money.dart';
 import '../auth/auth_controller.dart';
@@ -18,7 +20,7 @@ import '../providers.dart';
 /// The state of the counter: who is standing there, what they owe, what they
 /// have chosen to settle and what they handed over.
 final class RecordPaymentState {
-  /// Every household in this area with something outstanding.
+  /// Households with a current-month bill or reading awaiting an amount.
   final List<ConsumerOutstanding> households;
 
   /// What the cashier has typed into the search box.
@@ -31,6 +33,7 @@ final class RecordPaymentState {
   final List<Bill> payableBills;
 
   final Set<String> selectedBillIds;
+  final bool blockedByOverdue;
 
   /// The cash handed over, as typed. Text, not a number: it becomes [Money]
   /// through Money.tryParse and never passes through a double.
@@ -52,6 +55,7 @@ final class RecordPaymentState {
   const RecordPaymentState({
     this.households = const <ConsumerOutstanding>[],
     this.query = '',
+    this.blockedByOverdue = false,
     this.selected,
     this.payableBills = const <Bill>[],
     this.selectedBillIds = const <String>{},
@@ -69,6 +73,7 @@ final class RecordPaymentState {
     String? query,
     ConsumerOutstanding? selected,
     List<Bill>? payableBills,
+    bool? blockedByOverdue,
     Set<String>? selectedBillIds,
     String? cashTenderedText,
     bool? isLoadingHouseholds,
@@ -84,6 +89,7 @@ final class RecordPaymentState {
       query: query ?? this.query,
       selected: clearSelected ? null : (selected ?? this.selected),
       payableBills: payableBills ?? this.payableBills,
+      blockedByOverdue: blockedByOverdue ?? this.blockedByOverdue,
       selectedBillIds: selectedBillIds ?? this.selectedBillIds,
       cashTenderedText: cashTenderedText ?? this.cashTenderedText,
       isLoadingHouseholds: isLoadingHouseholds ?? this.isLoadingHouseholds,
@@ -126,7 +132,10 @@ final class RecordPaymentState {
   }
 
   bool get canConfirm =>
-      selectedBillIds.isNotEmpty && !isSubmitting && !isLoadingBills;
+      selectedBillIds.isNotEmpty &&
+      !isSubmitting &&
+      !isLoadingBills &&
+      !blockedByOverdue;
 }
 
 /// FR-30 — the cashier takes cash across the counter.
@@ -138,9 +147,14 @@ final class RecordPaymentState {
 /// half-paid the first time the network dropped mid-loop.
 class RecordPaymentController extends Notifier<RecordPaymentState> {
   Future<void>? _inFlightHouseholds;
+  int _generation = 0;
+  int _selection = 0;
 
   @override
   RecordPaymentState build() {
+    ref.watch(authControllerProvider.select((s) => s.value?.accessScope));
+    _generation++;
+    _inFlightHouseholds = null;
     Future<void>.microtask(loadHouseholds);
     return const RecordPaymentState(isLoadingHouseholds: true);
   }
@@ -160,7 +174,9 @@ class RecordPaymentController extends Notifier<RecordPaymentState> {
   }
 
   Future<void> _doLoadHouseholds() async {
+    final generation = _generation;
     final user = await ref.read(authControllerProvider.future);
+    if (!ref.mounted || generation != _generation) return;
     final AreaId? areaId = user?.areaId;
 
     if (areaId == null) {
@@ -176,10 +192,14 @@ class RecordPaymentController extends Notifier<RecordPaymentState> {
 
     state = state.copyWith(isLoadingHouseholds: true);
 
-    switch (await ref.read(billRepositoryProvider).outstandingInArea(areaId)) {
+    switch (await ref
+        .read(billRepositoryProvider)
+        .currentCollectionsInArea(areaId, ref.read(phClockProvider).today())) {
       case Ok(:final value):
+        if (!ref.mounted || generation != _generation) return;
         state = state.copyWith(households: value, isLoadingHouseholds: false);
       case Err(:final failure):
+        if (!ref.mounted || generation != _generation) return;
         state = state.copyWith(isLoadingHouseholds: false, failure: failure);
     }
   }
@@ -190,7 +210,10 @@ class RecordPaymentController extends Notifier<RecordPaymentState> {
   void search(String query) => state = state.copyWith(query: query);
 
   Future<void> selectHousehold(ConsumerOutstanding household) async {
+    final generation = _generation;
+    final selection = ++_selection;
     state = state.copyWith(
+      blockedByOverdue: false,
       selected: household,
       payableBills: const <Bill>[],
       selectedBillIds: const <String>{},
@@ -202,8 +225,31 @@ class RecordPaymentController extends Notifier<RecordPaymentState> {
         .read(billRepositoryProvider)
         .payableFor(household.consumerId)) {
       case Ok(:final value):
-        state = state.copyWith(payableBills: value, isLoadingBills: false);
+        if (!ref.mounted ||
+            generation != _generation ||
+            selection != _selection) {
+          return;
+        }
+        final today = ref.read(phClockProvider).today();
+        state = state.copyWith(
+          payableBills: value
+              .where(
+                (b) => b.cycle == CycleLabel.of(today) && !b.isOverdueOn(today),
+              )
+              .toList(),
+          blockedByOverdue: value.any(
+            (b) =>
+                b.isOverdueOn(today) ||
+                (b.settlementState != null && b.settlementState != 'settled'),
+          ),
+          isLoadingBills: false,
+        );
       case Err(:final failure):
+        if (!ref.mounted ||
+            generation != _generation ||
+            selection != _selection) {
+          return;
+        }
         state = state.copyWith(isLoadingBills: false, failure: failure);
     }
   }
@@ -229,8 +275,10 @@ class RecordPaymentController extends Notifier<RecordPaymentState> {
 
   /// Back to the household list, ready for the next person.
   void startNewPayment() {
+    _selection++;
     state = state.copyWith(
       clearSelected: true,
+      blockedByOverdue: false,
       payableBills: const <Bill>[],
       selectedBillIds: const <String>{},
       cashTenderedText: '',
@@ -241,6 +289,24 @@ class RecordPaymentController extends Notifier<RecordPaymentState> {
 
   /// Records the handover: one call, however many bills.
   Future<void> confirm() async {
+    final generation = _generation;
+    if (state.isSubmitting) return;
+    if (state.blockedByOverdue) {
+      state = state.copyWith(
+        failure: const ValidationFailure(
+          'Follow the assigned payment route and settle earlier debts first.',
+        ),
+      );
+      return;
+    }
+    if (!ref.read(networkStatusProvider).isOnline) {
+      state = state.copyWith(
+        failure: const NetworkFailure(
+          'Recording a payment needs internet. Nothing was recorded.',
+        ),
+      );
+      return;
+    }
     final ConsumerOutstanding? household = state.selected;
     if (household == null) return;
 
@@ -275,23 +341,28 @@ class RecordPaymentController extends Notifier<RecordPaymentState> {
 
     state = state.copyWith(isSubmitting: true);
 
+    final uuid = ref.read(clientUuidFactoryProvider)();
     final result = await ref.read(recordCashPaymentProvider)(
       consumerLabel: household.consumerNo.value,
       bills: bills,
       amounts: amounts,
       cashTendered: tendered,
+      clientUuid: uuid,
     );
 
     switch (result) {
       case Err(:final failure):
+        if (!ref.mounted || generation != _generation) return;
         state = state.copyWith(isSubmitting: false, failure: failure);
 
       case Ok():
+        if (!ref.mounted || generation != _generation) return;
         // The handover is safe in the outbox. Draining it is what produces the
         // official receipt, so it is awaited: the consumer is standing at the
         // counter waiting to be handed one.
         await ref.read(syncServiceProvider).syncNow();
-        await _fetchReceipt(household.consumerId);
+        if (!ref.mounted || generation != _generation) return;
+        await _fetchReceipt(uuid);
     }
   }
 
@@ -301,19 +372,46 @@ class RecordPaymentController extends Notifier<RecordPaymentState> {
   /// it from a sequence - so the app asks for it rather than inventing one.
   /// If it is not there yet the payment is queued, not lost, and the screen
   /// says exactly that.
-  Future<void> _fetchReceipt(ConsumerId consumerId) async {
-    switch (await ref.read(paymentRepositoryProvider).historyFor(consumerId)) {
-      case Ok(:final value) when value.isNotEmpty:
-        // historyFor returns newest first, so the handover just recorded is
-        // the first one.
-        state = state.copyWith(isSubmitting: false, receipt: value.first);
+  Future<void> _fetchReceipt(ClientUuid uuid) async {
+    final generation = _generation;
+    final result = await ref.read(outboxRepositoryProvider).all();
+    if (!ref.mounted || generation != _generation) return;
+    if (result case Err(:final failure)) {
+      state = state.copyWith(isSubmitting: false, failure: failure);
+      return;
+    }
+    if (!ref.mounted || generation != _generation) return;
+    final matches = (result as Ok<List<OutboxEntry>>).value.where(
+      (e) => e.operation.clientUuid == uuid,
+    );
+    final entry = matches.isEmpty ? null : matches.single;
+    if (entry?.status != OutboxStatus.synced || entry?.serverId == null) {
+      state = state.copyWith(
+        isSubmitting: false,
+        queuedOffline: true,
+        failure: const ServerFailure(
+          'Payment confirmation is pending. Do not collect again. Sync and check Receipts.',
+        ),
+      );
+      return;
+    }
+    switch (await ref
+        .read(paymentRepositoryProvider)
+        .byTransaction(entry!.serverId!)) {
+      case Ok(:final value) when value != null:
+        if (!ref.mounted || generation != _generation) return;
+        state = state.copyWith(isSubmitting: false, receipt: value);
       case Ok():
-        state = state.copyWith(isSubmitting: false, queuedOffline: true);
-      case Err():
-        // The money is recorded; only the receipt lookup failed. Saying
-        // "queued" is true and is better than showing an error for something
-        // that did work.
-        state = state.copyWith(isSubmitting: false, queuedOffline: true);
+        if (!ref.mounted || generation != _generation) return;
+        state = state.copyWith(
+          isSubmitting: false,
+          failure: const ServerFailure(
+            'Payment recorded. Its receipt could not be loaded yet. Check Receipts; do not collect again.',
+          ),
+        );
+      case Err(:final failure):
+        if (!ref.mounted || generation != _generation) return;
+        state = state.copyWith(isSubmitting: false, failure: failure);
     }
   }
 }

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../domain/repositories/payment_repository.dart';
 import '../../domain/value_objects/ph_date.dart';
 import '../common/expandable_bottom_sheet.dart';
+import '../common/receipt_qr_code.dart';
 
 /// Opens the complete server-issued receipt without leaving the Cashier tab.
 Future<void> showCashierReceiptDetails(
@@ -70,7 +71,9 @@ class CashierReceiptDetails extends StatelessWidget {
                     Icon(Icons.verified, color: colours.primary, size: 32),
                     const SizedBox(height: 8),
                     Text(
-                      'OFFICIAL DIGITAL RECEIPT',
+                      receipt.isPondoRepayment
+                          ? 'RESERVE FUND REPAYMENT RECEIPT'
+                          : 'OFFICIAL DIGITAL RECEIPT',
                       style: text.labelMedium?.copyWith(
                         color: colours.primary,
                         fontWeight: FontWeight.w700,
@@ -127,6 +130,8 @@ class CashierReceiptDetails extends StatelessWidget {
                   value: receipt.changeDue!.format(),
                 ),
               ],
+              const SizedBox(height: 20),
+              ReceiptQrCode(verificationCode: receipt.verificationCode),
             ],
           ),
         ),

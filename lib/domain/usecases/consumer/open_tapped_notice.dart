@@ -76,7 +76,7 @@ final class OpenTappedNotice {
     }
 
     final Bill? bill;
-    switch (await bills.byId(id)) {
+    switch (await bills.byId(id, consumerId: household.id)) {
       case Err():
         return const ShowInbox(explanation: couldNotOpen);
       case Ok(:final value):

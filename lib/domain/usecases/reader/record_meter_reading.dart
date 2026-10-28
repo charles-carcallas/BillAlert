@@ -68,12 +68,15 @@ final class RecordMeterReading {
     required Consumer consumer,
     required Kwh currentReading,
   }) async {
+    final captureSession = outbox.sessionGeneration;
     // An inactive or pending account is not read and not billed.
     if (!consumer.isActive) {
-      return Err(ValidationFailure(
-        '${consumer.fullName} is not an active account, so no reading can be '
-        'recorded. Ask your Area President to check the account first.',
-      ));
+      return Err(
+        ValidationFailure(
+          '${consumer.fullName} is not an active account, so no reading can be '
+          'recorded. Ask your Area President to check the account first.',
+        ),
+      );
     }
 
     final today = clock.today();
@@ -81,9 +84,11 @@ final class RecordMeterReading {
 
     // FR-23, part one: the server already has a reading for this cycle.
     if (consumer.hasBeenReadFor(cycle)) {
-      return Err(ConflictFailure(
-        '${consumer.fullName} has already been read for ${cycle.displayName}.',
-      ));
+      return Err(
+        ConflictFailure(
+          '${consumer.fullName} has already been read for ${cycle.displayName}.',
+        ),
+      );
     }
 
     // FR-23, part two: a reading is already queued on this phone. Without
@@ -98,20 +103,24 @@ final class RecordMeterReading {
         return Err(failure);
       case Ok(:final value):
         if (value) {
-          return Err(ConflictFailure(
-            'You already recorded a reading for ${consumer.fullName} this '
-            'month. It is still waiting to sync.',
-          ));
+          return Err(
+            ConflictFailure(
+              'You already recorded a reading for ${consumer.fullName} this '
+              'month. It is still waiting to sync.',
+            ),
+          );
         }
     }
 
     // MTR-08: a meter does not run backwards, so this is a mistyped digit.
     if (!consumer.isPlausibleReading(currentReading)) {
-      return Err(ValidationFailure(
-        '${currentReading.format()} is lower than the last reading of '
-        '${consumer.previousReading.format()}. Please check the digits on '
-        'the meter.',
-      ));
+      return Err(
+        ValidationFailure(
+          '${currentReading.format()} is lower than the last reading of '
+          '${consumer.previousReading.format()}. Please check the digits on '
+          'the meter.',
+        ),
+      );
     }
 
     // The capture time is recorded now and sent to the server as it is. The
@@ -130,6 +139,13 @@ final class RecordMeterReading {
 
     // Durable first, confirmation second. If the app is killed on the next
     // line, the reading is still on the phone.
+    if (captureSession != outbox.sessionGeneration) {
+      return const Err(
+        AuthFailure(
+          'The signed-in account changed. Nothing was queued for the new account.',
+        ),
+      );
+    }
     final enqueued = await outbox.enqueue(operation);
     switch (enqueued) {
       case Err(:final failure):
@@ -138,15 +154,17 @@ final class RecordMeterReading {
         break;
     }
 
-    return Ok(RecordedReading(
-      consumerId: consumer.id,
-      consumerLabel: consumer.fullName,
-      previousReading: consumer.previousReading,
-      currentReading: currentReading,
-      consumption: consumer.consumptionFor(currentReading),
-      cycle: cycle,
-      readingDate: PhDate.at(capturedAt),
-      clientUuid: operation.clientUuid,
-    ));
+    return Ok(
+      RecordedReading(
+        consumerId: consumer.id,
+        consumerLabel: consumer.fullName,
+        previousReading: consumer.previousReading,
+        currentReading: currentReading,
+        consumption: consumer.consumptionFor(currentReading),
+        cycle: cycle,
+        readingDate: PhDate.at(capturedAt),
+        clientUuid: operation.clientUuid,
+      ),
+    );
   }
 }

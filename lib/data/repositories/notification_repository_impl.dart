@@ -7,6 +7,7 @@ import '../../domain/repositories/notification_repository.dart';
 import '../../domain/value_objects/ids.dart';
 import '../local/app_database.dart';
 import '../supabase/failure_mapper.dart';
+import 'consumer_repository_impl.dart';
 
 /// CON-05 — the consumer's alert inbox.
 ///
@@ -37,6 +38,7 @@ class NotificationRepositoryImpl implements NotificationRepository {
 
   @override
   Future<Result<List<AppNotification>>> inboxFor(ConsumerId consumerId) async {
+    final epoch = _db.cacheEpoch;
     try {
       final rows = await _client
           .from('notifications')
@@ -44,13 +46,18 @@ class NotificationRepositoryImpl implements NotificationRepository {
           .eq('consumer_id', consumerId.value)
           .order('created_at', ascending: false);
 
+      if (epoch != _db.cacheEpoch) {
+        throw const AuthFailure('The signed-in account changed.');
+      }
       await _replaceConsumerCache(consumerId, rows);
       await _markConsumerNotificationsRefreshed(consumerId);
       return Ok<List<AppNotification>>(
         withoutTextCopies(rows.map(_fromRow).toList()),
       );
     } catch (error, stackTrace) {
-      final failure = FailureMapper.from(error, stackTrace);
+      final failure = epoch != _db.cacheEpoch
+          ? const AuthFailure('The signed-in account changed.')
+          : FailureMapper.from(error, stackTrace);
       if (failure is NetworkFailure) {
         final cached = await _cachedInboxFor(consumerId);
         switch (cached) {
@@ -73,13 +80,20 @@ class NotificationRepositoryImpl implements NotificationRepository {
   @override
   Future<Result<void>> markRead(NotificationId id) async {
     try {
+      final own = await ConsumerRepositoryImpl(_db, _client).signedInConsumer();
+      final consumer = switch (own) {
+        Ok(:final value) => value,
+        Err(:final failure) => throw failure,
+      };
+      if (consumer == null) return const Err<void>(PermissionFailure());
       await _client
           .from('notifications')
           .update(<String, dynamic>{
             'is_read': true,
             'read_at': DateTime.now().toUtc().toIso8601String(),
           })
-          .eq('id', id.value);
+          .eq('id', id.value)
+          .eq('consumer_id', consumer.id.value);
 
       await (_db.update(_db.cachedNotifications)
             ..where((table) => table.id.equals(id.value)))
@@ -98,39 +112,20 @@ class NotificationRepositoryImpl implements NotificationRepository {
   /// count somebody else's.
   @override
   Future<Result<int>> unreadCount() async {
-    try {
-      final rows = await _client
-          .from('notifications')
-          .select('id')
-          .eq('is_read', false);
-
-      return Ok<int>(rows.length);
-    } catch (error, stackTrace) {
-      final failure = FailureMapper.from(error, stackTrace);
-      if (failure is NetworkFailure) {
-        try {
-          final cached = await (_db.select(
-            _db.cachedNotifications,
-          )..where((table) => table.isRead.equals(false))).get();
-          final marker =
-              await (_db.select(_db.syncMeta)..where(
-                    (table) =>
-                        table.tableName_.like('consumer_notifications:%'),
-                  ))
-                  .getSingleOrNull();
-          if (cached.isNotEmpty || marker != null) {
-            return Ok<int>(cached.length);
-          }
-        } catch (cacheError) {
-          return Err<int>(
-            ServerFailure(
-              'Could not count the alerts saved on this phone.',
-              cacheError.toString(),
-            ),
-          );
-        }
-      }
-      return Err<int>(failure);
+    final own = await ConsumerRepositoryImpl(_db, _client).signedInConsumer();
+    switch (own) {
+      case Err(:final failure):
+        return Err<int>(failure);
+      case Ok(value: null):
+        return const Ok<int>(0);
+      case Ok(value: final consumer?):
+        final inbox = await inboxFor(consumer.id);
+        return switch (inbox) {
+          Ok(:final value) => Ok<int>(
+            value.where((alert) => !alert.isRead).length,
+          ),
+          Err(:final failure) => Err<int>(failure),
+        };
     }
   }
 

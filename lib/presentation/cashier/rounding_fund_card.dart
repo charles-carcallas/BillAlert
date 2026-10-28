@@ -75,7 +75,8 @@ class RoundingFundCard extends ConsumerWidget {
               const SizedBox(height: 10),
               if (latest != null) ...<Widget>[
                 FundLine('Rounding this month', latest.rounding),
-                FundLine('Meter Reader pay (max ₱300)', latest.readerPay),
+                if (latest.readerPay > Money.zero)
+                  FundLine('Previously recorded Reader pay', latest.readerPay),
                 if (latest.gap > Money.zero)
                   FundLine(
                     'Kept for unpaid bills',
@@ -132,8 +133,7 @@ void showRoundingFundMonths(
           ),
           const SizedBox(height: 4),
           Text(
-            'Unpaid bills are covered first, then the Meter Reader is paid '
-            'up to ₱300. The rest is saved and carries over.',
+            'Monthly ₱500 compensation is recorded separately under BOHECO trip. These figures summarize regular collections.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
           for (final RoundingFundMonth m in months.reversed) ...<Widget>[
@@ -149,9 +149,10 @@ void showRoundingFundMonths(
             FundLine('To BOHECO', m.toBoheco),
             FundLine('Rounding', m.rounding),
             FundLine('Fund carried in', m.fundBefore),
-            FundLine('BOHECO still owed on the 28th', m.gap),
+            FundLine('BOHECO owed at period end', m.gap),
             FundLine('Kept for unpaid bills', m.keptForGap),
-            FundLine('Meter Reader pay', m.readerPay),
+            if (m.readerPay > Money.zero)
+              FundLine('Previously recorded Reader pay', m.readerPay),
             FundLine('Saved in the fund', m.fundAfter, strong: true),
           ],
         ],

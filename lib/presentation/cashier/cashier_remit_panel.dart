@@ -84,7 +84,7 @@ class _CashierRemitPanelState extends ConsumerState<CashierRemitPanel> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Where the money goes',
+                    'Regular collections to remit',
                     style: text.titleSmall?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
@@ -117,16 +117,18 @@ class _CashierRemitPanelState extends ConsumerState<CashierRemitPanel> {
               FundLine('Collected', m.collected),
               FundLine('To BOHECO', m.toBoheco),
               FundLine('Rounding', m.rounding),
-              FundLine('Fund carried in', m.fundBefore),
+
               if (m.gap > Money.zero)
                 FundLine(
                   'Kept for unpaid bills',
                   m.keptForGap,
                   note: 'BOHECO still owed ${m.gap.format()}',
                 ),
-              FundLine('Meter Reader pay (max ₱300)', m.readerPay),
+
               const Divider(height: 18),
-              FundLine('Saved in the fund', m.fundAfter, strong: true),
+              const Text(
+                'Reserve fund repayments stay in the reserve fund balance above. Record actual contributions and salary withdrawals there.',
+              ),
             ],
             const SizedBox(height: 14),
             if (done != null)
@@ -157,7 +159,7 @@ class _CashierRemitPanelState extends ConsumerState<CashierRemitPanel> {
         title: const Text('Hand over to the Meter Reader?'),
         content: Text(
           'Give the Meter Reader ${m.toBoheco.format()} for the BOHECO '
-          'office, and ${m.readerPay.format()} as their pay.\n\n'
+          'office. Record salary withdrawals separately in reserve fund.\n\n'
           'This is recorded with today\'s date and cannot be changed.',
         ),
         actions: <Widget>[

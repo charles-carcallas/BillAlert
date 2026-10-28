@@ -47,12 +47,15 @@ final class RefreshPhoneAlerts {
   final PhoneNotifier phone;
   final PhClock clock;
   final UrgentAlertsSetting urgentAlerts;
+  final bool Function()? isCurrent;
+  bool get _current => isCurrent?.call() ?? true;
 
   const RefreshPhoneAlerts({
     required this.feed,
     required this.phone,
     required this.clock,
     required this.urgentAlerts,
+    this.isCurrent,
   });
 
   Future<Result<PhoneAlertReport>> call() async {
@@ -69,11 +72,17 @@ final class RefreshPhoneAlerts {
     if (household == null) {
       // Signed out, or staff on this phone: nothing about a household's bills
       // may stay on it.
-      await phone.cancelAll();
+      // Staff may have work alerts on the same phone. Only scheduled bill
+      // reminders belong to this household refresh; sign-out clears the tray.
+      for (final id in await phone.scheduledIds()) {
+        if (!_current) return const Ok<PhoneAlertReport>(PhoneAlertReport());
+        await phone.cancel(id);
+      }
       return const Ok<PhoneAlertReport>(PhoneAlertReport());
     }
 
     final bool canNotify = await phone.canNotify();
+    if (!_current) return const Ok<PhoneAlertReport>(PhoneAlertReport());
     // Not shown and not marked: a notice marked sent while notifications are
     // off would be a delivery record for something nobody saw.
     final int shown = canNotify ? await _showPending(household) : 0;
@@ -100,6 +109,7 @@ final class RefreshPhoneAlerts {
     }
 
     for (final PendingPhoneAlert alert in alerts) {
+      if (!_current) return 0;
       final (String title, String body) = _wordingFor(alert.type);
       final BillId? bill = alert.bill;
       await phone.show(
@@ -116,6 +126,10 @@ final class RefreshPhoneAlerts {
                   .encode(),
         ),
       );
+      if (!_current) {
+        await phone.cancel(stableNoticeId('alert:${alert.id.value}'));
+        return 0;
+      }
       // Shown first, marked second. If marking fails, the next run shows it
       // again under the same id, which replaces it rather than duplicating.
       await feed.markShown(alert.id);
@@ -142,6 +156,7 @@ final class RefreshPhoneAlerts {
     final Set<int> planned = <int>{};
 
     for (final Bill bill in bills) {
+      if (!_current) return 0;
       final PhDate? due = bill.dueDate;
       if (due == null || bill.isSettled) continue;
 
@@ -168,9 +183,14 @@ final class RefreshPhoneAlerts {
         atUtc: at,
       );
       planned.add(id);
+      if (!_current) {
+        await phone.cancel(id);
+        return 0;
+      }
     }
 
     for (final int id in await phone.scheduledIds()) {
+      if (!_current) return 0;
       if (!planned.contains(id)) await phone.cancel(id);
     }
     return planned.length;

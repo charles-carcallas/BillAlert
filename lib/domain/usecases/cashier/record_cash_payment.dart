@@ -22,11 +22,14 @@ final class RecordCashPayment {
   final OutboxRepository outbox;
   final PhClock clock;
   final ClientUuidFactory newClientUuid;
+  final Future<Result<void>> Function(List<BillId>, List<Money>)?
+  verifyCollection;
 
   const RecordCashPayment({
     required this.outbox,
     required this.clock,
     required this.newClientUuid,
+    this.verifyCollection,
   });
 
   Future<Result<void>> call({
@@ -34,55 +37,91 @@ final class RecordCashPayment {
     required List<Bill> bills,
     required List<Money> amounts,
     Money? cashTendered,
+    ClientUuid? clientUuid,
   }) async {
+    final captureSession = outbox.sessionGeneration;
     if (bills.isEmpty) {
-      return const Err(ValidationFailure(
-        'Choose at least one bill before recording a payment.',
-      ));
+      return const Err(
+        ValidationFailure(
+          'Choose at least one bill before recording a payment.',
+        ),
+      );
     }
     if (bills.length != amounts.length) {
-      return const Err(ValidationFailure(
-        'Every bill needs an amount. Please check the payment list.',
-      ));
+      return const Err(
+        ValidationFailure(
+          'Every bill needs an amount. Please check the payment list.',
+        ),
+      );
     }
 
     // FR-30: an unpriced bill is not collectable. There is no figure to pay.
     for (final Bill bill in bills) {
       if (bill.isUnpriced) {
-        return Err(ValidationFailure(
-          'Bill ${bill.billNo} is still waiting for its amount from the '
-          'cooperative, so it cannot be paid yet.',
-        ));
+        return Err(
+          ValidationFailure(
+            'Bill ${bill.billNo} is still waiting for its amount from the '
+            'cooperative, so it cannot be paid yet.',
+          ),
+        );
       }
     }
 
     for (var i = 0; i < bills.length; i++) {
       if (amounts[i] <= Money.zero) {
-        return Err(ValidationFailure(
-          'The amount for bill ${bills[i].billNo} must be more than zero.',
-        ));
+        return Err(
+          ValidationFailure(
+            'The amount for bill ${bills[i].billNo} must be more than zero.',
+          ),
+        );
       }
       if (amounts[i] > bills[i].balance) {
-        return Err(ValidationFailure(
-          '${amounts[i].format()} is more than the '
-          '${bills[i].balance.format()} still owed on bill ${bills[i].billNo}.',
-        ));
+        return Err(
+          ValidationFailure(
+            '${amounts[i].format()} is more than the '
+            '${bills[i].balance.format()} still owed on bill ${bills[i].billNo}.',
+          ),
+        );
       }
     }
 
     // Adding up amounts a person already decided. Not deriving a bill.
-    final total =
-        amounts.fold(Money.zero, (Money running, Money each) => running + each);
+    final total = amounts.fold(
+      Money.zero,
+      (Money running, Money each) => running + each,
+    );
 
     if (cashTendered != null && cashTendered < total) {
-      return Err(ValidationFailure(
-        'Cash received (${cashTendered.format()}) is less than the '
-        '${total.format()} being paid.',
-      ));
+      return Err(
+        ValidationFailure(
+          'Cash received (${cashTendered.format()}) is less than the '
+          '${total.format()} being paid.',
+        ),
+      );
     }
 
+    final pending = await outbox.pending();
+    if (pending case Err(:final failure)) return Err<void>(failure);
+    if (pending case Ok(:final value)) {
+      for (final entry in value) {
+        final op = entry.operation;
+        if (op is RecordPaymentOperation &&
+            op.billIds.any((id) => bills.any((bill) => bill.id == id))) {
+          return const Err<void>(
+            ConflictFailure(
+              'A payment for this bill is still being checked. Sync and verify its receipt before collecting again.',
+            ),
+          );
+        }
+      }
+    }
+    final verified = await verifyCollection?.call(
+      bills.map((b) => b.id).toList(),
+      amounts,
+    );
+    if (verified case Err(:final failure)) return Err<void>(failure);
     final operation = RecordPaymentOperation(
-      clientUuid: newClientUuid(),
+      clientUuid: clientUuid ?? newClientUuid(),
       capturedAt: clock.nowUtc(),
       billIds: bills.map((Bill b) => b.id).toList(),
       amounts: amounts,
@@ -90,6 +129,13 @@ final class RecordCashPayment {
       consumerLabel: consumerLabel,
     );
 
+    if (captureSession != outbox.sessionGeneration) {
+      return const Err(
+        AuthFailure(
+          'The signed-in account changed. Nothing was queued for the new account.',
+        ),
+      );
+    }
     return switch (await outbox.enqueue(operation)) {
       Err(:final failure) => Err<void>(failure),
       Ok() => const Ok<void>(null),

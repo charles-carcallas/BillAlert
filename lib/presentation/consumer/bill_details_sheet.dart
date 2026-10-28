@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../domain/entities/bill.dart';
 import '../../domain/value_objects/ph_date.dart';
+import '../common/collection_deadline.dart';
 import '../common/expandable_bottom_sheet.dart';
+import '../common/settlement_panel.dart';
 
 /// Opens one billing-cycle record without turning it into a payment receipt.
 Future<void> showConsumerBillDetails(
@@ -66,7 +68,12 @@ class ConsumerBillDetails extends StatelessWidget {
             controller: scrollController,
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
             children: <Widget>[
+              HouseholdPaymentRoute(
+                consumerId: bill.consumerId.value,
+                billId: bill.id.value,
+              ),
               _StatementCard(bill: bill, today: today),
+              CollectionDeadline(bill: bill),
               const SizedBox(height: 12),
               _DueDateCard(bill: bill, today: today),
               const SizedBox(height: 12),
@@ -220,7 +227,7 @@ class _StatementCard extends StatelessWidget {
 
                 // The balance above, broken down, so the big number is never
                 // a figure the consumer has to take on trust.
-                if (bill.isPayable) ...<Widget>[
+                if (!bill.isUnpriced) ...<Widget>[
                   const SizedBox(height: 16),
                   const Divider(height: 1),
                   const SizedBox(height: 14),
@@ -235,6 +242,20 @@ class _StatementCard extends StatelessWidget {
                         ? bill.amountPaid.format()
                         : '−${bill.amountPaid.format()}',
                   ),
+                  if (!bill.externalPaid.isZero) ...<Widget>[
+                    const SizedBox(height: 8),
+                    _LedgerLine(
+                      label: 'Paid directly to BOHECO',
+                      value: '−${bill.externalPaid.format()}',
+                    ),
+                  ],
+                  if (bill.isWaived) ...<Widget>[
+                    const SizedBox(height: 8),
+                    _LedgerLine(
+                      label: 'Covered by BOHECO',
+                      value: '−${bill.waiverAmount.format()}',
+                    ),
+                  ],
                 ],
               ],
             ),
@@ -357,14 +378,16 @@ class _ProgressCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final _Step priced = bill.isPayable ? _Step.done : _Step.current;
+    final _Step priced = !bill.isUnpriced ? _Step.done : _Step.current;
     final _Step paid = bill.isSettled
         ? _Step.done
         : bill.isPayable
         ? _Step.current
         : _Step.upcoming;
 
-    final String paymentNote = bill.isSettled
+    final String paymentNote = bill.isWaived
+        ? 'Full bill covered by BOHECO. No cash payment.'
+        : bill.isSettled
         ? 'Paid in full.'
         : bill.isPartiallyPaid
         ? 'Partly paid. The rest is still to be settled.'
@@ -387,13 +410,17 @@ class _ProgressCard extends StatelessWidget {
           _ProgressStep(
             state: priced,
             title: 'Amount posted',
-            note: bill.isPayable
+            note: !bill.isUnpriced
                 ? 'The cooperative’s peso amount has been posted.'
                 : 'The cooperative has not posted this bill’s peso amount '
                       'yet.',
             nextState: paid,
           ),
-          _ProgressStep(state: paid, title: 'Payment', note: paymentNote),
+          _ProgressStep(
+            state: paid,
+            title: bill.isWaived ? 'BOHECO coverage' : 'Payment',
+            note: paymentNote,
+          ),
         ],
       ),
     );

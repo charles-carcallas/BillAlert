@@ -13,9 +13,12 @@ import '../auth/auth_controller.dart';
 import '../cashier/cashier_remit_panel.dart';
 import '../cashier/receipt_details_sheet.dart';
 import '../common/failure_banner.dart';
+import '../common/section_tabs.dart';
+import '../common/settlement_panel.dart';
+import '../common/staff_app_bar.dart';
 import '../providers.dart';
 
-/// The BOHECO office takes the month's collections on this day.
+/// Legacy receipt reporting period end; collection uses the area's schedule.
 const int remittanceDay = 28;
 
 /// Every receipt issued in the signed-in reader's area in the remittance
@@ -131,6 +134,7 @@ final class RemitSplit {
     Money reader = Money.zero;
     Money unsplit = Money.zero;
     for (final PaymentSummary receipt in receipts) {
+      if (receipt.isPondoRepayment) continue;
       for (final SettledBill line in receipt.bills) {
         final Money? share = line.bohecoShare;
         if (share == null) {
@@ -216,27 +220,34 @@ class RemittanceScreen extends ConsumerStatefulWidget {
 
 class _RemittanceScreenState extends ConsumerState<RemittanceScreen> {
   CycleLabel? _month;
+  String _section = 'BOHECO trip';
 
   @override
   Widget build(BuildContext context) {
     final PhDate today = ref.watch(phClockProvider).today();
     final CycleLabel current = handoverMonthOf(today);
     final CycleLabel month = _month ?? current;
-    final DateTime? savedAt = ref
-        .watch(monthCollectionsSavedAtProvider(month))
-        .value;
-    final AsyncValue<List<PaymentSummary>> receipts = ref.watch(
-      monthCollectionsProvider(month),
-    );
-    final AsyncValue<MonthUnpaid> unpaid = ref.watch(
-      monthUnpaidProvider(month),
-    );
+    final showCollections = _section == 'Collections';
+    final DateTime? savedAt = showCollections
+        ? ref.watch(monthCollectionsSavedAtProvider(month)).value
+        : null;
+    final AsyncValue<List<PaymentSummary>> receipts = showCollections
+        ? ref.watch(monthCollectionsProvider(month))
+        : const AsyncData([]);
+    final AsyncValue<MonthUnpaid> unpaid = showCollections
+        ? ref.watch(monthUnpaidProvider(month))
+        : const AsyncLoading();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Remittance')),
+      appBar: const StaffAppBar(title: 'Remittance'),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async {
+            ref.invalidate(settlementSnapshotProvider);
+            if (!showCollections) {
+              await ref.read(settlementSnapshotProvider.future);
+              return;
+            }
             ref.invalidate(monthUnpaidProvider(month));
             if (widget.forCashier) refreshCashierRemit(ref);
             ref.invalidate(monthCollectionsProvider(month));
@@ -245,47 +256,66 @@ class _RemittanceScreenState extends ConsumerState<RemittanceScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: <Widget>[
-              _SummaryPanel(
-                month: month,
-                today: today,
-                isCurrentMonth: month == current,
-                savedAt: savedAt,
-                receipts: receipts.value,
-                unpaid: unpaid,
-                onPrevious: () => setState(() => _month = _shift(month, -1)),
-                onNext: month == current
-                    ? null
-                    : () => setState(() => _month = _shift(month, 1)),
-                onCopy: receipts.value == null
-                    ? null
-                    : () =>
-                          _copy(context, month, receipts.value!, unpaid.value),
-              ),
-              if (widget.forCashier) ...<Widget>[
-                const SizedBox(height: 12),
-                CashierRemitPanel(month: month),
+              ...[
+                SectionTabs(
+                  labels: const ['BOHECO trip', 'Collections'],
+                  selected: _section,
+                  onChanged: (v) => setState(() => _section = v),
+                ),
+                const SizedBox(height: 16),
               ],
-              ...receipts.when(
-                loading: () => const <Widget>[
-                  Padding(
-                    padding: EdgeInsets.symmetric(vertical: 48),
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
+              if (_section == 'BOHECO trip') SettlementPanel(month: month),
+              if (_section == 'Collections') ...[
+                const SizedBox(height: 16),
+                _SummaryPanel(
+                  month: month,
+                  today: today,
+                  isCurrentMonth: month == current,
+                  savedAt: savedAt,
+                  receipts: receipts.value,
+                  unpaid: unpaid,
+                  onPrevious: () => setState(() => _month = _shift(month, -1)),
+                  onNext: month == current
+                      ? null
+                      : () => setState(() => _month = _shift(month, 1)),
+                  onCopy: receipts.value == null
+                      ? null
+                      : () => _copy(
+                          context,
+                          month,
+                          receipts.value!,
+                          unpaid.value,
+                        ),
+                ),
+                if (widget.forCashier) ...<Widget>[
+                  const SizedBox(height: 12),
+                  CashierRemitPanel(month: month),
                 ],
-                error: (Object error, StackTrace _) => <Widget>[
-                  const SizedBox(height: 16),
-                  FailureBanner(
-                    failure: error is AppFailure
-                        ? error
-                        : ServerFailure(ServerFailure.defaultMessage, '$error'),
-                    onRetry: () =>
-                        ref.invalidate(monthCollectionsProvider(month)),
-                  ),
-                ],
-                data: (List<PaymentSummary> list) => list.isEmpty
-                    ? <Widget>[_Empty(month: month)]
-                    : _byDay(context, list),
-              ),
+                ...receipts.when(
+                  loading: () => const <Widget>[
+                    Padding(
+                      padding: EdgeInsets.symmetric(vertical: 48),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  ],
+                  error: (Object error, StackTrace _) => <Widget>[
+                    const SizedBox(height: 16),
+                    FailureBanner(
+                      failure: error is AppFailure
+                          ? error
+                          : ServerFailure(
+                              ServerFailure.defaultMessage,
+                              '$error',
+                            ),
+                      onRetry: () =>
+                          ref.invalidate(monthCollectionsProvider(month)),
+                    ),
+                  ],
+                  data: (List<PaymentSummary> list) => list.isEmpty
+                      ? <Widget>[_Empty(month: month)]
+                      : _byDay(context, list),
+                ),
+              ],
             ],
           ),
         ),
@@ -502,7 +532,7 @@ class _SummaryPanel extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: _Stat(
-                        label: 'Hand over',
+                        label: 'Period ends',
                         value: '$remittanceDay ${_shortMonth(month)}',
                       ),
                     ),
@@ -684,10 +714,10 @@ class _DueLine extends StatelessWidget {
         Flexible(
           child: Text(
             daysLeft == 0
-                ? 'Hand over to the BOHECO office today'
+                ? 'Receipt reporting period ends today'
                 : daysLeft == 1
-                ? 'Hand over to the BOHECO office tomorrow'
-                : 'Hand over to the BOHECO office in $daysLeft days',
+                ? 'Receipt reporting period ends tomorrow'
+                : 'Receipt reporting period ends in $daysLeft days',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: tone,

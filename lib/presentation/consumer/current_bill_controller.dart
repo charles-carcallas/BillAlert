@@ -32,48 +32,61 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/errors/app_failure.dart';
 import '../../core/result/result.dart';
 import '../../domain/entities/bill.dart';
+import '../../domain/entities/consumer.dart' as domain;
 import '../../domain/value_objects/ids.dart';
 import '../auth/auth_controller.dart';
 import '../providers.dart';
 
 // coach:anchor(state-class)
 class CurrentBillState {
+  final domain.Consumer? household;
   final Bill? currentBill;
   final List<Bill> history;
   final bool isLoading;
   final AppFailure? failure;
+  final bool needsHousehold;
 
   const CurrentBillState({
+    this.household,
     this.currentBill,
     this.history = const [],
     this.isLoading = false,
     this.failure,
+    this.needsHousehold = false,
   });
 
   CurrentBillState copyWith({
+    domain.Consumer? household,
     Bill? currentBill,
     List<Bill>? history,
     bool? isLoading,
     AppFailure? failure,
   }) {
     return CurrentBillState(
+      household: household ?? this.household,
       currentBill: currentBill ?? this.currentBill,
       history: history ?? this.history,
       isLoading: isLoading ?? this.isLoading,
       failure: failure,
+      needsHousehold: false,
     );
   }
 }
 
 // coach:anchor(controller-class)
 class CurrentBillController extends Notifier<CurrentBillState> {
+  int _generation = 0;
   @override
   CurrentBillState build() {
+    ref.watch(authControllerProvider.select((s) => s.value?.accessScope));
+    _generation++;
     Future.microtask(_load);
     return const CurrentBillState();
   }
 
   Future<void> _load() async {
+    if (!ref.mounted || ref.read(authControllerProvider).value == null) return;
+    final generation = _generation;
     state = state.copyWith(isLoading: true, failure: null);
 
     // Which household is this? A consumer signs in with a `profiles` row, but
@@ -84,30 +97,28 @@ class CurrentBillController extends Notifier<CurrentBillState> {
     final consumerResult = await ref
         .read(consumerRepositoryProvider)
         .signedInConsumer();
+    if (!ref.mounted || generation != _generation) return;
 
-    final ConsumerId? consumerId;
+    final domain.Consumer? household;
     switch (consumerResult) {
       case Ok(:final value):
-        consumerId = value?.id;
+        household = value;
       case Err(:final failure):
         state = state.copyWith(isLoading: false, failure: failure);
         return;
     }
 
-    if (consumerId == null) {
-      state = state.copyWith(
-        isLoading: false,
-        failure: const PermissionFailure(
-          'This screen shows a household its own bill, and the account you '
-          'are signed in with is not attached to one.',
-        ),
-      );
+    if (household == null) {
+      state = const CurrentBillState(isLoading: false, needsHousehold: true);
       return;
     }
 
+    state = state.copyWith(household: household);
+    final consumerId = household.id;
     final billRepo = ref.read(billRepositoryProvider);
 
     final billResult = await billRepo.currentBillFor(consumerId);
+    if (!ref.mounted || generation != _generation) return;
     Bill? currentBill;
     switch (billResult) {
       case Ok(:final value):
@@ -118,6 +129,7 @@ class CurrentBillController extends Notifier<CurrentBillState> {
     }
 
     final historyResult = await billRepo.historyFor(consumerId);
+    if (!ref.mounted || generation != _generation) return;
     List<Bill> history = [];
     switch (historyResult) {
       case Ok(:final value):
@@ -128,6 +140,7 @@ class CurrentBillController extends Notifier<CurrentBillState> {
     }
 
     state = CurrentBillState(
+      household: household,
       isLoading: false,
       currentBill: currentBill,
       history: history,

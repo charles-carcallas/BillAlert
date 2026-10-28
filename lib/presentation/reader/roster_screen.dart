@@ -10,6 +10,7 @@ import '../common/consumer_search.dart';
 import '../common/failure_banner.dart';
 import '../common/local_search_field.dart';
 import '../common/local_sort_button.dart';
+import '../common/staff_app_bar.dart';
 import '../router.dart';
 import 'roster_controller.dart';
 
@@ -27,21 +28,8 @@ class RosterScreen extends ConsumerWidget {
     final user = ref.watch(authControllerProvider).value;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(user == null ? 'My round' : 'My round · ${user.firstName}'),
-        actions: <Widget>[
-          // Step 2 of the month: the list that goes onto BOHECO's paper.
-          IconButton(
-            tooltip: 'Reading sheet',
-            icon: const Icon(Icons.table_rows_outlined),
-            onPressed: () => context.push(Routes.readingSheet),
-          ),
-          IconButton(
-            tooltip: 'Sign out',
-            icon: const Icon(Icons.logout),
-            onPressed: () => _confirmSignOut(context, ref),
-          ),
-        ],
+      appBar: StaffAppBar(
+        title: user == null ? 'My round' : 'My round · ${user.firstName}',
       ),
       body: SafeArea(
         child: state.when(
@@ -63,41 +51,6 @@ class RosterScreen extends ConsumerWidget {
         ),
       ),
     );
-  }
-
-  Future<void> _confirmSignOut(BuildContext context, WidgetRef ref) async {
-    final waiting =
-        ref.read(rosterControllerProvider).value?.roster.waitingToSync ?? 0;
-
-    // Signing out empties the cache. If there are readings still queued, the
-    // reader has to be told before that happens, not afterwards.
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext dialogContext) => AlertDialog(
-        title: const Text('Sign out?'),
-        content: Text(
-          waiting == 0
-              ? 'Everything you recorded has been sent.'
-              : 'You still have $waiting reading${waiting == 1 ? '' : 's'} '
-                    'waiting to sync. They stay saved on this phone and will be '
-                    'sent when you sign in again.',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Stay signed in'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Sign out'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed ?? false) {
-      await ref.read(authControllerProvider.notifier).signOut();
-    }
   }
 }
 
@@ -346,6 +299,15 @@ class _ProgressCard extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => context.push(Routes.readingSheet),
+                icon: const Icon(Icons.table_rows_outlined, size: 20),
+                label: const Text('View reading sheet'),
+              ),
             ),
           ],
         ),

@@ -10,6 +10,7 @@ import '../../domain/value_objects/ids.dart';
 import '../../domain/value_objects/kwh.dart';
 import '../dto/consumer_dto.dart';
 import '../local/app_database.dart';
+import '../local/query_cache.dart';
 import '../supabase/failure_mapper.dart';
 
 /// Households: read from the encrypted cache, refreshed from Supabase.
@@ -140,53 +141,26 @@ class ConsumerRepositoryImpl implements ConsumerRepository {
   @override
   Future<Result<Consumer?>> signedInConsumer() async {
     try {
-      // No `.eq` filter, deliberately. `consumers_select_scoped` lets a
-      // consumer see one row - theirs - so asking for "the row" is both the
-      // simplest query and the correct one. Staff see their whole area, which
-      // is why this returns null for them rather than an arbitrary household.
-      final rows = await _client
-          .from('consumers')
-          .select(
-            'id, consumer_no, first_name, last_name, contact_number, '
-            'meter_serial_no, area_id, purok, account_status',
-          )
-          .limit(2);
+      final profileId = _client.auth.currentUser?.id;
+      if (profileId == null) return const Ok<Consumer?>(null);
+      final rows = await QueryCache(_db).rows(
+        'own-household:$profileId',
+        () => _client
+            .from('consumers')
+            .select(
+              'id, consumer_no, first_name, last_name, contact_number, '
+              'meter_serial_no, area_id, purok, account_status',
+            )
+            .eq('profile_id', profileId)
+            .limit(2),
+      );
 
       if (rows.length != 1) return const Ok<Consumer?>(null);
 
       final row = rows.first;
-      await _db
-          .into(_db.cachedConsumers)
-          .insertOnConflictUpdate(
-            ConsumerDto.toCacheRow(
-              json: row,
-              previousReading: Kwh.zero,
-              previousReadingDate: null,
-              lastReadCycle: null,
-            ),
-          );
-
       return Ok<Consumer?>(_fromSupabaseRow(row));
     } catch (error, stackTrace) {
       final failure = FailureMapper.from(error, stackTrace);
-      if (failure is NetworkFailure) {
-        try {
-          final owner = await _db.select(_db.cacheOwner).getSingleOrNull();
-          if (owner?.role == 'consumer') {
-            final rows = await _db.select(_db.cachedConsumers).get();
-            if (rows.length == 1) {
-              return Ok<Consumer?>(ConsumerDto.fromCacheRow(rows.single));
-            }
-          }
-        } catch (cacheError) {
-          return Err<Consumer?>(
-            ServerFailure(
-              'Could not read the household saved on this phone.',
-              cacheError.toString(),
-            ),
-          );
-        }
-      }
       return Err<Consumer?>(failure);
     }
   }
@@ -206,9 +180,15 @@ class ConsumerRepositoryImpl implements ConsumerRepository {
           ),
         );
       }
-      await (_db.update(
-        _db.cachedConsumers,
-      )).write(CachedConsumersCompanion(contactNumber: Value<String?>(value)));
+      // The staff roster may contain many households; never rewrite all of it.
+      final own = await signedInConsumer();
+      if (own case Ok(value: final consumer?)) {
+        await (_db.update(
+          _db.cachedConsumers,
+        )..where((t) => t.id.equals(consumer.id.value))).write(
+          CachedConsumersCompanion(contactNumber: Value<String?>(value)),
+        );
+      }
       return Ok<String>(value);
     } catch (error, stackTrace) {
       final failure = FailureMapper.from(error, stackTrace);
@@ -263,6 +243,7 @@ class ConsumerRepositoryImpl implements ConsumerRepository {
 
   @override
   Future<Result<void>> refreshAreaRoster(AreaId areaId) async {
+    final epoch = _db.cacheEpoch;
     try {
       // MTR-02. Row-Level Security already restricts this to the reader's own
       // area; the filter is here so the query says what it means.
@@ -270,7 +251,7 @@ class ConsumerRepositoryImpl implements ConsumerRepository {
           .from('consumers')
           .select(
             'id, consumer_no, first_name, last_name, contact_number, '
-            'meter_serial_no, area_id, purok, account_status',
+            'meter_serial_no, area_id, purok, account_status, opening_reading',
           )
           .eq('area_id', areaId.value);
 
@@ -297,12 +278,15 @@ class ConsumerRepositoryImpl implements ConsumerRepository {
       }
 
       await _db.transaction(() async {
+        if (epoch != _db.cacheEpoch) {
+          throw const AuthFailure('The signed-in account changed.');
+        }
         for (final household in households) {
           final id = household['id'] as String;
           final reading = latest[id];
 
           final Kwh previousReading = reading == null
-              ? Kwh.zero
+              ? ConsumerDto.kwhFrom(household['opening_reading'] ?? 0)
               : ConsumerDto.kwhFrom(reading['current_reading']);
 
           final cycle = reading?['billing_cycles'] as Map<String, dynamic>?;
@@ -341,7 +325,7 @@ class ConsumerRepositoryImpl implements ConsumerRepository {
 
       return const Ok<void>(null);
     } catch (error, stackTrace) {
-      await _recordFailedAttempt(error);
+      if (epoch == _db.cacheEpoch) await _recordFailedAttempt(error);
       return Err<void>(FailureMapper.from(error, stackTrace));
     }
   }

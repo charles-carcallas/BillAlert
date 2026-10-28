@@ -5,6 +5,7 @@ import '../../core/result/result.dart';
 import '../../domain/entities/consumer.dart';
 import '../../domain/repositories/notification_repository.dart';
 import '../../domain/value_objects/ids.dart';
+import '../auth/auth_controller.dart';
 import '../providers.dart';
 
 /// CON-05 — the household's alerts.
@@ -23,11 +24,16 @@ final class InboxState {
 }
 
 class InboxController extends Notifier<InboxState> {
+  int _generation = 0;
   Future<void>? _inFlight;
   ConsumerId? _consumerId;
 
   @override
   InboxState build() {
+    ref.watch(authControllerProvider.select((s) => s.value?.accessScope));
+    _generation++;
+    _inFlight = null;
+    _consumerId = null;
     Future<void>.microtask(load);
     return const InboxState(isLoading: true);
   }
@@ -42,9 +48,12 @@ class InboxController extends Notifier<InboxState> {
   }
 
   Future<void> _doLoad() async {
+    if (!ref.mounted || ref.read(authControllerProvider).value == null) return;
+    final generation = _generation;
     final consumerResult = await ref
         .read(consumerRepositoryProvider)
         .signedInConsumer();
+    if (!ref.mounted || generation != _generation) return;
 
     final Consumer? me;
     switch (consumerResult) {
@@ -70,7 +79,11 @@ class InboxController extends Notifier<InboxState> {
 
     state = InboxState(alerts: state.alerts, isLoading: true);
 
-    switch (await ref.read(notificationRepositoryProvider).inboxFor(me.id)) {
+    final result = await ref
+        .read(notificationRepositoryProvider)
+        .inboxFor(me.id);
+    if (!ref.mounted || generation != _generation) return;
+    switch (result) {
       case Ok(:final value):
         state = InboxState(alerts: value);
       case Err(:final failure):
@@ -85,8 +98,12 @@ class InboxController extends Notifier<InboxState> {
   /// something the database does not say.
   Future<void> markRead(AppNotification alert) async {
     if (alert.isRead || _consumerId == null) return;
-
-    switch (await ref.read(notificationRepositoryProvider).markRead(alert.id)) {
+    final generation = _generation;
+    final result = await ref
+        .read(notificationRepositoryProvider)
+        .markRead(alert.id);
+    if (!ref.mounted || generation != _generation) return;
+    switch (result) {
       case Ok():
         await load();
       case Err(:final failure):
@@ -98,12 +115,15 @@ class InboxController extends Notifier<InboxState> {
   /// count and list reflect what the repository accepted.
   Future<void> markAllRead() async {
     if (_consumerId == null) return;
+    final generation = _generation;
 
     final unread = state.alerts.where((AppNotification alert) => !alert.isRead);
     for (final AppNotification alert in unread) {
-      switch (await ref
+      final result = await ref
           .read(notificationRepositoryProvider)
-          .markRead(alert.id)) {
+          .markRead(alert.id);
+      if (!ref.mounted || generation != _generation) return;
+      switch (result) {
         case Ok():
           break;
         case Err(:final failure):

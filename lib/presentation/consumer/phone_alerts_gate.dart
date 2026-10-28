@@ -8,6 +8,8 @@ import '../../core/result/result.dart';
 import '../../domain/notifications/phone_alerts.dart';
 import '../../domain/usecases/consumer/open_tapped_notice.dart';
 import '../../domain/usecases/consumer/refresh_phone_alerts.dart';
+import '../auth/auth_controller.dart';
+import '../common/staff_alerts.dart';
 import '../providers.dart';
 import 'bill_details_sheet.dart';
 import 'inbox_controller.dart';
@@ -149,6 +151,15 @@ class _PhoneAlertsGateState extends ConsumerState<PhoneAlertsGate> {
   Future<void> _open(String? payload) async {
     try {
       if (!mounted) return;
+      if (payload?.startsWith('staff:') == true) {
+        final user = ref.read(authControllerProvider).value;
+        if (user == null || !user.hasWorkAccess) return;
+        final prefix = 'staff:${user.id.value}:';
+        if (!payload!.startsWith(prefix)) return;
+        final destination = payload.substring(prefix.length);
+        if (staffDestinationAllowed(user, destination)) context.go(destination);
+        return;
+      }
       final TappedNoticeDestination destination = await ref.read(
         openTappedNoticeProvider,
       )(payload);

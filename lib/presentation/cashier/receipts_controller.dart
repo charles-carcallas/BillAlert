@@ -86,9 +86,17 @@ final class ReceiptsState {
 
 class ReceiptsController extends Notifier<ReceiptsState> {
   Future<void>? _inFlight;
+  int _generation = 0;
 
   @override
   ReceiptsState build() {
+    ref.watch(
+      authControllerProvider.select(
+        (s) => s.value?.accessScope,
+      ),
+    );
+    _generation++;
+    _inFlight = null;
     Future<void>.microtask(load);
     return const ReceiptsState(isLoading: true);
   }
@@ -105,7 +113,9 @@ class ReceiptsController extends Notifier<ReceiptsState> {
   }
 
   Future<void> _doLoad() async {
+    final generation = _generation;
     final user = await ref.read(authControllerProvider.future);
+    if (!ref.mounted || generation != _generation) return;
     final AreaId? areaId = user?.areaId;
 
     if (areaId == null) {
@@ -136,6 +146,7 @@ class ReceiptsController extends Notifier<ReceiptsState> {
       bills.outstandingInArea(areaId),
     ]);
 
+    if (!ref.mounted || generation != _generation) return;
     final summaryResult = results[0] as Result<CollectionSummary>;
     final listResult = results[1] as Result<List<PaymentSummary>>;
     final outstandingResult = results[2] as Result<List<ConsumerOutstanding>>;

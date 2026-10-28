@@ -13,6 +13,7 @@ import '../common/consumer_search.dart';
 import '../common/failure_banner.dart';
 import '../common/local_search_field.dart';
 import '../common/local_sort_button.dart';
+import '../common/staff_app_bar.dart';
 import '../providers.dart';
 import 'household_details_sheet.dart';
 import 'roster_controller.dart';
@@ -72,7 +73,7 @@ class _ReaderConsumersScreenState extends ConsumerState<ReaderConsumersScreen> {
     final TextTheme text = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Consumers')),
+      appBar: const StaffAppBar(title: 'Consumers'),
       body: SafeArea(
         child: households.when(
           loading: () => const Center(child: CircularProgressIndicator()),

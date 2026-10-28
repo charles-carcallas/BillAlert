@@ -28,7 +28,7 @@ class ConsumerContactNumberController
     if (state.isSubmitting) return;
 
     final AppUser? user = await ref.read(authControllerProvider.future);
-    if (user is! ConsumerUser) {
+    if (user == null) {
       state = const ConsumerContactNumberState(
         failure: PermissionFailure(
           'Only a consumer can change the SMS number for their household.',

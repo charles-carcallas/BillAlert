@@ -4,13 +4,19 @@ import 'package:go_router/go_router.dart';
 
 import '../../domain/entities/app_user.dart';
 import '../../domain/entities/bill.dart';
+import '../../domain/entities/consumer.dart' as domain;
+import '../../domain/value_objects/cycle_label.dart';
 import '../../domain/value_objects/money.dart';
 import '../../domain/value_objects/ph_date.dart';
+import '../admin/staff_household_setup.dart';
 import '../auth/auth_controller.dart';
+import '../common/account_view_menu.dart';
+import '../common/collection_deadline.dart';
 import '../common/failure_banner.dart';
+import '../common/settlement_panel.dart';
 import '../providers.dart';
 import 'current_bill_controller.dart';
-import 'inbox_controller.dart';
+import 'inbox_button.dart';
 
 /// The Consumer's read-only bill overview.
 class CurrentBillScreen extends ConsumerWidget {
@@ -21,7 +27,13 @@ class CurrentBillScreen extends ConsumerWidget {
     final state = ref.watch(currentBillControllerProvider);
     final PhDate today = ref.watch(phClockProvider).today();
     final AppUser? user = ref.watch(authControllerProvider).value;
-    final int unread = ref.watch(inboxControllerProvider).unreadCount;
+    final displayedBill =
+        state.history
+            .where(
+              (bill) => bill.isWaived && bill.cycle == CycleLabel.of(today),
+            )
+            .firstOrNull ??
+        state.currentBill;
 
     return Scaffold(
       body: SafeArea(
@@ -30,8 +42,44 @@ class CurrentBillScreen extends ConsumerWidget {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
             children: <Widget>[
-              _GreetingHeader(firstName: user?.firstName, unread: unread),
+              _GreetingHeader(firstName: user?.firstName),
+              const SizedBox(height: 14),
+              _HouseholdSummary(household: state.household),
+              if (state.household != null)
+                HouseholdPaymentRoute(consumerId: state.household!.id.value),
+              if (displayedBill != null)
+                CollectionDeadline(bill: displayedBill),
               const SizedBox(height: 16),
+              if (state.needsHousehold)
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'No household linked yet',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          user is AdminUser
+                              ? 'Set up your own electricity household using this login.'
+                              : 'Ask your Area President to link your household to this login.',
+                        ),
+                        if (user is AdminUser)
+                          StaffHouseholdSetupButton(
+                            person: {
+                              'id': user.id.value,
+                              'first_name': user.firstName,
+                              'last_name': user.lastName,
+                            },
+                            label: 'Set up my household',
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
               if (state.failure != null) ...<Widget>[
                 FailureBanner(
                   failure: state.failure!,
@@ -41,16 +89,17 @@ class CurrentBillScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 12),
               ],
-              if (state.isLoading && state.currentBill == null)
+              if (state.isLoading && displayedBill == null)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 64),
                   child: Center(child: CircularProgressIndicator()),
                 )
-              else if (state.currentBill == null &&
+              else if (displayedBill == null &&
                   !state.isLoading &&
+                  !state.needsHousehold &&
                   state.failure == null)
-                _NoCurrentBill(history: state.history)
-              else if (state.currentBill case final Bill bill) ...<Widget>[
+                _NoCurrentBill(history: state.history, today: today)
+              else if (displayedBill case final Bill bill) ...<Widget>[
                 _CurrentAmountPanel(
                   bill: bill,
                   today: today,
@@ -71,14 +120,12 @@ class CurrentBillScreen extends ConsumerWidget {
 
 class _GreetingHeader extends StatelessWidget {
   final String? firstName;
-  final int unread;
 
-  const _GreetingHeader({required this.firstName, required this.unread});
+  const _GreetingHeader({required this.firstName});
 
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
-    final colours = Theme.of(context).colorScheme;
     final String name = firstName?.trim().isNotEmpty == true
         ? firstName!.trim()
         : 'there';
@@ -99,20 +146,51 @@ class _GreetingHeader extends StatelessWidget {
             ],
           ),
         ),
-        IconButton(
-          tooltip: 'Open inbox',
-          onPressed: () => context.go('/consumer/inbox'),
-          icon: Badge(
-            isLabelVisible: unread > 0,
-            label: Text('$unread'),
-            child: Icon(
-              unread > 0
-                  ? Icons.notifications
-                  : Icons.notifications_none_outlined,
-              color: colours.onSurface,
+        const InboxButton(),
+        const AccountViewMenu(),
+      ],
+    );
+  }
+}
+
+class _HouseholdSummary extends StatelessWidget {
+  const _HouseholdSummary({required this.household});
+  final domain.Consumer? household;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final meter = household?.meterSerialNo?.trim();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.home_outlined,
+              size: 18,
+              color: theme.colorScheme.primary,
+            ),
+            const SizedBox(width: 8),
+            Text('My household', style: theme.textTheme.titleSmall),
+          ],
+        ),
+        if (household case final domain.Consumer home) ...[
+          const SizedBox(height: 6),
+          DefaultTextStyle(
+            style: theme.textTheme.bodySmall!.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            child: Wrap(
+              spacing: 16,
+              runSpacing: 4,
+              children: [
+                Text('Consumer no. ${home.consumerNo.value}'),
+                if (meter != null && meter.isNotEmpty) Text('Meter $meter'),
+              ],
             ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -249,6 +327,13 @@ class _CurrentAmountPanel extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           _BillFact(label: 'Bill number', value: bill.billNo.value),
+          if (bill.isWaived) ...<Widget>[
+            const SizedBox(height: 14),
+            _BillFact(
+              label: 'BOHECO coverage',
+              value: bill.waiverAmount.format(),
+            ),
+          ],
           if (bill.isUnpriced) ...<Widget>[
             const SizedBox(height: 14),
             Text(
@@ -308,7 +393,7 @@ class _BillStatusLine extends StatelessWidget {
         : overdue
         ? 'Overdue · due ${_friendlyDate(bill.dueDate!)}'
         : bill.isSettled
-        ? 'Paid'
+        ? bill.statusLabelOn(today)
         : 'Due ${_friendlyDate(bill.dueDate!)}';
 
     return Container(
@@ -321,7 +406,11 @@ class _BillStatusLine extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           Icon(
-            overdue ? Icons.error_outline : Icons.schedule_outlined,
+            overdue
+                ? Icons.error_outline
+                : bill.isSettled
+                ? Icons.check_circle_outline
+                : Icons.schedule_outlined,
             size: 17,
             color: colour,
           ),
@@ -475,64 +564,65 @@ class _PastDueNotice extends StatelessWidget {
 
 class _NoCurrentBill extends StatelessWidget {
   final List<Bill> history;
+  final PhDate today;
 
-  const _NoCurrentBill({required this.history});
+  const _NoCurrentBill({required this.history, required this.today});
 
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
     final colours = Theme.of(context).colorScheme;
-    final List<Bill> settled =
-        history.where((Bill bill) => bill.isSettled).toList()
-          ..sort((Bill a, Bill b) => b.cycle.compareTo(a.cycle));
-    final Bill? latestPaid = settled.isEmpty ? null : settled.first;
-    final bool hasBillingHistory = history.isNotEmpty;
+    final settled = history.where((bill) => bill.isSettled).toList()
+      ..sort((a, b) => b.cycle.compareTo(a.cycle));
+    final latestPaid = settled.firstOrNull;
+    final hasBillingHistory = history.isNotEmpty;
+    final month = CycleLabel.of(today).displayName;
+    final monthName = month.substring(0, month.lastIndexOf(' '));
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        // Keep the primary card in the same place on every visit. With no
-        // payable bill its value area is deliberately blank: ₱0.00 would
-        // look like a real bill amount, which the server never issued.
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: colours.surfaceContainerLowest,
-            border: Border.all(color: colours.outlineVariant),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
+    return Container(
+      key: const ValueKey('household-empty-bill'),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: colours.surfaceContainerLow,
+        border: Border.all(color: colours.outlineVariant),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text('Amount due', style: text.bodyMedium),
-              const SizedBox(height: 4),
-              const SizedBox(height: 48),
+            children: [
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: colours.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    Icon(
-                      hasBillingHistory
-                          ? Icons.check_circle_outline
-                          : Icons.schedule_outlined,
-                      size: 17,
-                      color: colours.primary,
+                child: Icon(
+                  hasBillingHistory
+                      ? Icons.task_alt
+                      : Icons.description_outlined,
+                  color: colours.primary,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      month,
+                      style: text.labelMedium?.copyWith(
+                        color: colours.onSurfaceVariant,
+                      ),
                     ),
-                    const SizedBox(width: 7),
+                    const SizedBox(height: 4),
                     Text(
                       hasBillingHistory
-                          ? 'No payment needed'
-                          : 'No current bill',
-                      style: text.titleSmall?.copyWith(
-                        color: colours.primary,
+                          ? 'You’re all caught up'
+                          : 'No bill for $monthName yet',
+                      style: text.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -541,61 +631,28 @@ class _NoCurrentBill extends StatelessWidget {
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 14),
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: colours.surfaceContainerLowest,
-            border: Border.all(color: colours.outlineVariant),
-            borderRadius: BorderRadius.circular(16),
+          const SizedBox(height: 16),
+          Text(
+            hasBillingHistory
+                ? 'You have no unpaid bills right now.'
+                : 'Your bill will appear after your meter reading is recorded.',
+            style: text.bodyMedium?.copyWith(color: colours.onSurfaceVariant),
           ),
-          child: Column(
-            children: <Widget>[
-              Icon(
-                hasBillingHistory ? Icons.task_alt : Icons.description_outlined,
-                size: 42,
-                color: colours.primary,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                hasBillingHistory
-                    ? 'You’re all caught up'
-                    : 'No current bill yet',
-                style: text.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                hasBillingHistory
-                    ? 'You have no unpaid bills right now.'
-                    : 'Your current bill will appear after your meter has '
-                          'been read.',
-                style: text.bodyMedium,
-                textAlign: TextAlign.center,
-              ),
-              if (latestPaid != null) ...<Widget>[
-                const SizedBox(height: 14),
-                Text(
-                  'Latest paid bill · ${latestPaid.cycle.displayName}',
-                  style: text.bodySmall?.copyWith(
-                    color: colours.onSurfaceVariant,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 18),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => context.go('/consumer/history'),
-                  icon: const Icon(Icons.history),
-                  label: const Text('View billing history'),
-                ),
-              ),
-            ],
+          if (latestPaid != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              '${latestPaid.isWaived ? 'Latest covered bill' : 'Latest paid bill'} · ${latestPaid.cycle.displayName}',
+              style: text.bodySmall?.copyWith(color: colours.onSurfaceVariant),
+            ),
+          ],
+          const SizedBox(height: 12),
+          TextButton.icon(
+            onPressed: () => context.go('/consumer/history'),
+            icon: const Icon(Icons.history, size: 18),
+            label: const Text('View billing history'),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

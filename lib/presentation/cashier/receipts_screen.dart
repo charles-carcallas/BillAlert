@@ -60,9 +60,13 @@ class _ReceiptsScreenState extends ConsumerState<ReceiptsScreen> {
         child: RefreshIndicator(
           onRefresh: controller.load,
           child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: <Widget>[
-              _TodayCard(today: state.today, outstanding: state.outstanding),
+              _CollectionsSummary(
+                today: state.today,
+                outstanding: state.outstanding,
+              ),
 
               if (state.failure != null) ...<Widget>[
                 const SizedBox(height: 12),
@@ -123,10 +127,20 @@ class _ReceiptsScreenState extends ConsumerState<ReceiptsScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 48),
                   child: Column(
                     children: <Widget>[
-                      Icon(
-                        Icons.receipt_long_outlined,
-                        size: 40,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.primary.withValues(alpha: 0.09),
+                          borderRadius: BorderRadius.circular(22),
+                        ),
+                        child: Icon(
+                          Icons.receipt_long_outlined,
+                          size: 36,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       Text(
@@ -243,139 +257,161 @@ class _ReceiptsScreenState extends ConsumerState<ReceiptsScreen> {
       _weekdays[DateTime.utc(day.year, day.month, day.day).weekday - 1];
 }
 
-/// What came in today, and what is still out there.
-///
-/// The card used to answer only the first. A cashier closing up also has to
-/// say how much of the area is still unsettled, and reading it off the
-/// household list one row at a time is how a figure gets miscounted.
-///
-/// The two halves are deliberately different colours: takings in the primary
-/// tone, what is still owed in red when any of it is overdue. They are not
-/// two views of one number — money collected and money outstanding never add
-/// up to anything meaningful — so nothing here totals them together.
-class _TodayCard extends StatelessWidget {
+/// Separate collection and outstanding figures inside one summary panel.
+/// These amounts are never added together.
+class _CollectionsSummary extends StatelessWidget {
   final CollectionSummary today;
 
-  /// Null until the roll-up has loaded. The card then shows its top half
-  /// only, rather than claiming an outstanding balance of zero.
+  /// Null until the roll-up has loaded. Only the collected figure is shown
+  /// until then, rather than claiming an outstanding balance of zero.
   final AreaOutstanding? outstanding;
 
-  const _TodayCard({required this.today, required this.outstanding});
+  const _CollectionsSummary({required this.today, required this.outstanding});
 
   @override
   Widget build(BuildContext context) {
-    final TextTheme text = Theme.of(context).textTheme;
-
     final colours = Theme.of(context).colorScheme;
-
-    final Widget collected = Container(
-      padding: const EdgeInsets.all(16),
+    return Container(
       decoration: BoxDecoration(
-        color: colours.primary.withValues(alpha: 0.13),
+        color: colours.surfaceContainerLowest,
+        border: Border.all(color: colours.outlineVariant),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: <Widget>[
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  "Today's collections",
-                  style: text.bodySmall?.copyWith(color: colours.primary),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  today.totalCollected.format(),
-                  style: text.headlineMedium?.copyWith(color: colours.primary),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            '${today.receiptCount} receipt'
-            '${today.receiptCount == 1 ? '' : 's'}',
-            style: text.bodyMedium?.copyWith(
-              color: colours.primary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-
-    final AreaOutstanding? owed = outstanding;
-    if (owed == null) return collected;
-
-    final bool anyOverdue = owed.overdueHouseholds > 0;
-    final Color tone = anyOverdue ? colours.error : colours.onSurfaceVariant;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        collected,
-        const SizedBox(height: 10),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: anyOverdue
-                ? colours.errorContainer.withValues(alpha: 0.22)
-                : colours.surfaceContainerLowest,
-            border: Border.all(
-              color: anyOverdue
-                  ? colours.error.withValues(alpha: 0.35)
-                  : colours.outlineVariant,
-            ),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            children: <Widget>[
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      'Still to collect',
-                      style: text.bodySmall?.copyWith(color: tone),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      owed.total.format(),
-                      style: text.headlineSmall?.copyWith(
-                        color: tone,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+      padding: const EdgeInsets.all(16),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+          final compact = constraints.maxWidth < 600 * scale;
+          final collected = _CollectionMetric(
+            icon: Icons.receipt_long_outlined,
+            label: "Today's collections",
+            amount: today.totalCollected.format(),
+            detail:
+                '${today.receiptCount} receipt'
+                '${today.receiptCount == 1 ? '' : 's'}',
+            accent: colours.primary,
+            compact: compact,
+          );
+          final owed = outstanding;
+          if (owed == null) return collected;
+          final remaining = _CollectionMetric(
+            icon: Icons.account_balance_wallet_outlined,
+            label: 'Still to collect',
+            amount: owed.total.format(),
+            detail:
+                '${owed.households} household'
+                '${owed.households == 1 ? '' : 's'}',
+            overdue: owed.overdueHouseholds,
+            accent: owed.overdueHouseholds > 0
+                ? colours.error
+                : colours.onSurfaceVariant,
+            compact: compact,
+          );
+          if (constraints.maxWidth >= 240 * scale) {
+            return IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text(
-                    '${owed.households} household'
-                    '${owed.households == 1 ? '' : 's'}',
-                    style: text.bodyMedium?.copyWith(
-                      color: tone,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  if (anyOverdue) ...<Widget>[
-                    const SizedBox(height: 2),
-                    Text(
-                      '${owed.overdueHouseholds} overdue',
-                      style: text.bodySmall?.copyWith(
-                        color: colours.error,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
+                  Expanded(child: collected),
+                  VerticalDivider(width: compact ? 24 : 40),
+                  Expanded(child: remaining),
                 ],
               ),
+            );
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              collected,
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 10),
+                child: Divider(),
+              ),
+              remaining,
             ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _CollectionMetric extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String amount;
+  final String detail;
+  final Color accent;
+  final int overdue;
+  final bool compact;
+
+  const _CollectionMetric({
+    required this.icon,
+    required this.label,
+    required this.amount,
+    required this.detail,
+    required this.accent,
+    this.overdue = 0,
+    this.compact = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final colours = Theme.of(context).colorScheme;
+    final content = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(label, style: compact ? text.bodySmall : text.bodyMedium),
+        const SizedBox(height: 4),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            amount,
+            maxLines: 1,
+            style: text.headlineMedium?.copyWith(
+              color: accent,
+              fontSize: compact ? 24 : 28,
+              height: 1.2,
+              fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
+            ),
           ),
         ),
+        const SizedBox(height: 4),
+        Wrap(
+          spacing: 12,
+          runSpacing: 4,
+          children: <Widget>[
+            Text(detail, style: text.bodySmall),
+            if (overdue > 0)
+              Text(
+                '$overdue overdue',
+                style: text.bodySmall?.copyWith(
+                  color: colours.error,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+    if (compact) return content;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: accent.withValues(alpha: 0.09),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(icon, size: 24, color: accent),
+        ),
+        const SizedBox(width: 14),
+        Expanded(child: content),
       ],
     );
   }

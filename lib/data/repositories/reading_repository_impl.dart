@@ -6,6 +6,7 @@ import '../../domain/repositories/reading_repository.dart';
 import '../../domain/value_objects/cycle_label.dart';
 import '../../domain/value_objects/ids.dart';
 import '../local/app_database.dart';
+import '../sync/outbox_session.dart';
 
 /// FR-23, answered from the device.
 ///
@@ -16,7 +17,8 @@ import '../local/app_database.dart';
 class ReadingRepositoryImpl implements ReadingRepository {
   final AppDatabase _db;
 
-  const ReadingRepositoryImpl(this._db);
+  final OutboxSession? session;
+  const ReadingRepositoryImpl(this._db, {this.session});
 
   /// Only readings not yet on the server. A key stays behind after its
   /// reading syncs, and counting it kept a synced reading "waiting to sync"
@@ -35,8 +37,14 @@ class ReadingRepositoryImpl implements ReadingRepository {
     try {
       final rows = await _db
           .customSelect(
-            _unsent,
-            variables: <Variable<Object>>[Variable<String>(cycle.value)],
+            "$_unsent ${session == null ? '' : 'and o.owner_id = ? and o.owner_role = ?'}",
+            variables: <Variable<Object>>[
+              Variable<String>(cycle.value),
+              if (session != null) ...[
+                Variable<String>(session!.scope?.id ?? ''),
+                Variable<String>(session!.scope?.role ?? ''),
+              ],
+            ],
             readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
               _db.outboxReadingKeys,
               _db.outboxRows,
@@ -49,10 +57,12 @@ class ReadingRepositoryImpl implements ReadingRepository {
             .toSet(),
       );
     } catch (error) {
-      return Err<Set<ConsumerId>>(ServerFailure(
-        'Could not check which households are already recorded on this phone.',
-        error.toString(),
-      ));
+      return Err<Set<ConsumerId>>(
+        ServerFailure(
+          'Could not check which households are already recorded on this phone.',
+          error.toString(),
+        ),
+      );
     }
   }
 
@@ -64,10 +74,14 @@ class ReadingRepositoryImpl implements ReadingRepository {
     try {
       final rows = await _db
           .customSelect(
-            '$_unsent and k.consumer_id = ?',
+            "$_unsent and k.consumer_id = ? ${session == null ? '' : 'and o.owner_id = ? and o.owner_role = ?'}",
             variables: <Variable<Object>>[
               Variable<String>(cycle.value),
               Variable<String>(consumerId.value),
+              if (session != null) ...[
+                Variable<String>(session!.scope?.id ?? ''),
+                Variable<String>(session!.scope?.role ?? ''),
+              ],
             ],
             readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
               _db.outboxReadingKeys,
@@ -77,10 +91,12 @@ class ReadingRepositoryImpl implements ReadingRepository {
           .get();
       return Ok<bool>(rows.isNotEmpty);
     } catch (error) {
-      return Err<bool>(ServerFailure(
-        'Could not check whether this household is already recorded.',
-        error.toString(),
-      ));
+      return Err<bool>(
+        ServerFailure(
+          'Could not check whether this household is already recorded.',
+          error.toString(),
+        ),
+      );
     }
   }
 }

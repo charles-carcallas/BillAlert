@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -21,6 +22,45 @@ class PaymentRepositoryImpl implements PaymentRepository {
 
   const PaymentRepositoryImpl(this._db, this._client);
 
+  @override
+  Future<Result<void>> checkCollection(
+    List<BillId> bills,
+    List<Money> amounts,
+  ) async {
+    try {
+      await _client.rpc(
+        'fn_check_collection',
+        params: {
+          'p_bill_ids': bills.map((b) => b.value).toList(),
+          'p_amounts': amounts.map((a) => a.toDatabaseString()).toList(),
+        },
+      );
+      return const Ok(null);
+    } catch (error, stack) {
+      return Err(FailureMapper.from(error, stack));
+    }
+  }
+
+  @override
+  Future<Result<PaymentSummary?>> byTransaction(String transactionId) async {
+    try {
+      final transaction = await _client
+          .from('payment_transactions')
+          .select('receipt_no')
+          .eq('id', transactionId)
+          .maybeSingle();
+      if (transaction == null) return const Ok(null);
+      final rows = await _client
+          .from('v_payment_history')
+          .select()
+          .eq('receipt_no', transaction['receipt_no'] as String);
+      final receipts = _groupIntoReceipts(rows);
+      return Ok(receipts.isEmpty ? null : receipts.single);
+    } catch (error, stack) {
+      return Err(FailureMapper.from(error, stack));
+    }
+  }
+
   static String _consumerCacheKey(ConsumerId id) =>
       'consumer_payments:${id.value}';
 
@@ -38,6 +78,7 @@ class PaymentRepositoryImpl implements PaymentRepository {
   /// nothing here re-decides who was paid what.
   @override
   Future<Result<List<PaymentSummary>>> historyFor(ConsumerId consumerId) async {
+    final epoch = _db.cacheEpoch;
     try {
       final rows = await _client
           .from('v_payment_history')
@@ -45,11 +86,16 @@ class PaymentRepositoryImpl implements PaymentRepository {
           .eq('consumer_id', consumerId.value)
           .order('paid_at', ascending: false);
 
+      if (epoch != _db.cacheEpoch) {
+        throw const AuthFailure('The signed-in account changed.');
+      }
       await _replaceConsumerCache(consumerId, rows);
       await _markConsumerPaymentsRefreshed(consumerId);
       return Ok<List<PaymentSummary>>(_groupIntoReceipts(rows));
     } catch (error, stackTrace) {
-      final failure = FailureMapper.from(error, stackTrace);
+      final failure = epoch != _db.cacheEpoch
+          ? const AuthFailure('The signed-in account changed.')
+          : FailureMapper.from(error, stackTrace);
       if (failure is NetworkFailure) {
         final cached = await _cachedHistoryFor(consumerId);
         switch (cached) {
@@ -148,6 +194,7 @@ class PaymentRepositoryImpl implements PaymentRepository {
     required DateTime from,
     required DateTime until,
   }) async {
+    final epoch = _db.cacheEpoch;
     try {
       // No row limit: a remittance with a receipt missing would not match
       // the cash in hand, which is the one thing it exists to do.
@@ -160,18 +207,31 @@ class PaymentRepositoryImpl implements PaymentRepository {
           .order('paid_at', ascending: false);
 
       // Saved for the handover itself, which may be made with no signal.
+      if (epoch != _db.cacheEpoch) {
+        throw const AuthFailure('The signed-in account changed.');
+      }
       await _replaceRangeCache(from, until, rows);
       await _markRefreshed(_areaRangeCacheKey(areaId, from));
-      return Ok<List<PaymentSummary>>(_groupIntoReceipts(rows));
+      return Ok<List<PaymentSummary>>(
+        _groupIntoReceipts(rows).where((r) => !r.isPondoRepayment).toList(),
+      );
     } catch (error, stackTrace) {
-      final failure = FailureMapper.from(error, stackTrace);
+      final failure = epoch != _db.cacheEpoch
+          ? const AuthFailure('The signed-in account changed.')
+          : FailureMapper.from(error, stackTrace);
       if (failure is NetworkFailure &&
           await _hasCache(_areaRangeCacheKey(areaId, from))) {
         // The cache only ever holds the signed-in staff member's own area,
         // so every saved receipt in the window belongs to this remittance.
-        return _cachedReceipts(
+        final saved = await _cachedReceipts(
           (CachedPaymentRow row) => _inRange(row.paidAt, from, until),
         );
+        return switch (saved) {
+          Ok(:final value) => Ok(
+            value.where((r) => !r.isPondoRepayment).toList(),
+          ),
+          Err(:final failure) => Err(failure),
+        };
       }
       return Err<List<PaymentSummary>>(failure);
     }
@@ -335,6 +395,7 @@ class PaymentRepositoryImpl implements PaymentRepository {
       final first = entry.value.first;
 
       return PaymentSummary(
+        collectionKind: first['collection_kind'] as String? ?? 'regular',
         receiptNo: entry.key,
         consumerId: ConsumerId(first['consumer_id'] as String),
         consumerName: first['consumer_name'] as String? ?? '',
@@ -384,6 +445,17 @@ class PaymentRepositoryImpl implements PaymentRepository {
 
   Future<void> _insertRows(List<Map<String, dynamic>> rows) async {
     for (final row in rows) {
+      await _db
+          .into(_db.cachedQueries)
+          .insertOnConflictUpdate(
+            CachedQueriesCompanion.insert(
+              queryKey: 'receipt_kind:${row['receipt_no']}',
+              rowsJson: jsonEncode({
+                'kind': row['collection_kind'] ?? 'regular',
+              }),
+              savedAt: DateTime.now().toUtc().toIso8601String(),
+            ),
+          );
       final amountPaid = _money(row['amount_paid']);
       final transactionTotal = _money(row['transaction_total']);
       final cashTendered = _moneyOrNull(row['cash_tendered']);
@@ -456,10 +528,21 @@ class PaymentRepositoryImpl implements PaymentRepository {
             .add(row);
       }
 
+      final kinds = <String, String>{};
+      for (final key in byReceipt.keys) {
+        final meta =
+            await (_db.select(_db.cachedQueries)
+                  ..where((t) => t.queryKey.equals('receipt_kind:$key')))
+                .getSingleOrNull();
+        kinds[key] = meta == null
+            ? 'regular'
+            : (jsonDecode(meta.rowsJson) as Map)['kind'] as String;
+      }
       return Ok<List<PaymentSummary>>(
         byReceipt.entries.map((entry) {
           final first = entry.value.first;
           return PaymentSummary(
+            collectionKind: kinds[entry.key] ?? 'regular',
             receiptNo: entry.key,
             consumerId: ConsumerId(first.consumerId!),
             consumerName: first.consumerName!,

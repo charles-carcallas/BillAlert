@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -62,7 +64,7 @@ class BillRepositoryImpl implements BillRepository {
   /// that offers them - confirmed against the live database, not assumed.
   static const String _baseBillColumns =
       'bill_id:id, bill_no, consumer_id, cycle_year, cycle_month, consumption, '
-      'total_amount, due_date, amount_paid';
+      'total_amount, due_date, amount_paid, waiver_amount, waiver_assignment_id, waived_at, external_paid, settlement_state, collection_cutoff_at';
 
   /// Appended to `v_bill_status` by `15_bill_meter_readings.sql` so Bill
   /// Details can show the dial figures behind the consumption (FR-25).
@@ -171,6 +173,7 @@ class BillRepositoryImpl implements BillRepository {
   /// rather than as an error.
   @override
   Future<Result<Bill?>> currentBillFor(ConsumerId consumerId) async {
+    final epoch = _db.cacheEpoch;
     try {
       final row = await _client
           .from('v_consumer_current_bill')
@@ -178,11 +181,16 @@ class BillRepositoryImpl implements BillRepository {
           .eq('consumer_id', consumerId.value)
           .maybeSingle();
 
+      if (epoch != _db.cacheEpoch) {
+        throw const AuthFailure('The signed-in account changed.');
+      }
       if (row != null) await _upsertCachedBill(row);
       await _markConsumerBillsRefreshed(consumerId);
       return Ok<Bill?>(row == null ? null : Bill.fromJson(row));
     } catch (error, stackTrace) {
-      final failure = FailureMapper.from(error, stackTrace);
+      final failure = epoch != _db.cacheEpoch
+          ? const AuthFailure('The signed-in account changed.')
+          : FailureMapper.from(error, stackTrace);
       if (failure is NetworkFailure) {
         final cached = await _cachedBillsFor(consumerId);
         switch (cached) {
@@ -210,6 +218,7 @@ class BillRepositoryImpl implements BillRepository {
     ConsumerId consumerId, {
     int limit = 12,
   }) async {
+    final epoch = _db.cacheEpoch;
     try {
       final rows = await _withBillColumns(
         (String columns) async => await _client
@@ -220,11 +229,16 @@ class BillRepositoryImpl implements BillRepository {
             .limit(limit),
       );
 
+      if (epoch != _db.cacheEpoch) {
+        throw const AuthFailure('The signed-in account changed.');
+      }
       await _replaceCachedBills(consumerId, rows);
       await _markConsumerBillsRefreshed(consumerId);
       return Ok<List<Bill>>(rows.map(Bill.fromJson).toList());
     } catch (error, stackTrace) {
-      final failure = FailureMapper.from(error, stackTrace);
+      final failure = epoch != _db.cacheEpoch
+          ? const AuthFailure('The signed-in account changed.')
+          : FailureMapper.from(error, stackTrace);
       if (failure is NetworkFailure) {
         final cached = await _cachedBillsFor(consumerId);
         switch (cached) {
@@ -247,6 +261,7 @@ class BillRepositoryImpl implements BillRepository {
     AreaId areaId,
     CycleLabel cycle,
   ) async {
+    final epoch = _db.cacheEpoch;
     try {
       final rows = await _withBillColumns(
         (String columns) async => await _client
@@ -258,6 +273,9 @@ class BillRepositoryImpl implements BillRepository {
       );
 
       // Saved so the reading sheet can still be written up with no signal.
+      if (epoch != _db.cacheEpoch) {
+        throw const AuthFailure('The signed-in account changed.');
+      }
       await _db.transaction(() async {
         final ids = rows.map((row) => row['bill_id'] as String).toList();
         await (_db.delete(_db.cachedBills)..where(
@@ -272,7 +290,9 @@ class BillRepositoryImpl implements BillRepository {
       await _markRefreshed(_areaCycleCacheKey(areaId, cycle));
       return Ok<List<Bill>>(rows.map(Bill.fromJson).toList());
     } catch (error, stackTrace) {
-      final failure = FailureMapper.from(error, stackTrace);
+      final failure = epoch != _db.cacheEpoch
+          ? const AuthFailure('The signed-in account changed.')
+          : FailureMapper.from(error, stackTrace);
       if (failure is NetworkFailure &&
           await _hasCache(_areaCycleCacheKey(areaId, cycle))) {
         try {
@@ -280,7 +300,9 @@ class BillRepositoryImpl implements BillRepository {
           final saved = await (_db.select(
             _db.cachedBills,
           )..where((table) => table.cycleLabel.equals(cycle.value))).get();
-          return Ok<List<Bill>>(saved.map(_billFromCacheRow).toList());
+          return Ok<List<Bill>>(
+            await Future.wait(saved.map(_billFromCacheRow)),
+          );
         } catch (error) {
           return Err<List<Bill>>(
             ServerFailure(
@@ -319,19 +341,28 @@ class BillRepositoryImpl implements BillRepository {
 
   /// One bill, priced or not.
   @override
-  Future<Result<Bill?>> byId(BillId id) async {
+  Future<Result<Bill?>> byId(BillId id, {ConsumerId? consumerId}) async {
+    final epoch = _db.cacheEpoch;
     try {
-      final row = await _withBillColumns(
-        (String columns) async => await _client
+      final row = await _withBillColumns((String columns) async {
+        var query = _client
             .from('v_bill_status')
             .select(columns)
-            .eq('id', id.value)
-            .maybeSingle(),
-      );
+            .eq('id', id.value);
+        if (consumerId != null) {
+          query = query.eq('consumer_id', consumerId.value);
+        }
+        return await query.maybeSingle();
+      });
+      if (epoch != _db.cacheEpoch) {
+        throw const AuthFailure('Account access changed.');
+      }
 
       return Ok<Bill?>(row == null ? null : Bill.fromJson(row));
     } catch (error, stackTrace) {
-      final failure = FailureMapper.from(error, stackTrace);
+      final failure = epoch != _db.cacheEpoch
+          ? const AuthFailure('Account access changed.')
+          : FailureMapper.from(error, stackTrace);
       if (failure is NetworkFailure) {
         // The bill an Inbox alert or a tapped notification points at is
         // usually one the Bill or History tab has already cached. The cache
@@ -341,7 +372,12 @@ class BillRepositoryImpl implements BillRepository {
           final CachedBillRow? cached = await (_db.select(
             _db.cachedBills,
           )..where((table) => table.id.equals(id.value))).getSingleOrNull();
-          if (cached != null) return Ok<Bill?>(_billFromCacheRow(cached));
+          if (cached != null &&
+              (consumerId == null || cached.consumerId == consumerId.value)) {
+            final bill = await _billFromCacheRow(cached);
+            if (epoch != _db.cacheEpoch) return const Err<Bill?>(AuthFailure());
+            return Ok<Bill?>(bill);
+          }
         } catch (_) {
           // An unreadable cached row is no better than none. The connection
           // problem below is the thing the household can act on.
@@ -353,7 +389,14 @@ class BillRepositoryImpl implements BillRepository {
     }
   }
 
-  static Bill _billFromCacheRow(CachedBillRow row) {
+  Future<Bill> _billFromCacheRow(CachedBillRow row) async {
+    final metadata =
+        await (_db.select(_db.cachedQueries)
+              ..where((t) => t.queryKey.equals('bill_waiver:${row.id}')))
+            .getSingleOrNull();
+    final waiver = metadata == null
+        ? <String, dynamic>{}
+        : jsonDecode(metadata.rowsJson) as Map<String, dynamic>;
     final cycle = CycleLabel.tryParse(row.cycleLabel);
     if (cycle == null) {
       throw const FormatException('Cached bill has an invalid cycle.');
@@ -369,6 +412,16 @@ class BillRepositoryImpl implements BillRepository {
           : Money.fromCentavos(row.totalAmountCentavos!),
       dueDate: row.dueDate == null ? null : PhDate.tryParse(row.dueDate!),
       amountPaid: Money.fromCentavos(row.amountPaidCentavos),
+      externalPaid:
+          Money.tryParse('${waiver['external_paid'] ?? 0}') ?? Money.zero,
+      settlementState: waiver['settlement_state'] as String?,
+      collectionCutoffAt: DateTime.tryParse(
+        '${waiver['collection_cutoff_at'] ?? ''}',
+      ),
+      waiverAmount:
+          Money.tryParse('${waiver["waiver_amount"] ?? 0}') ?? Money.zero,
+      waiverAssignmentId: waiver['waiver_assignment_id'] as String?,
+      waivedAt: DateTime.tryParse('${waiver["waived_at"] ?? ""}'),
       previousReading: row.previousReadingHundredths == null
           ? null
           : Kwh.fromHundredths(row.previousReadingHundredths!),
@@ -401,7 +454,7 @@ class BillRepositoryImpl implements BillRepository {
               .select(columns)
               .eq('consumer_id', consumerId.value)
               .not('total_amount', 'is', null)
-              .neq('status', 'paid')
+              .not('status', 'in', '(paid,waived)')
               // Oldest debt first: the order a cashier settles them in.
               .order('due_date', ascending: true),
         ),
@@ -442,6 +495,85 @@ class BillRepositoryImpl implements BillRepository {
     }
   }
 
+  @override
+  Future<Result<List<ConsumerOutstanding>>> currentCollectionsInArea(
+    AreaId areaId,
+    PhDate today,
+  ) async {
+    try {
+      final cycle = CycleLabel.of(today);
+      final rows = await QueryCache(_db).rows(
+        'current-collections:${areaId.value}:$cycle',
+        () => _client
+            .from('v_bill_status')
+            .select(
+              'consumer_id, consumer_no, first_name, last_name, purok, '
+              'cycle_year, cycle_month, total_amount, balance, due_date, settlement_state',
+            )
+            .eq('area_id', areaId.value)
+            .not('status', 'in', '(paid,waived)')
+            .or('total_amount.is.null,balance.gt.0'),
+      );
+      final groups = <String, List<Map<String, dynamic>>>{};
+      for (final row in rows) {
+        groups.putIfAbsent(row['consumer_id'] as String, () => []).add(row);
+      }
+      final result = <ConsumerOutstanding>[];
+      for (final bills in groups.values) {
+        bool overdue(Map<String, dynamic> b) {
+          final due = PhDate.tryParse('${b['due_date']}');
+          return b['total_amount'] != null &&
+              due != null &&
+              due.compareTo(today) < 0 &&
+              (Money.tryParse('${b['balance']}') ?? Money.zero) > Money.zero;
+        }
+
+        final current = bills
+            .where(
+              (b) =>
+                  b['cycle_year'] == cycle.year &&
+                  b['cycle_month'] == cycle.month &&
+                  !overdue(b),
+            )
+            .toList();
+        // A household belongs in Overdue until every past-due balance is paid.
+        if (current.isEmpty ||
+            bills.any(overdue) ||
+            bills.any(
+              (b) =>
+                  b['settlement_state'] != null &&
+                  b['settlement_state'] != 'settled',
+            )) {
+          continue;
+        }
+        final h = current.first;
+        result.add(
+          ConsumerOutstanding(
+            consumerId: ConsumerId(h['consumer_id'] as String),
+            consumerNo: ConsumerNumber(h['consumer_no'] as String),
+            consumerName: '${h['first_name']} ${h['last_name']}',
+            purok: h['purok'] as String?,
+            payableBillCount: current
+                .where((b) => b['total_amount'] != null)
+                .length,
+            unpricedBillCount: current
+                .where((b) => b['total_amount'] == null)
+                .length,
+            overdueCount: bills.where(overdue).length,
+            totalOutstanding: current.fold(
+              Money.zero,
+              (sum, b) =>
+                  sum + (Money.tryParse('${b['balance']}') ?? Money.zero),
+            ),
+          ),
+        );
+      }
+      return Ok(result);
+    } catch (error, stackTrace) {
+      return Err(FailureMapper.from(error, stackTrace));
+    }
+  }
+
   /// Refreshes the cached bills for one consumer and one cycle.
   ///
   /// Filtered on `cycle_year` and `cycle_month` rather than on `cycle_label`,
@@ -456,6 +588,7 @@ class BillRepositoryImpl implements BillRepository {
     ConsumerId consumerId,
     CycleLabel cycle,
   ) async {
+    final epoch = _db.cacheEpoch;
     try {
       final rows = await _withBillColumns(
         // [refreshFor] additionally caches when the bill was generated.
@@ -467,8 +600,12 @@ class BillRepositoryImpl implements BillRepository {
             .eq('cycle_month', cycle.month),
       );
 
+      if (epoch != _db.cacheEpoch) {
+        throw const AuthFailure('The signed-in account changed.');
+      }
       await _db.transaction(() async {
         for (final Map<String, dynamic> row in rows) {
+          await _cacheWaiver(row);
           final Money? total = row['total_amount'] == null
               ? null
               : Money.tryParse(row['total_amount'].toString());
@@ -518,6 +655,7 @@ class BillRepositoryImpl implements BillRepository {
         _db.cachedBills,
       )..where((table) => table.consumerId.equals(consumerId.value))).go();
       for (final row in rows) {
+        await _cacheWaiver(row);
         await _db
             .into(_db.cachedBills)
             .insertOnConflictUpdate(_cachedBillCompanion(row));
@@ -525,9 +663,33 @@ class BillRepositoryImpl implements BillRepository {
     });
   }
 
-  Future<void> _upsertCachedBill(Map<String, dynamic> row) => _db
-      .into(_db.cachedBills)
-      .insertOnConflictUpdate(_cachedBillCompanion(row));
+  Future<void> _upsertCachedBill(Map<String, dynamic> row) async {
+    await _db.transaction(() async {
+      await _cacheWaiver(row);
+      await _db
+          .into(_db.cachedBills)
+          .insertOnConflictUpdate(_cachedBillCompanion(row));
+    });
+  }
+
+  Future<void> _cacheWaiver(Map<String, dynamic> row) async {
+    await _db
+        .into(_db.cachedQueries)
+        .insertOnConflictUpdate(
+          CachedQueriesCompanion.insert(
+            queryKey: 'bill_waiver:${row['bill_id']}',
+            rowsJson: jsonEncode({
+              'waiver_amount': row['waiver_amount'] ?? 0,
+              'waiver_assignment_id': row['waiver_assignment_id'],
+              'waived_at': row['waived_at'],
+              'external_paid': row['external_paid'] ?? 0,
+              'settlement_state': row['settlement_state'],
+              'collection_cutoff_at': row['collection_cutoff_at'],
+            }),
+            savedAt: DateTime.now().toUtc().toIso8601String(),
+          ),
+        );
+  }
 
   static CachedBillsCompanion _cachedBillCompanion(Map<String, dynamic> row) {
     final cycle = CycleLabel.fromRow(row);
@@ -571,7 +733,7 @@ class BillRepositoryImpl implements BillRepository {
       final query = _db.select(_db.cachedBills)
         ..where((table) => table.consumerId.equals(consumerId.value));
       final rows = await query.get();
-      return Ok<List<Bill>>(rows.map(_billFromCacheRow).toList());
+      return Ok<List<Bill>>(await Future.wait(rows.map(_billFromCacheRow)));
     } catch (error) {
       return Err<List<Bill>>(
         ServerFailure(

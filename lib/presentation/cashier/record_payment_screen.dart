@@ -2,14 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/repositories/overdue_repository.dart';
 import '../../domain/entities/bill.dart';
 import '../../domain/repositories/bill_repository.dart';
 import '../../domain/repositories/payment_repository.dart';
+import '../../domain/value_objects/ids.dart';
 import '../../domain/value_objects/money.dart';
 import '../../domain/value_objects/ph_date.dart';
 import '../common/failure_banner.dart';
 import '../common/final_confirmation_dialog.dart';
 import '../common/local_sort_button.dart';
+import '../common/overdue_screen.dart';
+import '../common/receipt_qr_code.dart';
+import '../common/saved_list_time.dart';
+import '../common/section_tabs.dart';
+import '../common/settlement_panel.dart';
 import '../common/staff_app_bar.dart';
 import '../providers.dart';
 import 'record_payment_controller.dart';
@@ -27,11 +34,29 @@ import 'record_payment_controller.dart';
 /// The receipt number is never invented here. It is minted by the server from
 /// a sequence and read back afterwards; until it arrives the screen says the
 /// payment is queued, which is the truth.
-class RecordPaymentScreen extends ConsumerWidget {
-  const RecordPaymentScreen({super.key});
+class RecordPaymentScreen extends ConsumerStatefulWidget {
+  const RecordPaymentScreen({super.key, this.initialOverdue = false});
+  final bool initialOverdue;
+  @override
+  ConsumerState<RecordPaymentScreen> createState() =>
+      _RecordPaymentScreenState();
+}
+
+class _RecordPaymentScreenState extends ConsumerState<RecordPaymentScreen> {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialOverdue) {
+      Future<void>.microtask(() {
+        if (mounted) {
+          ref.read(recordPaymentControllerProvider.notifier).startNewPayment();
+        }
+      });
+    }
+  }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final state = ref.watch(recordPaymentControllerProvider);
     final controller = ref.read(recordPaymentControllerProvider.notifier);
 
@@ -57,7 +82,20 @@ class RecordPaymentScreen extends ConsumerWidget {
             ),
       body: SafeArea(
         child: choosingHousehold
-            ? _HouseholdPicker(state: state, controller: controller)
+            ? _HouseholdPicker(
+                state: state,
+                controller: controller,
+                initialOverdue: widget.initialOverdue,
+              )
+            : state.blockedByOverdue && !state.isLoadingBills
+            ? OverdueScreen(
+                key: ValueKey(state.selected!.consumerId.value),
+                consumerId: state.selected!.consumerId.value,
+                onPaymentRecorded: () async {
+                  await controller.selectHousehold(state.selected!);
+                  await controller.loadHouseholds();
+                },
+              )
             : _PaymentForm(
                 state: state,
                 controller: controller,
@@ -69,24 +107,178 @@ class RecordPaymentScreen extends ConsumerWidget {
 }
 
 /// CSH-02 — who is at the counter.
-class _HouseholdPicker extends StatefulWidget {
+class _HouseholdPicker extends ConsumerStatefulWidget {
   final RecordPaymentState state;
   final RecordPaymentController controller;
 
-  const _HouseholdPicker({required this.state, required this.controller});
+  final bool initialOverdue;
+  const _HouseholdPicker({
+    required this.state,
+    required this.controller,
+    required this.initialOverdue,
+  });
 
   @override
-  State<_HouseholdPicker> createState() => _HouseholdPickerState();
+  ConsumerState<_HouseholdPicker> createState() => _HouseholdPickerState();
 }
 
-class _HouseholdPickerState extends State<_HouseholdPicker> {
+class _HouseholdPickerState extends ConsumerState<_HouseholdPicker> {
   LocalNameSort _sort = LocalNameSort.az;
+  late String tab = widget.initialOverdue ? 'Covered bills' : 'Current bills';
 
   @override
   Widget build(BuildContext context) {
     final TextTheme text = Theme.of(context).textTheme;
     final state = widget.state;
     final controller = widget.controller;
+    final overdueRows = tab != 'Current bills'
+        ? ref.watch(overdueBillsProvider)
+        : const AsyncData<List<OverdueBill>>([]);
+    final snapshot = tab != 'Current bills'
+        ? ref.watch(settlementSnapshotProvider)
+        : null;
+    final routes = {
+      for (final b
+          in snapshot?.value?.rows('bills') ?? <Map<String, dynamic>>[])
+        b['bill_id']: b,
+    };
+    if (tab != 'Current bills') {
+      final groups = <String, List<OverdueBill>>{};
+      for (final row in overdueRows.value ?? <OverdueBill>[]) {
+        final route = routes[row.bill.id.value];
+        final covered =
+            route?['route'] == 'pondo' &&
+            ['handed_over', 'awaiting_repayment'].contains(route?['state']);
+        final direct =
+            route?['route'] == 'boheco' &&
+            ['awaiting_referral', 'referred'].contains(route?['state']);
+        if (tab == 'Covered bills' ? !covered : !direct) continue;
+        groups.putIfAbsent(row.bill.consumerId.value, () => []).add(row);
+      }
+      final homes =
+          groups.values
+              .map(
+                (rows) => ConsumerOutstanding(
+                  consumerId: rows.first.bill.consumerId,
+                  consumerNo: ConsumerNumber(
+                    rows.first.consumerNo ?? rows.first.bill.consumerId.value,
+                  ),
+                  consumerName: rows.first.consumerName ?? rows.first.household,
+                  purok: rows.first.purok,
+                  payableBillCount: rows.length,
+                  unpricedBillCount: 0,
+                  overdueCount: rows
+                      .where(
+                        (r) =>
+                            r.bill.isOverdueOn(
+                              ref.read(phClockProvider).today(),
+                            ) &&
+                            tab == 'Pay at BOHECO',
+                      )
+                      .length,
+                  totalOutstanding: rows.fold(
+                    Money.zero,
+                    (sum, r) => sum + r.bill.balance,
+                  ),
+                ),
+              )
+              .where((h) => h.matches(state.query))
+              .toList()
+            ..sort(
+              (a, b) => compareNames(a.consumerName, b.consumerName, _sort),
+            );
+      return Column(
+        children: [
+          _tabs(),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: TextField(
+              onChanged: controller.search,
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search),
+                hintText: 'Search name or account number',
+              ),
+            ),
+          ),
+          Expanded(
+            child: snapshot!.isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : snapshot.hasError
+                ? Center(
+                    child: TextButton(
+                      onPressed: () =>
+                          ref.invalidate(settlementSnapshotProvider),
+                      child: const Text(
+                        'Could not load payment routes. Try again.',
+                      ),
+                    ),
+                  )
+                : overdueRows.when(
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (e, s) => Center(
+                      child: TextButton(
+                        onPressed: () => ref.invalidate(overdueBillsProvider),
+                        child: const Text('Could not load bills. Try again.'),
+                      ),
+                    ),
+                    data: (_) => RefreshIndicator(
+                      onRefresh: () async {
+                        ref.invalidate(settlementSnapshotProvider);
+                        await ref.read(settlementSnapshotProvider.future);
+                        ref.invalidate(overdueBillsProvider);
+                        await ref.read(overdueBillsProvider.future);
+                      },
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        children: [
+                          if (homes.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 64),
+                              child: Center(
+                                child: Text(
+                                  state.query.isEmpty
+                                      ? (tab == 'Covered bills'
+                                            ? 'No covered bills awaiting repayment.'
+                                            : 'No bills assigned to direct BOHECO payment.')
+                                      : 'No household matches that search.',
+                                ),
+                              ),
+                            ),
+                          for (final h in homes)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: _HouseholdTile(
+                                household: h,
+                                overdueTab: true,
+                                onTap: () => Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => Scaffold(
+                                      appBar: AppBar(title: Text(tab)),
+                                      body: SafeArea(
+                                        child: OverdueScreen(
+                                          consumerId: h.consumerId.value,
+                                          paymentRoute: tab == 'Covered bills'
+                                              ? 'pondo'
+                                              : 'boheco',
+                                          onPaymentRecorded:
+                                              controller.loadHouseholds,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+          ),
+        ],
+      );
+    }
     final List<ConsumerOutstanding> visible = List.of(state.visibleHouseholds)
       ..sort((a, b) => compareNames(a.consumerName, b.consumerName, _sort));
     final Money total = state.households.fold(
@@ -99,40 +291,42 @@ class _HouseholdPickerState extends State<_HouseholdPicker> {
 
     return Column(
       children: <Widget>[
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: Row(
-            children: <Widget>[
-              Expanded(
-                child: TextField(
-                  onChanged: controller.search,
-                  decoration: const InputDecoration(
-                    hintText: 'Search name or account number',
-                    prefixIcon: Icon(Icons.search),
+        _tabs(),
+        if (state.households.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Row(
+              children: <Widget>[
+                Expanded(
+                  child: TextField(
+                    onChanged: controller.search,
+                    decoration: const InputDecoration(
+                      hintText: 'Search name or account number',
+                      prefixIcon: Icon(Icons.search),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 120,
-                child: LocalSortButton<LocalNameSort>(
-                  buttonKey: const ValueKey('cashier-consumers-sort'),
-                  value: _sort,
-                  options: localNameSortOptions,
-                  onChanged: (value) => setState(() => _sort = value),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 120,
+                  child: LocalSortButton<LocalNameSort>(
+                    buttonKey: const ValueKey('cashier-consumers-sort'),
+                    value: _sort,
+                    options: localNameSortOptions,
+                    onChanged: (value) => setState(() => _sort = value),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
         if (state.households.isNotEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                '$payable consumer${payable == 1 ? '' : 's'} with payable '
-                'bills · ${total.format()} outstanding',
+                '$payable household${payable == 1 ? '' : 's'} with current '
+                'bills · ${total.format()} this month',
                 style: text.bodySmall,
               ),
             ),
@@ -148,14 +342,18 @@ class _HouseholdPickerState extends State<_HouseholdPicker> {
         Expanded(
           child: state.isLoadingHouseholds && state.households.isEmpty
               ? const Center(child: CircularProgressIndicator())
+              : state.households.isEmpty
+              ? state.failure != null
+                    ? const SizedBox.shrink()
+                    : _CollectionEmptyState(
+                        onRefresh: controller.loadHouseholds,
+                      )
               : visible.isEmpty
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(32),
                     child: Text(
-                      state.households.isEmpty
-                          ? 'Nobody in this area has an unpaid bill.'
-                          : 'No household matches that search.',
+                      'No household matches that search.',
                       style: text.bodyMedium,
                       textAlign: TextAlign.center,
                     ),
@@ -183,6 +381,22 @@ class _HouseholdPickerState extends State<_HouseholdPicker> {
     );
   }
 
+  Widget _tabs() => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+    child: SectionTabs(
+      labels: const ['Current bills', 'Covered bills', 'Pay at BOHECO'],
+      selected: tab,
+      onChanged: (value) {
+        setState(() => tab = value);
+        widget.controller.search('');
+        if (value != 'Current bills') {
+          ref.invalidate(overdueBillsProvider);
+          ref.invalidate(settlementSnapshotProvider);
+        }
+      },
+    ),
+  );
+
   static String _billsPhrase(ConsumerOutstanding c) {
     if (!c.hasPayableBills) {
       return c.unpricedBillCount > 0
@@ -197,11 +411,88 @@ class _HouseholdPickerState extends State<_HouseholdPicker> {
   }
 }
 
+class _CollectionEmptyState extends StatelessWidget {
+  final Future<void> Function() onRefresh;
+
+  const _CollectionEmptyState({required this.onRefresh});
+
+  @override
+  Widget build(BuildContext context) {
+    final colours = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: <Widget>[
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              child: Align(
+                alignment: const Alignment(0, -0.3),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 440),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: colours.primary.withValues(alpha: 0.09),
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          child: Icon(
+                            Icons.people_outline,
+                            size: 40,
+                            color: colours.primary,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          'No bills to collect',
+                          style: text.titleLarge,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Current bills appear here. Check the Overdue tab for older debt.',
+                          style: text.bodyMedium,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 24),
+                        OutlinedButton.icon(
+                          onPressed: onRefresh,
+                          icon: const Icon(Icons.refresh, size: 20),
+                          label: const Text('Refresh'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _HouseholdTile extends StatelessWidget {
   final ConsumerOutstanding household;
   final VoidCallback? onTap;
 
-  const _HouseholdTile({required this.household, this.onTap});
+  final bool overdueTab;
+  const _HouseholdTile({
+    required this.household,
+    this.onTap,
+    this.overdueTab = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -276,20 +567,25 @@ class _HouseholdTile extends StatelessWidget {
                             ),
                           ),
                           if (overdue)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: colours.errorContainer,
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Text(
-                                '${household.overdueCount} overdue',
-                                style: text.labelSmall?.copyWith(
-                                  color: colours.onErrorContainer,
-                                  fontWeight: FontWeight.w700,
+                            Flexible(
+                              flex: 2,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: colours.errorContainer,
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Text(
+                                  overdueTab
+                                      ? 'Review overdue bills'
+                                      : 'Settle overdue first',
+                                  style: text.labelSmall?.copyWith(
+                                    color: colours.onErrorContainer,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
                             ),
@@ -376,6 +672,13 @@ class _PaymentForm extends StatelessWidget {
                 FailureBanner(failure: state.failure!),
               ],
 
+              if (state.blockedByOverdue)
+                const Padding(
+                  padding: EdgeInsets.only(top: 12),
+                  child: Text(
+                    'Current payment is blocked. Open Overdue, request Admin authorization, then settle every overdue balance.',
+                  ),
+                ),
               const SizedBox(height: 20),
               Row(
                 children: <Widget>[
@@ -383,8 +686,12 @@ class _PaymentForm extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        Text('OUTSTANDING BILLS', style: text.labelMedium),
+                        Text('BILLS NOT YET OVERDUE', style: text.labelMedium),
                         Text('Tap a bill to select it', style: text.bodySmall),
+                        SavedListTime(
+                          cacheKey:
+                              'payable:${state.selected!.consumerId.value}',
+                        ),
                       ],
                     ),
                   ),
@@ -408,8 +715,9 @@ class _PaymentForm extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 24),
                   child: Text(
-                    'Nothing to collect. Any reading for this household is '
-                    'still waiting for its amount from the cooperative.',
+                    state.blockedByOverdue
+                        ? 'This household has overdue bills. Collect them through Overdue after Admin authorization.'
+                        : 'No priced bills available for collection.',
                     style: text.bodyMedium,
                   ),
                 )
@@ -601,8 +909,7 @@ class _Totals extends StatelessWidget {
                 if (state.queuedOffline) ...<Widget>[
                   const SizedBox(height: 8),
                   Text(
-                    'Saved on this phone. The receipt number is issued when it '
-                    'reaches the server.',
+                    'Confirmation pending. Do not collect again. Sync and check Receipts.',
                     style: text.bodySmall,
                     textAlign: TextAlign.center,
                   ),
@@ -669,8 +976,16 @@ class _Line extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: <Widget>[
-        Text(label, style: emphasise ? text.titleMedium : text.bodyMedium),
-        Text(value, style: style),
+        Expanded(
+          child: Text(
+            label,
+            style: emphasise ? text.titleMedium : text.bodyMedium,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(value, style: style, textAlign: TextAlign.end),
+        ),
       ],
     );
   }
@@ -764,6 +1079,7 @@ class _ReceiptIssued extends StatelessWidget {
                     style: text.headlineSmall,
                     textAlign: TextAlign.center,
                   ),
+                  ReceiptQrCode(verificationCode: receipt.verificationCode),
                   Text(
                     'Verification ${receipt.verificationCode}',
                     style: text.bodySmall,

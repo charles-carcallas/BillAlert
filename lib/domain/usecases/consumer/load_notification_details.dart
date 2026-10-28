@@ -2,6 +2,7 @@ import '../../../core/errors/app_failure.dart';
 import '../../../core/result/result.dart';
 import '../../entities/bill.dart';
 import '../../repositories/bill_repository.dart';
+import '../../repositories/consumer_repository.dart';
 import '../../repositories/notice_repository.dart';
 import '../../repositories/notification_repository.dart';
 import '../../value_objects/ids.dart';
@@ -49,10 +50,34 @@ final class NotificationDetails {
 final class LoadNotificationDetails {
   final BillRepository bills;
   final NoticeRepository notices;
+  final ConsumerRepository? consumers;
 
-  const LoadNotificationDetails({required this.bills, required this.notices});
+  const LoadNotificationDetails({
+    required this.bills,
+    required this.notices,
+    this.consumers,
+  });
 
   Future<NotificationDetails> call(AppNotification notification) async {
+    ConsumerId? own;
+    if (consumers != null) {
+      switch (await consumers!.signedInConsumer()) {
+        case Ok(value: final household?):
+          own = household.id;
+        case Ok(value: null):
+          return NotificationDetails(
+            notification: notification,
+            relatedFailure: const PermissionFailure(
+              'No household is linked to this account.',
+            ),
+          );
+        case Err(:final failure):
+          return NotificationDetails(
+            notification: notification,
+            relatedFailure: failure,
+          );
+      }
+    }
     final BillId? billId = notification.billId;
     final NoticeId? noticeId = notification.noticeId;
 
@@ -61,18 +86,19 @@ final class LoadNotificationDetails {
     AppFailure? failure;
 
     if (billId != null) {
-      switch (await bills.byId(billId)) {
+      final result = await bills.byId(billId, consumerId: own);
+      switch (result) {
         case Ok(:final value):
-          bill = value;
+          bill = own == null || value?.consumerId == own ? value : null;
         case Err(failure: final AppFailure reason):
           failure = reason;
       }
     }
 
     if (noticeId != null) {
-      switch (await notices.byId(noticeId)) {
+      switch (await notices.byId(noticeId, consumerId: own)) {
         case Ok(:final value):
-          notice = value;
+          notice = own == null || value?.consumerId == own ? value : null;
         case Err(failure: final AppFailure reason):
           failure ??= reason;
       }

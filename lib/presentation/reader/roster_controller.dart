@@ -36,6 +36,7 @@ final initialRosterRefreshProvider = FutureProvider<AppFailure?>((
 ) async {
   // Only a different person or area starts it again, not every token refresh
   // that hands out a new user object.
+  ref.watch(authControllerProvider.select((state) => state.value?.accessScope));
   final String? areaId = ref.watch(
     authControllerProvider.select((state) => state.value?.areaId?.value),
   );
@@ -156,8 +157,7 @@ class RosterController extends AsyncNotifier<RosterView> {
   /// Drains the outbox now, then reloads so the counters move.
   Future<Result<SyncReport>> syncNow() async {
     final result = await ref.read(syncServiceProvider).syncNow();
-    ref.invalidateSelf();
-    await future;
+    await refreshFromServer();
     return result;
   }
 }

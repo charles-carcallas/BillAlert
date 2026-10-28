@@ -7,7 +7,9 @@ import '../../core/result/result.dart';
 import '../../domain/entities/consumer.dart';
 import '../../domain/repositories/payment_repository.dart';
 import '../../domain/value_objects/ph_date.dart';
+import '../auth/auth_controller.dart';
 import '../common/failure_banner.dart';
+import '../common/receipt_qr_code.dart';
 import '../providers.dart';
 
 /// The household's own copy of one receipt, looked up by its number.
@@ -15,6 +17,7 @@ final consumerReceiptProvider = FutureProvider.family<PaymentSummary?, String>((
   Ref ref,
   String receiptNo,
 ) async {
+  ref.watch(authControllerProvider.select((s) => s.value?.accessScope));
   final consumerResult = await ref
       .watch(consumerRepositoryProvider)
       .signedInConsumer();
@@ -277,10 +280,8 @@ class _Receipt extends StatelessWidget {
                     ),
                     _ReceiptSection(
                       children: <Widget>[
-                        Text(
-                          'Present this code at the counter to verify',
-                          style: text.bodySmall,
-                          textAlign: TextAlign.center,
+                        ReceiptQrCode(
+                          verificationCode: receipt.verificationCode,
                         ),
                         const SizedBox(height: 12),
                         Container(

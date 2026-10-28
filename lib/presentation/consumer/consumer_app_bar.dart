@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/entities/app_user.dart';
 import '../auth/auth_controller.dart';
+import '../common/account_view_menu.dart';
+import 'inbox_button.dart';
 
 /// The branded header shared by the Consumer's tab screens.
 class ConsumerAppBar extends ConsumerWidget implements PreferredSizeWidget {
@@ -37,30 +39,13 @@ class ConsumerAppBar extends ConsumerWidget implements PreferredSizeWidget {
         ],
       ),
       actions: <Widget>[
+        if (user != null) const InboxButton(),
         if (user != null)
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: CircleAvatar(
-              radius: 18,
-              backgroundColor: colours.primary.withValues(alpha: 0.14),
-              foregroundColor: colours.primary,
-              child: Text(
-                _initials(user),
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
+          const Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: AccountViewMenu(),
           ),
       ],
     );
-  }
-
-  static String _initials(AppUser user) {
-    final first = user.firstName.isEmpty ? '' : user.firstName[0];
-    final last = user.lastName.isEmpty ? '' : user.lastName[0];
-    final value = '$first$last'.toUpperCase();
-    return value.isEmpty ? '?' : value;
   }
 }
