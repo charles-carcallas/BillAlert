@@ -284,6 +284,10 @@ class OutboxRows extends Table {
     ]),
   )();
 
+  // Null means legacy work whose creator cannot be proved. Never auto-upload it.
+  TextColumn get ownerId => text().named('owner_id').nullable()();
+  TextColumn get ownerRole => text().named('owner_role').nullable()();
+  TextColumn get ownerArea => text().named('owner_area').nullable()();
   TextColumn get payloadJson => text().named('payload_json')();
 
   /// MTR-12: the moment of capture, not the moment of sync. The 48-hour

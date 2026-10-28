@@ -56,6 +56,7 @@ class FailureMapper {
   }
 
   static AppFailure _map(Object error) {
+    if (error is AppFailure) return error;
     final detail = error.toString();
 
     // ---- no network -------------------------------------------------
@@ -109,6 +110,8 @@ class FailureMapper {
     // GoTrue names its failures. The code is preferred over the prose
     // because the wording changes between releases and the code does not.
     switch (error.code) {
+      case 'user_banned':
+        return AuthFailure(AuthFailure.disabledMessage, detail);
       // The session was ended on the server. Setting a password for an
       // account, as an Area President's reset does, ends all of its sessions.
       case 'session_not_found':

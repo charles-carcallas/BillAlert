@@ -184,7 +184,9 @@ class AndroidPhoneNotifier
         notificationDetails: await _detailsFor(notice),
         payload: notice.payload,
       );
-    } catch (_) {}
+    } catch (_) {
+      if (notice.payload.startsWith('staff:')) rethrow;
+    }
   }
 
   @override

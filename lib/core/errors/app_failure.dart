@@ -45,6 +45,8 @@ final class NetworkFailure extends AppFailure {
 
 /// Not signed in, wrong password, or the session expired.
 final class AuthFailure extends AppFailure {
+  static const String disabledMessage =
+      'This login has been disabled. Ask your Area President to enable it.';
   static const String defaultMessage =
       'Your username or password is incorrect.';
 

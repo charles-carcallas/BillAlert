@@ -48,6 +48,19 @@ sealed class AppUser {
   /// GEN-04: a new account gets a temporary password and must change it
   /// before it can reach anything else.
   final bool mustChangePassword;
+  final int accessVersion;
+
+  /// Effective capabilities are separate from the server's historical role.
+  bool get hasWorkAccess => this is! ConsumerUser;
+  String get historicalRole => roleCode;
+  String get accessScope => '$id:$roleCode:$areaId:$accessVersion';
+
+  List<AppTab> get householdTabs => const <AppTab>[
+    AppTab(label: 'Bill', route: '/consumer', icon: NavIcon.bill),
+    AppTab(label: 'History', route: '/consumer/history', icon: NavIcon.history),
+    AppTab(label: 'Inbox', route: '/consumer/inbox', icon: NavIcon.inbox),
+    AppTab(label: 'Profile', route: '/consumer/profile', icon: NavIcon.profile),
+  ];
 
   const AppUser({
     required this.id,
@@ -56,6 +69,7 @@ sealed class AppUser {
     required this.lastName,
     required this.areaId,
     required this.mustChangePassword,
+    this.accessVersion = 0,
   });
 
   String get fullName => '$firstName $lastName';
@@ -83,6 +97,7 @@ final class AdminUser extends AppUser {
     required super.lastName,
     required super.areaId,
     required super.mustChangePassword,
+    super.accessVersion,
   });
 
   @override
@@ -100,7 +115,7 @@ final class AdminUser extends AppUser {
   List<AppTab> get permittedTabs => const <AppTab>[
     AppTab(label: 'Amounts', route: '/admin', icon: NavIcon.amounts),
     AppTab(
-      label: 'Notices',
+      label: 'Follow-up',
       route: '/admin/disconnections',
       icon: NavIcon.disconnections,
     ),
@@ -118,6 +133,7 @@ final class MeterReaderUser extends AppUser {
     required super.lastName,
     required super.areaId,
     required super.mustChangePassword,
+    super.accessVersion,
   });
 
   @override
@@ -155,6 +171,7 @@ final class CashierUser extends AppUser {
     required super.lastName,
     required super.areaId,
     required super.mustChangePassword,
+    super.accessVersion,
   });
 
   @override
@@ -180,23 +197,23 @@ final class CashierUser extends AppUser {
       route: '/cashier/receipts',
       icon: NavIcon.receipts,
     ),
-    AppTab(
-      label: 'Remit',
-      route: '/cashier/remit',
-      icon: NavIcon.remittance,
-    ),
+    AppTab(label: 'Remit', route: '/cashier/remit', icon: NavIcon.remittance),
     AppTab(label: 'Profile', route: '/cashier/profile', icon: NavIcon.profile),
   ];
 }
 
 /// The household. Sees their own bill, history, receipts and alerts.
 final class ConsumerUser extends AppUser {
+  @override
+  final String historicalRole;
   const ConsumerUser({
     required super.id,
     required super.username,
     required super.firstName,
     required super.lastName,
     required super.mustChangePassword,
+    super.accessVersion,
+    this.historicalRole = 'consumer',
   }) : super(areaId: null);
 
   @override

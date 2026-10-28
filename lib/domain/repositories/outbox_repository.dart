@@ -2,6 +2,7 @@ import '../../core/result/result.dart';
 import '../outbox/outbox_entry.dart';
 import '../outbox/outbox_operation.dart';
 import '../value_objects/ids.dart';
+import '../value_objects/ph_date.dart';
 
 /// The durable queue of work that has not reached the server.
 ///
@@ -11,6 +12,15 @@ import '../value_objects/ids.dart';
 /// action only in memory is the difference between "works offline" and "loses
 /// a morning of field work when Android kills the process".
 abstract class OutboxRepository {
+  /// Changes whenever the signed-in identity or assignment changes.
+  int get sessionGeneration;
+
+  /// Legacy work with no provable owner is preserved for manual reconciliation.
+  Future<Result<int>> quarantinedCount();
+
+  /// Amend only a post explicitly rejected for a passed due date; keep its UUID.
+  Future<Result<void>> reviseRejectedDueDate(ClientUuid uuid, PhDate dueDate);
+
   /// Writes the operation to the encrypted database, synchronously, before
   /// anything is shown to the user as saved.
   Future<Result<void>> enqueue(OutboxOperation operation);

@@ -35,7 +35,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 10;
 
   /// v1 -> v2: the CHECK constraints and the five indexes that the retired
   /// `local_cache_schema.sql` had and this port had lost.
@@ -65,8 +65,12 @@ class AppDatabase extends _$AppDatabase {
   /// only from the four values in OutboxStatus.
   @override
   MigrationStrategy get migration => MigrationStrategy(
-    onCreate: (Migrator m) => m.createAll(),
+    onCreate: (Migrator m) async {
+      await m.createAll();
+      await _createFundRequests();
+    },
     onUpgrade: (Migrator m, int from, int to) async {
+      if (from < 10) await _createFundRequests();
       if (from < 2) {
         // alterTable uses the current (v3) table definition. Add the v3
         // identity columns to a v1 table first so its copy step has real
@@ -77,6 +81,9 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(cacheOwner, cacheOwner.lastName);
         await m.addColumn(cacheOwner, cacheOwner.mustChangePassword);
 
+        await m.addColumn(outboxRows, outboxRows.ownerId);
+        await m.addColumn(outboxRows, outboxRows.ownerRole);
+        await m.addColumn(outboxRows, outboxRows.ownerArea);
         await m.alterTable(TableMigration(cacheOwner));
         await m.alterTable(TableMigration(outboxRows));
 
@@ -144,6 +151,11 @@ class AppDatabase extends _$AppDatabase {
         // empty table: nothing existing is touched.
         await m.createTable(cachedQueries);
       }
+      if (from >= 2 && from < 9) {
+        await m.addColumn(outboxRows, outboxRows.ownerId);
+        await m.addColumn(outboxRows, outboxRows.ownerRole);
+        await m.addColumn(outboxRows, outboxRows.ownerArea);
+      }
       if (from < 8) {
         // Remit splits the money collected into BOHECO's part and the Meter
         // Reader's rounding share. Nullable: receipts saved before v8 show
@@ -153,12 +165,24 @@ class AppDatabase extends _$AppDatabase {
     },
   );
 
+  // Financial requests survive cache clearing and sign-out. Only their owner
+  // may resolve them; never discard a request with an uncertain server result.
+  Future<void> _createFundRequests() => customStatement('''
+    CREATE TABLE pending_fund_requests (
+      owner TEXT PRIMARY KEY NOT NULL,
+      payload TEXT NOT NULL
+    )
+  ''');
+
   /// GEN-06: what signing out destroys.
   ///
   /// The outbox is deliberately not in this list. Signing out with unsynced
   /// field work would throw away a morning of readings, so the screen warns
   /// and asks first, and only then calls [clearOutbox].
+  int cacheEpoch = 0;
+
   Future<void> clearCachedData() async {
+    cacheEpoch++;
     await transaction(() async {
       await delete(cachedConsumers).go();
       await delete(cachedBills).go();

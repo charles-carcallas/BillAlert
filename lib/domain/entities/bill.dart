@@ -44,6 +44,15 @@ final class Bill {
   final PhDate? dueDate;
 
   final Money amountPaid;
+  final Money externalPaid;
+  final String? settlementState;
+  final DateTime? collectionCutoffAt;
+
+  /// BOHECO noncash coverage, separate from cash received.
+  final Money waiverAmount;
+  final String? waiverAssignmentId;
+  final DateTime? waivedAt;
+  bool get isWaived => !waiverAmount.isZero;
 
   const Bill({
     required this.id,
@@ -54,6 +63,12 @@ final class Bill {
     required this.totalAmount,
     required this.dueDate,
     this.amountPaid = Money.zero,
+    this.externalPaid = Money.zero,
+    this.settlementState,
+    this.collectionCutoffAt,
+    this.waiverAmount = Money.zero,
+    this.waiverAssignmentId,
+    this.waivedAt,
     this.previousReading,
     this.currentReading,
     this.readingDate,
@@ -89,6 +104,16 @@ final class Bill {
       amountPaid: json['amount_paid'] != null
           ? Money.tryParse(json['amount_paid'].toString()) ?? Money.zero
           : Money.zero,
+      externalPaid:
+          Money.tryParse('${json['external_paid'] ?? 0}') ?? Money.zero,
+      settlementState: json['settlement_state'] as String?,
+      collectionCutoffAt: DateTime.tryParse(
+        '${json['collection_cutoff_at'] ?? ''}',
+      ),
+      waiverAmount:
+          Money.tryParse('${json['waiver_amount'] ?? 0}') ?? Money.zero,
+      waiverAssignmentId: json['waiver_assignment_id'] as String?,
+      waivedAt: DateTime.tryParse('${json['waived_at'] ?? ''}'),
       previousReading: json['previous_reading'] != null
           ? Kwh.tryParse(json['previous_reading'].toString())
           : null,
@@ -101,6 +126,13 @@ final class Bill {
     );
   }
 
+  /// Default only within this bill's cycle, never silently moved to next month.
+  PhDate? suggestedDueDate(PhDate today, {int defaultDay = 28}) {
+    final lastDay = DateTime(cycle.year, cycle.month + 1, 0).day;
+    final date = PhDate(cycle.year, cycle.month, defaultDay.clamp(1, lastDay));
+    return date.isBefore(today) ? null : date;
+  }
+
   /// Whether this bill knows the dial figures behind its consumption. Both
   /// or neither: a reading with only one end of it is not a reading.
   bool get hasMeterReadings =>
@@ -111,18 +143,23 @@ final class Bill {
   bool get isUnpriced => totalAmount == null;
 
   /// The Admin has posted an amount, so this bill can be collected against.
-  bool get isPayable => totalAmount != null;
+  bool get isPayable => totalAmount != null && !isWaived;
 
   /// What is still owed. Zero for an unpriced bill: nothing is owed on a
   /// reading the cooperative has not priced.
-  Money get balance => (totalAmount ?? Money.zero) - amountPaid;
+  Money get balance =>
+      (totalAmount ?? Money.zero) - amountPaid - waiverAmount - externalPaid;
 
   /// Paid in full.
-  bool get isSettled => isPayable && amountPaid >= totalAmount!;
+  bool get isSettled =>
+      isWaived || (isPayable && amountPaid + externalPaid >= totalAmount!);
 
   /// Something has been paid, but not all of it.
   bool get isPartiallyPaid =>
-      isPayable && !amountPaid.isZero && amountPaid < totalAmount!;
+      isPayable &&
+      !isSettled &&
+      !amountPaid.isZero &&
+      amountPaid < totalAmount!;
 
   /// Past its due date and not yet settled. Takes today as an argument
   /// rather than reading a clock, so the caller decides which day it is and
@@ -138,8 +175,17 @@ final class Bill {
   /// What the status chip says. Matches the `bill_status` enum server-side,
   /// which a trigger keeps in step with these same fields.
   String statusLabelOn(PhDate today) {
+    if (isWaived) return 'Covered by BOHECO';
     if (isUnpriced) return 'Awaiting amount';
-    if (isSettled) return 'Paid';
+    if (isSettled) {
+      return externalPaid.isZero ? 'Paid' : 'Paid directly to BOHECO';
+    }
+    if (settlementState == 'awaiting_repayment') return 'Repay reserve fund';
+    if (settlementState == 'review') return 'Reserve fund review';
+    if (settlementState == 'referred' ||
+        settlementState == 'awaiting_referral') {
+      return 'Pay BOHECO';
+    }
     if (isOverdueOn(today)) return 'Overdue';
     if (isPartiallyPaid) return 'Partially paid';
     return 'Unpaid';

@@ -9,6 +9,11 @@ import '../value_objects/money.dart';
 /// Do not replace that with a loop of updates in Dart: three separate updates
 /// leave a consumer half-paid the first time the network drops mid-loop.
 abstract class PaymentRepository {
+  Future<Result<void>> checkCollection(List<BillId> bills, List<Money> amounts);
+
+  /// Exact server-confirmed handover; never falls back to an older cached receipt.
+  Future<Result<PaymentSummary?>> byTransaction(String transactionId);
+
   /// One handover, one receipt, covering however many bills it settled.
   /// Backed by `v_payment_history`.
   Future<Result<List<PaymentSummary>>> historyFor(ConsumerId consumerId);
@@ -83,9 +88,8 @@ final class RemitHandover {
 
 /// One remittance month of the rounding fund.
 ///
-/// Bills are rounded up to the peso. That rounding pays the Meter Reader, at
-/// most 300 pesos a month, after enough is kept back to cover what the
-/// month's bills still owe BOHECO. The rest is saved and carries over.
+/// Regular collection totals and historical rounding allocations. Current
+/// Reader compensation is a separate PHP500 reserve-fund ledger payout.
 final class RoundingFundMonth {
   /// The month handed over on its 28th.
   final int year;
@@ -120,7 +124,7 @@ final class RoundingFundMonth {
     required this.fundAfter,
   });
 
-  /// The most the Meter Reader is paid in a month.
+  /// Legacy rounding allocation cap; current compensation uses its own ledger.
   static const Money payCap = Money.fromCentavos(30000);
 }
 
@@ -136,6 +140,8 @@ final class RoundingFundMonth {
 /// handover, not about any one bill, which is why they live here and not on
 /// [SettledBill].
 final class PaymentSummary {
+  final String collectionKind;
+  bool get isPondoRepayment => collectionKind == 'pondo_repayment';
   final String receiptNo;
 
   /// Who paid, as both an identifier and the name shown on the Cashier's
@@ -159,6 +165,7 @@ final class PaymentSummary {
   final List<SettledBill> bills;
 
   const PaymentSummary({
+    this.collectionKind = 'regular',
     required this.receiptNo,
     required this.consumerId,
     required this.consumerName,
@@ -201,7 +208,8 @@ final class SettledBill {
   });
 
   /// The Meter Reader's share of this line, or null when it is not known.
-  Money? get readerShare => bohecoShare == null ? null : amountPaid - bohecoShare!;
+  Money? get readerShare =>
+      bohecoShare == null ? null : amountPaid - bohecoShare!;
 }
 
 /// One cashier's takings for one day.

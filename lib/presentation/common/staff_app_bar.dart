@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../domain/entities/app_user.dart';
 import '../auth/auth_controller.dart';
+import 'account_view_menu.dart';
 
 /// The branded header used by staff tab screens.
 class StaffAppBar extends ConsumerWidget implements PreferredSizeWidget {
@@ -37,34 +39,17 @@ class StaffAppBar extends ConsumerWidget implements PreferredSizeWidget {
         ],
       ),
       actions: <Widget>[
-        Padding(
-          padding: const EdgeInsets.only(right: 16),
-          child: Container(
-            width: 36,
-            height: 36,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: colours.primary.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Text(
-              _initials(user),
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: colours.primary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+        if (user != null)
+          IconButton(
+            tooltip: 'Staff notifications',
+            icon: const Icon(Icons.notifications_outlined),
+            onPressed: () => context.push('${user.homeRoute}/alerts'),
           ),
+        const Padding(
+          padding: EdgeInsets.only(right: 16),
+          child: AccountViewMenu(),
         ),
       ],
     );
-  }
-
-  static String _initials(AppUser? user) {
-    if (user == null) return '?';
-    final String first = user.firstName.isEmpty ? '' : user.firstName[0];
-    final String last = user.lastName.isEmpty ? '' : user.lastName[0];
-    final String initials = '$first$last'.toUpperCase();
-    return initials.isEmpty ? '?' : initials;
   }
 }

@@ -10,7 +10,11 @@ abstract class NoticeRepository {
   /// Backed by `v_active_disconnection_warnings`.
   Future<Result<List<ActiveNotice>>> activeFor(AreaId areaId);
 
-  Future<Result<ActiveNotice?>> byId(NoticeId id);
+  Future<Result<ActiveNotice?>> byId(NoticeId id, {ConsumerId? consumerId});
+
+  /// Admin review includes closed records and receipt/delivery evidence.
+  Future<Result<NoticeReview?>> review(NoticeId id);
+  Future<Result<List<ClosedNotice>>> historyFor(AreaId areaId);
 
   /// Calls `fn_close_disconnection_notice`. Online only - see
   /// RecordNoticeOutcome for why this one is not queued.
@@ -77,6 +81,7 @@ final class ActiveNotice {
   final Money amountOverdue;
 
   final int hoursRemaining;
+  final bool readyToClose;
 
   const ActiveNotice({
     required this.id,
@@ -89,6 +94,7 @@ final class ActiveNotice {
     required this.amountOverdue,
     required this.hoursRemaining,
     required this.reason,
+    this.readyToClose = false,
     this.consumerNo,
     this.purok,
     this.meterSerialNo,
@@ -100,4 +106,96 @@ final class ActiveNotice {
   String get addressLine => purok == null
       ? 'Barangay Tubod, Clarin, Bohol'
       : '$purok, Barangay Tubod, Clarin, Bohol';
+}
+
+final class NoticeBillItem {
+  final String billNo;
+  final String cycle;
+  final String dueDate;
+  final Money balance;
+  final Money? amountAtIssue;
+  final bool legacy;
+  const NoticeBillItem({
+    required this.billNo,
+    required this.cycle,
+    required this.dueDate,
+    required this.balance,
+    this.amountAtIssue,
+    this.legacy = false,
+  });
+}
+
+final class NoticeReceipt {
+  final String receiptNo;
+  final String billNo;
+  final Money amount;
+  final DateTime paidAt;
+  const NoticeReceipt({
+    required this.receiptNo,
+    required this.billNo,
+    required this.amount,
+    required this.paidAt,
+  });
+}
+
+final class NoticeSms {
+  final String status;
+  final String? dispatchState;
+  final DateTime? sentAt;
+  const NoticeSms({required this.status, this.dispatchState, this.sentAt});
+  String get label => status == 'sent'
+      ? 'Sent by gateway'
+      : status == 'failed'
+      ? 'Failed — check SMS delivery'
+      : dispatchState == 'uncertain'
+      ? 'Delivery uncertain — do not resend blindly'
+      : dispatchState == 'accepted'
+      ? 'Accepted by gateway; awaiting send confirmation'
+      : 'Waiting to send';
+}
+
+final class ClosedNotice {
+  final NoticeId id;
+  final String noticeNo;
+  final String household;
+  final NoticeOutcome outcome;
+  final DateTime closedAt;
+  final String? closedBy;
+  final String? notes;
+  const ClosedNotice({
+    required this.id,
+    required this.noticeNo,
+    required this.household,
+    required this.outcome,
+    required this.closedAt,
+    this.closedBy,
+    this.notes,
+  });
+}
+
+final class NoticeReview {
+  final ActiveNotice notice;
+  final String status;
+  final DateTime checkedAt;
+  final DateTime? closedAt;
+  final String? closedBy;
+  final String? outcomeNotes;
+  final List<NoticeBillItem> coveredBills;
+  final List<NoticeBillItem> overdueBills;
+  final List<NoticeReceipt> receipts;
+  final List<NoticeSms> sms;
+  const NoticeReview({
+    required this.notice,
+    required this.status,
+    required this.checkedAt,
+    this.closedAt,
+    this.closedBy,
+    this.outcomeNotes,
+    required this.coveredBills,
+    required this.overdueBills,
+    required this.receipts,
+    required this.sms,
+  });
+  bool get isActive => status == 'active';
+  bool get readyToClose => isActive && notice.readyToClose;
 }

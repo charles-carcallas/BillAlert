@@ -3,24 +3,27 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../domain/entities/app_user.dart';
-import '../domain/entities/household_login.dart';
+import 'admin/account_management_screen.dart';
 import 'admin/accounts_screen.dart';
-import 'admin/disconnections_screen.dart';
-import 'admin/household_login_screen.dart';
-import 'admin/new_consumer_screen.dart';
+import 'admin/create_account_screen.dart';
+import 'admin/linked_account_screen.dart';
 import 'admin/notice_document_screen.dart';
+import 'admin/overdue_workspace_screen.dart';
 import 'admin/post_bill_amount_screen.dart';
 import 'admin/reset_password_screen.dart';
 import 'admin/serve_notice_screen.dart';
 import 'auth/app_lock_controller.dart';
 import 'auth/auth_controller.dart';
 import 'auth/change_password_screen.dart';
+import 'auth/linked_household_provider.dart';
 import 'auth/login_screen.dart';
 import 'cashier/receipts_screen.dart';
 import 'cashier/record_payment_screen.dart';
+import 'common/account_transfer_screen.dart';
 import 'common/profile_screen.dart';
 import 'common/role_shell.dart';
 import 'common/splash_screen.dart';
+import 'common/staff_alerts.dart';
 import 'consumer/current_bill_screen.dart';
 import 'consumer/history_screen.dart';
 import 'consumer/inbox_screen.dart';
@@ -117,6 +120,7 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
   // Unlocking with a fingerprint changes where a signed-in user may go
   // without changing who is signed in, so it has to move the router too.
   ref.listen(appLockControllerProvider, (_, _) => refresh.value++);
+  ref.listen(linkedHouseholdProvider, (_, _) => refresh.value++);
   ref.onDispose(refresh.dispose);
 
   return GoRouter(
@@ -136,6 +140,36 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
         builder: (_, _) => const ChangePasswordScreen(),
       ),
       GoRoute(
+        path: '/admin/accounts/create',
+        builder: (_, _) => const AdminCreateAccountScreen(),
+      ),
+      GoRoute(
+        path: '/admin/accounts/transfer',
+        builder: (_, _) =>
+            const AccountManagementScreen(page: AccountManagementPage.transfer),
+      ),
+      GoRoute(
+        path: '/admin/accounts/activity',
+        builder: (_, _) =>
+            const AccountManagementScreen(page: AccountManagementPage.activity),
+      ),
+      GoRoute(
+        path: '/admin/accounts/manage',
+        builder: (_, _) => const AccountManagementScreen(),
+      ),
+      GoRoute(
+        path: '/account/transfer',
+        builder: (_, _) => const AccountTransferScreen(),
+      ),
+      GoRoute(
+        path: '/account-transfer',
+        redirect: (_, _) => '/account/transfer',
+      ),
+      GoRoute(
+        path: '/admin/account-management',
+        redirect: (_, _) => '/admin/accounts/manage',
+      ),
+      GoRoute(
         path: Routes.consumerReceipt,
         builder: (_, GoRouterState state) => ConsumerReceiptScreen(
           receiptNo: state.pathParameters['receiptNo']!,
@@ -143,11 +177,13 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
       ),
       GoRoute(
         path: Routes.serveNotice,
-        builder: (_, _) => const ServeNoticeScreen(),
+        builder: (_, state) => ServeNoticeScreen(
+          consumerId: state.uri.queryParameters['consumer'],
+        ),
       ),
       GoRoute(
         path: Routes.newConsumer,
-        builder: (_, _) => const AdminNewConsumerScreen(),
+        builder: (_, _) => const LinkedAccountScreen(),
       ),
       GoRoute(
         path: Routes.resetAccountPassword,
@@ -155,11 +191,12 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
       ),
       GoRoute(
         path: Routes.householdLogin,
-        builder: (_, GoRouterState state) => AdminHouseholdLoginScreen(
-          household: state.extra is HouseholdWithoutLogin
-              ? state.extra! as HouseholdWithoutLogin
-              : null,
-        ),
+        redirect: (_, _) => '/admin/accounts/create',
+      ),
+      GoRoute(
+        path: '/admin/disconnections/history',
+        builder: (_, _) =>
+            const AdminOverdueWorkspaceScreen(initialHistory: true),
       ),
       GoRoute(
         path: Routes.noticeDocument,
@@ -194,6 +231,19 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
             builder: (_, _) => const ProfileScreen(),
           ),
 
+          for (final role in ['admin', 'reader', 'cashier'])
+            GoRoute(
+              path: '/$role/alerts',
+              builder: (_, _) => const StaffAlertsScreen(),
+            ),
+          GoRoute(
+            path: '/admin/overdue',
+            redirect: (_, _) => '/admin/disconnections',
+          ),
+          GoRoute(
+            path: '/cashier/overdue',
+            redirect: (_, _) => '${Routes.cashier}?tab=overdue',
+          ),
           // ---- Admin (Area President) --------------------------------
           GoRoute(
             path: Routes.admin,
@@ -201,7 +251,7 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
           ),
           GoRoute(
             path: '/admin/disconnections',
-            builder: (_, _) => const DisconnectionsScreen(),
+            builder: (_, _) => const AdminOverdueWorkspaceScreen(),
           ),
           GoRoute(
             path: '/admin/accounts',
@@ -218,7 +268,10 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
           // cash, hand over the receipt. CashierNav has no Payment tab.
           GoRoute(
             path: Routes.cashier,
-            builder: (_, _) => const RecordPaymentScreen(),
+            builder: (_, state) => RecordPaymentScreen(
+              key: ValueKey(state.uri.queryParameters['tab']),
+              initialOverdue: state.uri.queryParameters['tab'] == 'overdue',
+            ),
           ),
           GoRoute(
             path: '/cashier/receipts',
@@ -253,7 +306,7 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
         ],
       ),
     ],
-    redirect: (BuildContext context, GoRouterState state) {
+    redirect: (BuildContext context, GoRouterState state) async {
       final auth = ref.read(authControllerProvider);
       final location = state.matchedLocation;
 
@@ -302,8 +355,25 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
       // GEN-08, courtesy layer: keep a role out of another role's section.
       // Row-Level Security is what actually stops them reading the data; this
       // just avoids an empty screen and a confusing error.
-      if (!_mayVisit(user, location)) {
+      if (!mayVisit(user, location)) {
         return user.homeRoute;
+      }
+
+      if (user.hasWorkAccess &&
+          (location == Routes.consumer ||
+              location.startsWith('${Routes.consumer}/'))) {
+        var linked = false;
+        try {
+          linked = await ref.read(linkedHouseholdProvider.future) != null;
+        } catch (_) {
+          // Work stays available if the household link cannot be verified.
+        }
+        if (!ref.mounted) return null;
+        final current = ref.read(authControllerProvider).value;
+        if (current?.accessScope != user.accessScope) {
+          return current?.homeRoute ?? Routes.login;
+        }
+        if (!linked) return user.homeRoute;
       }
 
       return null;
@@ -312,7 +382,7 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
 });
 
 /// True when [location] belongs to this user's own section of the app.
-bool _mayVisit(AppUser user, String location) {
+bool mayVisit(AppUser user, String location) {
   const sections = <String>[
     Routes.reader,
     Routes.admin,
@@ -322,7 +392,7 @@ bool _mayVisit(AppUser user, String location) {
 
   for (final String section in sections) {
     if (location == section || location.startsWith('$section/')) {
-      return user.homeRoute == section;
+      return section == Routes.consumer || user.homeRoute == section;
     }
   }
   // Anything outside the four role sections is not restricted here.

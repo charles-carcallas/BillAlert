@@ -12,11 +12,14 @@ class ProfileDto {
 
   static const String columns =
       'id, username, first_name, last_name, role, area_id, '
-      'must_change_password, account_status';
+      'must_change_password, account_status, staff_enabled, access_version';
 
   /// Returns null for a role this app version does not know, rather than
   /// guessing and dropping somebody into the wrong screen.
   static AppUser? fromJson(Map<String, dynamic> json) {
+    if (json['account_status'] != null && json['account_status'] != 'active') {
+      return null;
+    }
     final id = ProfileId(json['id'] as String);
     final username = json['username'] as String;
     final firstName = json['first_name'] as String;
@@ -24,6 +27,20 @@ class ProfileDto {
     final mustChangePassword = json['must_change_password'] as bool? ?? false;
     final areaValue = json['area_id'] as String?;
     final areaId = areaValue == null ? null : AreaId(areaValue);
+    final accessVersion = (json['access_version'] as num?)?.toInt() ?? 0;
+    final historicalRole = json['role'] as String;
+    if (json['staff_enabled'] == false &&
+        const ['admin', 'meter_reader', 'cashier'].contains(historicalRole)) {
+      return ConsumerUser(
+        id: id,
+        username: username,
+        firstName: firstName,
+        lastName: lastName,
+        mustChangePassword: mustChangePassword,
+        accessVersion: accessVersion,
+        historicalRole: historicalRole,
+      );
+    }
 
     switch (json['role'] as String) {
       case 'admin':
@@ -33,6 +50,7 @@ class ProfileDto {
           firstName: firstName,
           lastName: lastName,
           areaId: areaId,
+          accessVersion: accessVersion,
           mustChangePassword: mustChangePassword,
         );
       case 'meter_reader':
@@ -42,6 +60,7 @@ class ProfileDto {
           firstName: firstName,
           lastName: lastName,
           areaId: areaId,
+          accessVersion: accessVersion,
           mustChangePassword: mustChangePassword,
         );
       case 'cashier':
@@ -51,10 +70,12 @@ class ProfileDto {
           firstName: firstName,
           lastName: lastName,
           areaId: areaId,
+          accessVersion: accessVersion,
           mustChangePassword: mustChangePassword,
         );
       case 'consumer':
         return ConsumerUser(
+          accessVersion: accessVersion,
           id: id,
           username: username,
           firstName: firstName,

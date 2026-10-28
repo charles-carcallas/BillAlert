@@ -4417,6 +4417,39 @@ class $OutboxRowsTable extends OutboxRows
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _ownerIdMeta = const VerificationMeta(
+    'ownerId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerId = GeneratedColumn<String>(
+    'owner_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _ownerRoleMeta = const VerificationMeta(
+    'ownerRole',
+  );
+  @override
+  late final GeneratedColumn<String> ownerRole = GeneratedColumn<String>(
+    'owner_role',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _ownerAreaMeta = const VerificationMeta(
+    'ownerArea',
+  );
+  @override
+  late final GeneratedColumn<String> ownerArea = GeneratedColumn<String>(
+    'owner_area',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _payloadJsonMeta = const VerificationMeta(
     'payloadJson',
   );
@@ -4511,6 +4544,9 @@ class $OutboxRowsTable extends OutboxRows
   List<GeneratedColumn> get $columns => [
     clientUuid,
     operation,
+    ownerId,
+    ownerRole,
+    ownerArea,
     payloadJson,
     capturedAt,
     status,
@@ -4547,6 +4583,24 @@ class $OutboxRowsTable extends OutboxRows
       );
     } else if (isInserting) {
       context.missing(_operationMeta);
+    }
+    if (data.containsKey('owner_id')) {
+      context.handle(
+        _ownerIdMeta,
+        ownerId.isAcceptableOrUnknown(data['owner_id']!, _ownerIdMeta),
+      );
+    }
+    if (data.containsKey('owner_role')) {
+      context.handle(
+        _ownerRoleMeta,
+        ownerRole.isAcceptableOrUnknown(data['owner_role']!, _ownerRoleMeta),
+      );
+    }
+    if (data.containsKey('owner_area')) {
+      context.handle(
+        _ownerAreaMeta,
+        ownerArea.isAcceptableOrUnknown(data['owner_area']!, _ownerAreaMeta),
+      );
     }
     if (data.containsKey('payload_json')) {
       context.handle(
@@ -4622,6 +4676,18 @@ class $OutboxRowsTable extends OutboxRows
         DriftSqlType.string,
         data['${effectivePrefix}operation'],
       )!,
+      ownerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_id'],
+      ),
+      ownerRole: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_role'],
+      ),
+      ownerArea: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_area'],
+      ),
       payloadJson: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}payload_json'],
@@ -4676,6 +4742,9 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
   /// the schema allows — whether the app queues each of them yet is a separate
   /// question.
   final String operation;
+  final String? ownerId;
+  final String? ownerRole;
+  final String? ownerArea;
   final String payloadJson;
 
   /// MTR-12: the moment of capture, not the moment of sync. The 48-hour
@@ -4693,6 +4762,9 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
   const OutboxRow({
     required this.clientUuid,
     required this.operation,
+    this.ownerId,
+    this.ownerRole,
+    this.ownerArea,
     required this.payloadJson,
     required this.capturedAt,
     required this.status,
@@ -4707,6 +4779,15 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
     final map = <String, Expression>{};
     map['client_uuid'] = Variable<String>(clientUuid);
     map['operation'] = Variable<String>(operation);
+    if (!nullToAbsent || ownerId != null) {
+      map['owner_id'] = Variable<String>(ownerId);
+    }
+    if (!nullToAbsent || ownerRole != null) {
+      map['owner_role'] = Variable<String>(ownerRole);
+    }
+    if (!nullToAbsent || ownerArea != null) {
+      map['owner_area'] = Variable<String>(ownerArea);
+    }
     map['payload_json'] = Variable<String>(payloadJson);
     map['captured_at'] = Variable<String>(capturedAt);
     map['status'] = Variable<String>(status);
@@ -4728,6 +4809,15 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
     return OutboxRowsCompanion(
       clientUuid: Value(clientUuid),
       operation: Value(operation),
+      ownerId: ownerId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ownerId),
+      ownerRole: ownerRole == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ownerRole),
+      ownerArea: ownerArea == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ownerArea),
       payloadJson: Value(payloadJson),
       capturedAt: Value(capturedAt),
       status: Value(status),
@@ -4753,6 +4843,9 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
     return OutboxRow(
       clientUuid: serializer.fromJson<String>(json['clientUuid']),
       operation: serializer.fromJson<String>(json['operation']),
+      ownerId: serializer.fromJson<String?>(json['ownerId']),
+      ownerRole: serializer.fromJson<String?>(json['ownerRole']),
+      ownerArea: serializer.fromJson<String?>(json['ownerArea']),
       payloadJson: serializer.fromJson<String>(json['payloadJson']),
       capturedAt: serializer.fromJson<String>(json['capturedAt']),
       status: serializer.fromJson<String>(json['status']),
@@ -4769,6 +4862,9 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
     return <String, dynamic>{
       'clientUuid': serializer.toJson<String>(clientUuid),
       'operation': serializer.toJson<String>(operation),
+      'ownerId': serializer.toJson<String?>(ownerId),
+      'ownerRole': serializer.toJson<String?>(ownerRole),
+      'ownerArea': serializer.toJson<String?>(ownerArea),
       'payloadJson': serializer.toJson<String>(payloadJson),
       'capturedAt': serializer.toJson<String>(capturedAt),
       'status': serializer.toJson<String>(status),
@@ -4783,6 +4879,9 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
   OutboxRow copyWith({
     String? clientUuid,
     String? operation,
+    Value<String?> ownerId = const Value.absent(),
+    Value<String?> ownerRole = const Value.absent(),
+    Value<String?> ownerArea = const Value.absent(),
     String? payloadJson,
     String? capturedAt,
     String? status,
@@ -4794,6 +4893,9 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
   }) => OutboxRow(
     clientUuid: clientUuid ?? this.clientUuid,
     operation: operation ?? this.operation,
+    ownerId: ownerId.present ? ownerId.value : this.ownerId,
+    ownerRole: ownerRole.present ? ownerRole.value : this.ownerRole,
+    ownerArea: ownerArea.present ? ownerArea.value : this.ownerArea,
     payloadJson: payloadJson ?? this.payloadJson,
     capturedAt: capturedAt ?? this.capturedAt,
     status: status ?? this.status,
@@ -4809,6 +4911,9 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
           ? data.clientUuid.value
           : this.clientUuid,
       operation: data.operation.present ? data.operation.value : this.operation,
+      ownerId: data.ownerId.present ? data.ownerId.value : this.ownerId,
+      ownerRole: data.ownerRole.present ? data.ownerRole.value : this.ownerRole,
+      ownerArea: data.ownerArea.present ? data.ownerArea.value : this.ownerArea,
       payloadJson: data.payloadJson.present
           ? data.payloadJson.value
           : this.payloadJson,
@@ -4829,6 +4934,9 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
     return (StringBuffer('OutboxRow(')
           ..write('clientUuid: $clientUuid, ')
           ..write('operation: $operation, ')
+          ..write('ownerId: $ownerId, ')
+          ..write('ownerRole: $ownerRole, ')
+          ..write('ownerArea: $ownerArea, ')
           ..write('payloadJson: $payloadJson, ')
           ..write('capturedAt: $capturedAt, ')
           ..write('status: $status, ')
@@ -4845,6 +4953,9 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
   int get hashCode => Object.hash(
     clientUuid,
     operation,
+    ownerId,
+    ownerRole,
+    ownerArea,
     payloadJson,
     capturedAt,
     status,
@@ -4860,6 +4971,9 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
       (other is OutboxRow &&
           other.clientUuid == this.clientUuid &&
           other.operation == this.operation &&
+          other.ownerId == this.ownerId &&
+          other.ownerRole == this.ownerRole &&
+          other.ownerArea == this.ownerArea &&
           other.payloadJson == this.payloadJson &&
           other.capturedAt == this.capturedAt &&
           other.status == this.status &&
@@ -4873,6 +4987,9 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
 class OutboxRowsCompanion extends UpdateCompanion<OutboxRow> {
   final Value<String> clientUuid;
   final Value<String> operation;
+  final Value<String?> ownerId;
+  final Value<String?> ownerRole;
+  final Value<String?> ownerArea;
   final Value<String> payloadJson;
   final Value<String> capturedAt;
   final Value<String> status;
@@ -4885,6 +5002,9 @@ class OutboxRowsCompanion extends UpdateCompanion<OutboxRow> {
   const OutboxRowsCompanion({
     this.clientUuid = const Value.absent(),
     this.operation = const Value.absent(),
+    this.ownerId = const Value.absent(),
+    this.ownerRole = const Value.absent(),
+    this.ownerArea = const Value.absent(),
     this.payloadJson = const Value.absent(),
     this.capturedAt = const Value.absent(),
     this.status = const Value.absent(),
@@ -4898,6 +5018,9 @@ class OutboxRowsCompanion extends UpdateCompanion<OutboxRow> {
   OutboxRowsCompanion.insert({
     required String clientUuid,
     required String operation,
+    this.ownerId = const Value.absent(),
+    this.ownerRole = const Value.absent(),
+    this.ownerArea = const Value.absent(),
     required String payloadJson,
     required String capturedAt,
     this.status = const Value.absent(),
@@ -4915,6 +5038,9 @@ class OutboxRowsCompanion extends UpdateCompanion<OutboxRow> {
   static Insertable<OutboxRow> custom({
     Expression<String>? clientUuid,
     Expression<String>? operation,
+    Expression<String>? ownerId,
+    Expression<String>? ownerRole,
+    Expression<String>? ownerArea,
     Expression<String>? payloadJson,
     Expression<String>? capturedAt,
     Expression<String>? status,
@@ -4928,6 +5054,9 @@ class OutboxRowsCompanion extends UpdateCompanion<OutboxRow> {
     return RawValuesInsertable({
       if (clientUuid != null) 'client_uuid': clientUuid,
       if (operation != null) 'operation': operation,
+      if (ownerId != null) 'owner_id': ownerId,
+      if (ownerRole != null) 'owner_role': ownerRole,
+      if (ownerArea != null) 'owner_area': ownerArea,
       if (payloadJson != null) 'payload_json': payloadJson,
       if (capturedAt != null) 'captured_at': capturedAt,
       if (status != null) 'status': status,
@@ -4943,6 +5072,9 @@ class OutboxRowsCompanion extends UpdateCompanion<OutboxRow> {
   OutboxRowsCompanion copyWith({
     Value<String>? clientUuid,
     Value<String>? operation,
+    Value<String?>? ownerId,
+    Value<String?>? ownerRole,
+    Value<String?>? ownerArea,
     Value<String>? payloadJson,
     Value<String>? capturedAt,
     Value<String>? status,
@@ -4956,6 +5088,9 @@ class OutboxRowsCompanion extends UpdateCompanion<OutboxRow> {
     return OutboxRowsCompanion(
       clientUuid: clientUuid ?? this.clientUuid,
       operation: operation ?? this.operation,
+      ownerId: ownerId ?? this.ownerId,
+      ownerRole: ownerRole ?? this.ownerRole,
+      ownerArea: ownerArea ?? this.ownerArea,
       payloadJson: payloadJson ?? this.payloadJson,
       capturedAt: capturedAt ?? this.capturedAt,
       status: status ?? this.status,
@@ -4976,6 +5111,15 @@ class OutboxRowsCompanion extends UpdateCompanion<OutboxRow> {
     }
     if (operation.present) {
       map['operation'] = Variable<String>(operation.value);
+    }
+    if (ownerId.present) {
+      map['owner_id'] = Variable<String>(ownerId.value);
+    }
+    if (ownerRole.present) {
+      map['owner_role'] = Variable<String>(ownerRole.value);
+    }
+    if (ownerArea.present) {
+      map['owner_area'] = Variable<String>(ownerArea.value);
     }
     if (payloadJson.present) {
       map['payload_json'] = Variable<String>(payloadJson.value);
@@ -5012,6 +5156,9 @@ class OutboxRowsCompanion extends UpdateCompanion<OutboxRow> {
     return (StringBuffer('OutboxRowsCompanion(')
           ..write('clientUuid: $clientUuid, ')
           ..write('operation: $operation, ')
+          ..write('ownerId: $ownerId, ')
+          ..write('ownerRole: $ownerRole, ')
+          ..write('ownerArea: $ownerArea, ')
           ..write('payloadJson: $payloadJson, ')
           ..write('capturedAt: $capturedAt, ')
           ..write('status: $status, ')
@@ -7535,6 +7682,9 @@ typedef $$OutboxRowsTableCreateCompanionBuilder =
     OutboxRowsCompanion Function({
       required String clientUuid,
       required String operation,
+      Value<String?> ownerId,
+      Value<String?> ownerRole,
+      Value<String?> ownerArea,
       required String payloadJson,
       required String capturedAt,
       Value<String> status,
@@ -7549,6 +7699,9 @@ typedef $$OutboxRowsTableUpdateCompanionBuilder =
     OutboxRowsCompanion Function({
       Value<String> clientUuid,
       Value<String> operation,
+      Value<String?> ownerId,
+      Value<String?> ownerRole,
+      Value<String?> ownerArea,
       Value<String> payloadJson,
       Value<String> capturedAt,
       Value<String> status,
@@ -7607,6 +7760,21 @@ class $$OutboxRowsTableFilterComposer
 
   ColumnFilters<String> get operation => $composableBuilder(
     column: $table.operation,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ownerId => $composableBuilder(
+    column: $table.ownerId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ownerRole => $composableBuilder(
+    column: $table.ownerRole,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ownerArea => $composableBuilder(
+    column: $table.ownerArea,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7695,6 +7863,21 @@ class $$OutboxRowsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get ownerId => $composableBuilder(
+    column: $table.ownerId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get ownerRole => $composableBuilder(
+    column: $table.ownerRole,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get ownerArea => $composableBuilder(
+    column: $table.ownerArea,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get payloadJson => $composableBuilder(
     column: $table.payloadJson,
     builder: (column) => ColumnOrderings(column),
@@ -7752,6 +7935,15 @@ class $$OutboxRowsTableAnnotationComposer
 
   GeneratedColumn<String> get operation =>
       $composableBuilder(column: $table.operation, builder: (column) => column);
+
+  GeneratedColumn<String> get ownerId =>
+      $composableBuilder(column: $table.ownerId, builder: (column) => column);
+
+  GeneratedColumn<String> get ownerRole =>
+      $composableBuilder(column: $table.ownerRole, builder: (column) => column);
+
+  GeneratedColumn<String> get ownerArea =>
+      $composableBuilder(column: $table.ownerArea, builder: (column) => column);
 
   GeneratedColumn<String> get payloadJson => $composableBuilder(
     column: $table.payloadJson,
@@ -7838,6 +8030,9 @@ class $$OutboxRowsTableTableManager
               ({
                 Value<String> clientUuid = const Value.absent(),
                 Value<String> operation = const Value.absent(),
+                Value<String?> ownerId = const Value.absent(),
+                Value<String?> ownerRole = const Value.absent(),
+                Value<String?> ownerArea = const Value.absent(),
                 Value<String> payloadJson = const Value.absent(),
                 Value<String> capturedAt = const Value.absent(),
                 Value<String> status = const Value.absent(),
@@ -7850,6 +8045,9 @@ class $$OutboxRowsTableTableManager
               }) => OutboxRowsCompanion(
                 clientUuid: clientUuid,
                 operation: operation,
+                ownerId: ownerId,
+                ownerRole: ownerRole,
+                ownerArea: ownerArea,
                 payloadJson: payloadJson,
                 capturedAt: capturedAt,
                 status: status,
@@ -7864,6 +8062,9 @@ class $$OutboxRowsTableTableManager
               ({
                 required String clientUuid,
                 required String operation,
+                Value<String?> ownerId = const Value.absent(),
+                Value<String?> ownerRole = const Value.absent(),
+                Value<String?> ownerArea = const Value.absent(),
                 required String payloadJson,
                 required String capturedAt,
                 Value<String> status = const Value.absent(),
@@ -7876,6 +8077,9 @@ class $$OutboxRowsTableTableManager
               }) => OutboxRowsCompanion.insert(
                 clientUuid: clientUuid,
                 operation: operation,
+                ownerId: ownerId,
+                ownerRole: ownerRole,
+                ownerArea: ownerArea,
                 payloadJson: payloadJson,
                 capturedAt: capturedAt,
                 status: status,

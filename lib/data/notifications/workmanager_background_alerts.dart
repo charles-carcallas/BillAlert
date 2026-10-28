@@ -11,6 +11,7 @@ import '../network/fail_fast_http_client.dart';
 import '../network/network_status.dart';
 import 'android_phone_notifier.dart';
 import 'secure_urgent_alerts_setting.dart';
+import 'staff_phone_alerts.dart';
 import 'supabase_alert_feed.dart';
 
 const String _uniqueName = 'billalert-phone-alerts';
@@ -45,6 +46,22 @@ void phoneAlertsCallbackDispatcher() {
       final AndroidPhoneNotifier phone = AndroidPhoneNotifier();
       await phone.initialize();
 
+      final client = Supabase.instance.client;
+      final owner = client.auth.currentUser?.id;
+      if (owner == null) return true;
+      final profile = await client
+          .from('profiles')
+          .select('role, account_status, staff_enabled')
+          .eq('id', owner)
+          .single();
+      if (profile['account_status'] != 'active') return true;
+      if (profile['role'] != 'consumer' && profile['staff_enabled'] != false) {
+        await refreshStaffPhoneAlerts(
+          client,
+          phone,
+          await staffAlertDeviceId(),
+        );
+      }
       await RefreshPhoneAlerts(
         feed: SupabaseAlertFeed(Supabase.instance.client),
         phone: phone,

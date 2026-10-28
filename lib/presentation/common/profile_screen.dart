@@ -8,8 +8,13 @@ import '../../domain/entities/app_user.dart';
 import '../../domain/entities/consumer.dart' as domain;
 import '../../domain/notifications/phone_alerts.dart';
 import '../../domain/outbox/outbox_entry.dart';
+import '../../domain/outbox/outbox_operation.dart';
+import '../../domain/value_objects/ph_date.dart';
+import '../admin/billing_schedule_screen.dart';
+import '../admin/reserve_fund_report_screen.dart';
 import '../auth/app_lock_controller.dart';
 import '../auth/auth_controller.dart';
+import '../auth/linked_household_provider.dart';
 import '../consumer/consumer_app_bar.dart';
 import '../consumer/edit_contact_number_sheet.dart';
 import '../providers.dart';
@@ -21,30 +26,29 @@ import 'staff_app_bar.dart';
 ///
 /// Read here rather than passed in, so the number on the Profile screen is
 /// the outbox's own answer and cannot drift from it.
-final pendingOutboxProvider = FutureProvider<List<OutboxEntry>>((
-  Ref ref,
-) async {
-  final result = await ref.watch(outboxRepositoryProvider).pending();
+final quarantinedOutboxProvider = FutureProvider<int>((ref) async {
+  ref.watch(authControllerProvider);
+  final result = await ref.watch(outboxRepositoryProvider).quarantinedCount();
   return switch (result) {
     Ok(:final value) => value,
-    // A queue that cannot be read is reported as empty rather than as an
-    // error: the Profile screen's job is signing out, and it must not become
-    // unusable because a count failed.
-    Err() => const <OutboxEntry>[],
+    Err(:final failure) => throw failure,
   };
+});
+
+final pendingOutboxProvider = StreamProvider<List<OutboxEntry>>((ref) {
+  ref.watch(authControllerProvider);
+  return ref
+      .watch(outboxRepositoryProvider)
+      .watchAll()
+      .map(
+        (rows) =>
+            rows.where((entry) => entry.status != OutboxStatus.synced).toList(),
+      );
 });
 
 /// The household record supplies details that are not stored on the auth
 /// profile, such as the consumer number and SMS contact.
-final profileConsumerProvider = FutureProvider<domain.Consumer?>((
-  Ref ref,
-) async {
-  final result = await ref.watch(consumerRepositoryProvider).signedInConsumer();
-  return switch (result) {
-    Ok(:final value) => value,
-    Err() => null,
-  };
-});
+final profileConsumerProvider = linkedHouseholdProvider;
 
 /// Whether this phone can use fingerprint sign-in, and whether it is on for
 /// the signed-in person. Read here, so the switch shows the setting's own
@@ -85,7 +89,7 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final AppUser? user = ref.watch(authControllerProvider).value;
     final pending = ref.watch(pendingOutboxProvider);
-    final AsyncValue<domain.Consumer?>? consumer = user is ConsumerUser
+    final AsyncValue<domain.Consumer?>? consumer = user != null
         ? ref.watch(profileConsumerProvider)
         : null;
 
@@ -95,28 +99,80 @@ class ProfileScreen extends ConsumerWidget {
     }
 
     final ColorScheme colours = Theme.of(context).colorScheme;
+    final location = GoRouter.maybeOf(
+      context,
+    )?.routeInformationProvider.value.uri.path;
+    final householdView =
+        !user.hasWorkAccess ||
+        location == '/consumer' ||
+        (location?.startsWith('/consumer/') ?? false);
 
     return Scaffold(
-      appBar: user is ConsumerUser
+      appBar: householdView
           ? const ConsumerAppBar(title: 'Profile')
-          : user is CashierUser
-          ? const StaffAppBar(title: 'Profile')
-          : AppBar(title: const Text('Profile')),
+          : const StaffAppBar(title: 'Profile'),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(pendingOutboxProvider);
             ref.invalidate(fingerprintStatusProvider);
-            if (user is ConsumerUser) {
-              ref.invalidate(profileConsumerProvider);
-              ref.invalidate(urgentAlertsStatusProvider);
-            }
+            ref.invalidate(profileConsumerProvider);
+            ref.invalidate(urgentAlertsStatusProvider);
           },
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: <Widget>[
               _ProfileHeader(user: user, consumer: consumer?.value),
-              if (user is ConsumerUser)
+              if (user is AdminUser && user.hasWorkAccess && !householdView)
+                _Group(
+                  title: 'Settings',
+                  children: [
+                    _SettingRow(
+                      icon: Icons.calendar_month_outlined,
+                      title: 'Billing schedule',
+                      subtitle: 'Default due day and Cashier collection cutoff',
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const BillingScheduleScreen(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              if (user is AdminUser && user.hasWorkAccess && !householdView)
+                _Group(
+                  title: 'Reports',
+                  children: [
+                    _SettingRow(
+                      icon: Icons.account_balance_wallet_outlined,
+                      title: 'Reserve fund',
+                      subtitle: 'Balances, transactions and corrections',
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const ReserveFundReportScreen(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              // Nominees and former presidents keep their own handover entry.
+              // Active presidents manage transfers from the Accounts tab.
+              if (!user.hasWorkAccess && user.historicalRole == 'admin')
+                _Group(
+                  title: 'Handover',
+                  children: <Widget>[
+                    _SettingRow(
+                      icon: Icons.swap_horiz,
+                      title: 'My president transfer',
+                      subtitle: 'Review your Area President handover',
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => context.push('/account/transfer'),
+                    ),
+                  ],
+                ),
+              if (consumer != null)
                 _Group(
                   title: 'Notifications',
                   footer:
@@ -133,13 +189,13 @@ class ProfileScreen extends ConsumerWidget {
                     const _UrgentAlertsRow(),
                     _SmsRow(
                       consumer: consumer,
-                      onEdit: consumer?.hasValue == true
+                      onEdit: consumer.value != null
                           ? () async {
                               final String? saved =
                                   await showEditConsumerContactNumber(
                                     context,
                                     currentNumber:
-                                        consumer?.value?.contactNumber,
+                                        consumer.value?.contactNumber,
                                   );
                               if (saved != null) {
                                 ref.invalidate(profileConsumerProvider);
@@ -201,6 +257,42 @@ class ProfileScreen extends ConsumerWidget {
                     'when you sign in again.',
                 children: <Widget>[
                   _SyncRow(pending: pending),
+                  ref
+                      .watch(quarantinedOutboxProvider)
+                      .when(
+                        data: (count) => count == 0
+                            ? const SizedBox.shrink()
+                            : Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Text(
+                                  '$count older saved items need owner verification. They are preserved and will not upload automatically. Do not clear app data.',
+                                ),
+                              ),
+                        loading: () => const SizedBox.shrink(),
+                        error: (_, _) => const Text(
+                          'Could not verify whether older saved work remains.',
+                        ),
+                      ),
+                  TextButton.icon(
+                    onPressed: () async {
+                      await ref.read(networkStatusProvider).recheck();
+                      final result = await ref
+                          .read(syncServiceProvider)
+                          .syncNow();
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(switch (result) {
+                            Ok(:final value) =>
+                              '${value.succeeded} sent; ${value.failed} need attention.',
+                            Err(:final failure) => failure.message,
+                          }),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.sync),
+                    label: const Text('Sync now'),
+                  ),
                   _SettingRow(
                     icon: Icons.logout,
                     tint: colours.error,
@@ -225,15 +317,22 @@ class ProfileScreen extends ConsumerWidget {
     WidgetRef ref,
     AsyncValue<List<OutboxEntry>> pending,
   ) async {
-    final int waiting = pending.value?.length ?? 0;
+    final current = await ref.read(outboxRepositoryProvider).pending();
+    if (!context.mounted) return;
+    final int? waiting = switch (current) {
+      Ok(:final value) => value.length,
+      Err() => null,
+    };
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext dialogContext) => AlertDialog(
         title: const Text('Sign out?'),
         content: Text(
-          waiting == 0
-              ? 'Everything you have recorded has been sent.'
+          waiting == null
+              ? 'The sync queue could not be checked. Saved work will remain on this phone.'
+              : waiting == 0
+              ? 'No current-account items are waiting. Any older unverified work stays on this phone.'
               : 'You still have $waiting item${waiting == 1 ? '' : 's'} '
                     'waiting to sync. They stay saved on this phone and are '
                     'sent when you sign in again.',
@@ -492,13 +591,13 @@ class _Group extends StatelessWidget {
 }
 
 /// What has not reached the server yet, as a row like every other.
-class _SyncRow extends StatelessWidget {
+class _SyncRow extends ConsumerWidget {
   final AsyncValue<List<OutboxEntry>> pending;
 
   const _SyncRow({required this.pending});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final TextTheme text = Theme.of(context).textTheme;
 
     return pending.when(
@@ -545,7 +644,75 @@ class _SyncRow extends StatelessWidget {
               for (final OutboxEntry entry in entries)
                 Padding(
                   padding: const EdgeInsets.only(left: 52, top: 2),
-                  child: Text('· ${entry.description}', style: text.bodySmall),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '· ${entry.description} · ${entry.status.name}',
+                        style: text.bodySmall,
+                      ),
+                      if (entry.lastError != null)
+                        Text(entry.lastError!, style: text.bodySmall),
+                      if (entry.operation is PostAmountOperation &&
+                          entry.status == OutboxStatus.failed &&
+                          (entry.lastError?.contains('due date') ?? false))
+                        TextButton(
+                          onPressed: () async {
+                            final user = ref.read(authControllerProvider).value;
+                            final today = ref.read(phClockProvider).today();
+                            final now = DateTime(
+                              today.year,
+                              today.month,
+                              today.day,
+                            );
+                            final date = await showDatePicker(
+                              context: context,
+                              initialDate: now,
+                              firstDate: now,
+                              lastDate: DateTime(
+                                today.year + 1,
+                                today.month,
+                                today.day,
+                              ),
+                            );
+                            if (date == null ||
+                                !context.mounted ||
+                                ref.read(authControllerProvider).value?.id !=
+                                    user?.id) {
+                              return;
+                            }
+                            final sync = ref.read(syncServiceProvider);
+                            final outbox = ref.read(outboxRepositoryProvider);
+                            final session = ref.read(outboxSessionProvider);
+                            final generation = session.generation;
+                            await sync.stop();
+                            final result = await outbox.reviseRejectedDueDate(
+                              entry.operation.clientUuid,
+                              PhDate(date.year, date.month, date.day),
+                            );
+                            if (session.generation == generation &&
+                                session.scope?.id == user?.id.value) {
+                              sync.start();
+                            }
+                            if (!context.mounted ||
+                                ref.read(authControllerProvider).value?.id !=
+                                    user?.id) {
+                              return;
+                            }
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(switch (result) {
+                                  Ok() =>
+                                    'Corrected date saved. Tap Sync now to send it.',
+                                  Err(:final failure) => failure.message,
+                                }),
+                              ),
+                            );
+                          },
+                          child: const Text('Correct rejected due date'),
+                        ),
+                    ],
+                  ),
                 ),
             ],
           ),

@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-
 import '../../core/errors/app_failure.dart';
 import '../supabase/failure_mapper.dart';
 import 'app_database.dart';
@@ -32,12 +31,19 @@ class QueryCache {
     String key,
     Future<List<Map<String, dynamic>>> Function() fetch,
   ) async {
+    final epoch = _db.cacheEpoch;
     try {
       final List<Map<String, dynamic>> fresh = await fetch();
+      if (epoch != _db.cacheEpoch) {
+        throw const AuthFailure('The signed-in account changed.');
+      }
       await _save(key, fresh);
       return fresh;
     } catch (error, stackTrace) {
       if (FailureMapper.from(error, stackTrace) is! NetworkFailure) rethrow;
+      if (epoch != _db.cacheEpoch) {
+        throw const AuthFailure('The signed-in account changed.');
+      }
       final List<Map<String, dynamic>>? saved = await _load(key);
       if (saved == null) rethrow;
       return saved;

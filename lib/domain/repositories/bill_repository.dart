@@ -30,7 +30,7 @@ abstract class BillRepository {
   });
 
   /// One bill, for the post-amount screen.
-  Future<Result<Bill?>> byId(BillId id);
+  Future<Result<Bill?>> byId(BillId id, {ConsumerId? consumerId});
 
   /// Bills a cashier can collect against. Excludes unpriced bills: an
   /// unpriced bill is not collectable and must not appear in a payment.
@@ -44,6 +44,13 @@ abstract class BillRepository {
   /// which is a per-consumer aggregate and cannot produce a [Bill] - it is
   /// the answer to "who owes what", not "which bills".
   Future<Result<List<ConsumerOutstanding>>> outstandingInArea(AreaId areaId);
+
+  /// Main collection list: this Philippine month's non-overdue bills only.
+  /// Older overdue balances contribute only to the blocking warning.
+  Future<Result<List<ConsumerOutstanding>>> currentCollectionsInArea(
+    AreaId areaId,
+    PhDate today,
+  );
 
   /// Every bill in the area for [cycle], each carrying the meter reading it
   /// was made from. The Meter Reader's sheet for BOHECO. Backed by

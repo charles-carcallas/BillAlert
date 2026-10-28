@@ -19,6 +19,7 @@ import '../data/repositories/reading_repository_impl.dart';
 import '../data/security/local_auth_device_unlock.dart';
 import '../data/security/secure_fingerprint_setting.dart';
 import '../data/security/secure_password_verifier.dart';
+import '../data/sync/outbox_session.dart';
 import '../data/sync/supabase_outbox_gateway.dart';
 import '../data/sync/sync_service.dart';
 import '../domain/notifications/phone_alerts.dart';
@@ -48,6 +49,7 @@ import '../domain/usecases/reader/load_reading_sheet.dart';
 import '../domain/usecases/reader/record_meter_reading.dart';
 import '../domain/value_objects/ids.dart';
 import '../domain/value_objects/temporary_password.dart';
+import 'auth/auth_controller.dart';
 
 /// Where the app is wired together.
 ///
@@ -142,14 +144,21 @@ final backgroundAlertsProvider = Provider<BackgroundAlerts>(
 );
 
 /// Shows queued notices and schedules due-date reminders, once, now.
-final refreshPhoneAlertsProvider = Provider<RefreshPhoneAlerts>(
-  (Ref ref) => RefreshPhoneAlerts(
+final refreshPhoneAlertsProvider = Provider<RefreshPhoneAlerts>((Ref ref) {
+  final scope = ref.watch(
+    authControllerProvider.select((s) => s.value?.accessScope),
+  );
+  return RefreshPhoneAlerts(
     feed: ref.watch(alertFeedProvider),
     phone: ref.watch(phoneNotifierProvider),
     clock: ref.watch(phClockProvider),
     urgentAlerts: ref.watch(urgentAlertsSettingProvider),
-  ),
-);
+    isCurrent: () =>
+        ref.mounted &&
+        scope != null &&
+        ref.read(authControllerProvider).value?.accessScope == scope,
+  );
+});
 
 /// Decides where a tapped notification lands, after checking it belongs to
 /// the household signed in now.
@@ -222,11 +231,19 @@ final notificationRepositoryProvider = Provider<NotificationRepository>(
 );
 
 final readingRepositoryProvider = Provider<ReadingRepository>(
-  (Ref ref) => ReadingRepositoryImpl(ref.watch(appDatabaseProvider)),
+  (Ref ref) => ReadingRepositoryImpl(
+    ref.watch(appDatabaseProvider),
+    session: ref.watch(outboxSessionProvider),
+  ),
 );
 
+final outboxSessionProvider = Provider<OutboxSession>((ref) => OutboxSession());
+
 final outboxRepositoryProvider = Provider<OutboxRepository>(
-  (Ref ref) => OutboxRepositoryImpl(ref.watch(appDatabaseProvider)),
+  (Ref ref) => OutboxRepositoryImpl(
+    ref.watch(appDatabaseProvider),
+    session: ref.watch(outboxSessionProvider),
+  ),
 );
 
 final outboxGatewayProvider = Provider<OutboxGateway>(
@@ -237,8 +254,18 @@ final syncServiceProvider = Provider<SyncService>((Ref ref) {
   final service = SyncService(
     ref.watch(outboxRepositoryProvider),
     ref.watch(outboxGatewayProvider),
+    session: ref.watch(outboxSessionProvider),
   );
-  ref.onDispose(service.dispose);
+  final network = ref.watch(networkStatusProvider);
+  void reconnect() {
+    if (network.isOnline) service.syncNow();
+  }
+
+  network.addListener(reconnect);
+  ref.onDispose(() {
+    network.removeListener(reconnect);
+    service.dispose();
+  });
   return service;
 });
 
@@ -316,5 +343,6 @@ final recordCashPaymentProvider = Provider<RecordCashPayment>(
     outbox: ref.watch(outboxRepositoryProvider),
     clock: ref.watch(phClockProvider),
     newClientUuid: ref.watch(clientUuidFactoryProvider),
+    verifyCollection: ref.watch(paymentRepositoryProvider).checkCollection,
   ),
 );

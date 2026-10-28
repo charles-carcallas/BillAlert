@@ -1,5 +1,10 @@
 # Supabase — the database of record
 
+**Existing project / October 2026 beta:** use [the current operations kit](operations/README.md)
+for status checks, the four confirmed member accounts, a previewable transaction reset,
+and a small sample dataset. Do not rerun old saved migration or dummy-data queries.
+The historical run order below is for building a fresh database, not resetting this one.
+
 These files are the source of truth for the BillAlert database. They used to
 be duplicated under
 `04_Phase2_Build/Week10_DataModel/sql/` in the coursework folder; that copy
@@ -31,12 +36,50 @@ Apply to a fresh database in this order:
 | `migrations/16_cycle_named_by_reading_month.sql` | files each reading and bill under the month it was read |
 | `migrations/17_bill_cooperative_amount.sql` | keeps BOHECO's own amount beside the rounded bill (`bills.cooperative_amount`) and adds `boheco_share` to `v_payment_history`, so Remit can split the money collected into BOHECO's part and the Meter Reader's rounding share |
 | `migrations/18_remit_handovers.sql` | the Cashier records handing BOHECO's part of the month's money to the Meter Reader (`remit_handovers`, `fn_record_remit_handover`); amounts frozen at the handover |
+| `migrations/19_overdue_collection.sql` | REVIEW REQUIRED: overdue approvals, guarded online collection, exact UUID payment/post replay; preserves existing records |
+| `migrations/20_staff_alerts.sql` | REVIEW REQUIRED: recipient-scoped staff inbox, event triggers and per-device notification claims |
+| `migrations/20261002034514_disconnection_review.sql` | REVIEW REQUIRED, apply after 19 and 20: receipt-checked notice closure, bill snapshots, closed history, delivery review and Admin payment alert |
+| `migrations/20261002064410_account_lifecycle.sql` | REVIEW REQUIRED, after disconnection review: separate work/login access, audited President transfer, household handover, cache access versions and guarded mutations |
+| `migrations/20261002064728_reader_boheco_waiver.sql` | REVIEW REQUIRED, after account lifecycle: approved one-household Meter Reader coverage, noncash bill settlement and corrected financial summaries |
+| `migrations/20261002151432_staff_assignment.sql` | REVIEW REQUIRED, after reader coverage: atomic Meter Reader/Cashier replacement using existing logins, stale-selection checks and audited handover; preserves accounts and history |
+| `migrations/20261003122000_household_required_accounts.sql` | REVIEW REQUIRED, after staff assignment: atomic profile/household setup, deferred household requirement for new accounts, and household checks during staff replacement. Redeploy `manage-accounts` and install the updated app together. |
+| `migrations/20261003212547_overdue_batch_authorization.sql` | historical batch approval API |
+| `migrations/20261003221703_overdue_household_request.sql` | historical household request API |
+| `migrations/20261004015207_pondo_boheco_settlement.sql` | reserve ledger, BOHECO trips and settlement routes |
+| `migrations/20261004030427_billing_schedule.sql` | area schedules and frozen trip cutoffs |
+| `migrations/20261004060000_referred_disconnection_notices.sql` | notices following confirmed BOHECO referrals |
+| `migrations/20261004070000_reader_monthly_compensation.sql` | monthly PHP 500 reserve-funded compensation |
+| `migrations/20261004071610_automatic_boheco_routing.sql` | automatic uncovered overdue routing |
+| `migrations/20261007105843_regular_rounding_reserve_credit.sql` | receipt-backed rounding credits, exactly once |
+| `migrations/20261007111213_settlement_correction_recovery.sql` | explicit, version-checked settlement corrections |
+| `migrations/20261007202922_restrict_legacy_settlement_correction.sql` | blocks the obsolete correction endpoint |
 | `scheduling/sms_cron.sql` | runs `send-sms` every 15 minutes with `pg_cron` — apply last, see below |
 
 `07` is not optional. Every policy calls a helper in the `app` schema, and
 without the grant every request fails with
 `401 permission denied for schema app` — which surfaces in the app as a silent
 bounce back to the login screen.
+
+### Account lifecycle and BOHECO coverage rollout
+
+For the simplified **Manage accounts → Staff → Change** flow, review and apply
+`20261002151432_staff_assignment.sql` after the lifecycle/coverage migrations.
+It extends the account workspace and adds a guarded assignment function. No
+Edge Function redeployment is needed for this change: new people use the existing
+`manage-accounts` creation action. See [staff assignment rollout](../docs/week13/staff_assignment_implementation.md).
+
+The two October 2 account/waiver migrations above are prepared locally and have
+not been applied to the live project by this implementation. Existing accounts
+and transactions are retained. Review both files before applying them in order;
+the updated app requires both migrations. Existing installations that already
+applied 19, 20 and disconnection review should not rerun those earlier files.
+
+After the two new migrations, deploy the new authenticated `manage-accounts`
+Edge Function, then release the updated app. It uses the usual server-side
+Supabase URL/service key; no new SMS setup is needed. Deployment remains a
+separate user-approved step. See `docs/week13/account_management.md` for
+failure recovery and `docs/week13/account_lifecycle_implementation.md` for the
+test sequence and verification limits.
 
 Staff creation enters through the authenticated `create-staff-account` Edge
 Function. It uses Supabase's Auth Admin API, then calls the `SECURITY DEFINER`
@@ -211,3 +254,32 @@ trusting a green run:
   the foot of `migrations/03_views.sql`.
 
 Both were invisible to the test suite. Neither was a policy bug.
+
+## Pending Week 13 rollout
+
+Migrations 19 and 20 are prepared, not applied live. Apply each once, in order,
+only after approval and checking deployed definitions against migrations through
+18. They change payment policy for older APKs too. Reconcile pre-upgrade queued
+cash before rollout; do not clear app data to remove pending items. See
+`../docs/week13/implementation_report.md` for the release and phone checklist.
+
+`tests/overdue_staff_test.sql` is for a disposable local database with synthetic
+05 fixtures and migrations 19/20. It uses simulated Auth identities and ends in
+ROLLBACK. Never run this fixture-dependent test against the live project.
+
+The disconnection review migration must follow 19 and 20, regardless of filename
+sorting. It preserves existing notices and reconstructs legacy bill associations
+without inventing original balances. Its new read APIs require the migration
+before distributing the updated app. See
+`../docs/week13/disconnection_review_implementation.md` for verification and the
+phone checklist. Existing cleanup scripts need a separate review against the new
+dependencies before reuse; this rollout does not perform a reset.
+
+`tests/disconnection_review_test.sql` runs only in a disposable local database
+with synthetic 05 fixtures and all three pending migrations. It tests payment
+evidence, closing permission, required notes, history, legacy associations, SMS
+review and the Admin alert. It ends in ROLLBACK; never run it on production.
+
+Household-required creation and the optional reviewed legacy backfill are documented in [household account setup](../docs/week13/household_required_accounts.md). Start with the read-only `checks/account_setup_inventory.sql`; no backfill is part of the migration.
+
+The combined Admin billing settings are documented in [billing schedule](../docs/week13/billing_schedule.md). Apply `20261004030427_billing_schedule.sql` after the pondo settlement migration before using the updated app. No live migration has been applied by this task.

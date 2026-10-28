@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'responsive_layout.dart';
+
 /// Builds the body of an [showExpandableBottomSheet]. The body's own scroll
 /// view must use [scrollController], so a drag on the content grows the sheet
 /// before it scrolls the list.
@@ -9,6 +11,7 @@ typedef ExpandableSheetBuilder =
 /// Opens a modal bottom sheet that starts at [initialSize] of the screen and
 /// can be dragged up to fill it — from the grip, from any [SheetDragRegion],
 /// or from the content while it is scrolled to the top.
+/// At laptop widths it opens as a centered dialog with ordinary scrolling.
 ///
 /// A non-[dismissible] sheet can still be resized, but no drag or outside tap
 /// ever closes it; its own close button decides.
@@ -17,18 +20,56 @@ Future<T?> showExpandableBottomSheet<T>({
   required ExpandableSheetBuilder builder,
   double initialSize = 0.6,
   bool dismissible = true,
-}) => showModalBottomSheet<T>(
-  context: context,
-  isScrollControlled: true,
-  useSafeArea: true,
-  isDismissible: dismissible,
-  enableDrag: dismissible,
-  builder: (_) => ExpandableSheet(
-    initialSize: initialSize,
-    dismissible: dismissible,
-    builder: builder,
-  ),
-);
+}) {
+  if (MediaQuery.sizeOf(context).width >= desktopBreakpoint) {
+    return showDialog<T>(
+      context: context,
+      barrierDismissible: dismissible,
+      builder: (_) => _DesktopSheet(builder: builder),
+    );
+  }
+  return showModalBottomSheet<T>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    isDismissible: dismissible,
+    enableDrag: dismissible,
+    builder: (_) => ExpandableSheet(
+      initialSize: initialSize,
+      dismissible: dismissible,
+      builder: builder,
+    ),
+  );
+}
+
+class _DesktopSheet extends StatefulWidget {
+  final ExpandableSheetBuilder builder;
+  const _DesktopSheet({required this.builder});
+
+  @override
+  State<_DesktopSheet> createState() => _DesktopSheetState();
+}
+
+class _DesktopSheetState extends State<_DesktopSheet> {
+  final _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Dialog(
+    clipBehavior: Clip.antiAlias,
+    insetPadding: const EdgeInsets.all(24),
+    child: SizedBox(
+      width: 760,
+      height: (MediaQuery.sizeOf(context).height * 0.85).clamp(0, 800),
+      child: widget.builder(context, _scrollController),
+    ),
+  );
+}
 
 class ExpandableSheet extends StatefulWidget {
   final double initialSize;
