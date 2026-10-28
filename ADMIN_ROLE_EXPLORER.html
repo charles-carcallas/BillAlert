@@ -1,0 +1,2687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BillAlert Admin (Area President) Defense Dashboard</title>
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-secondary: #111827;
+      --bg-card: #161f30;
+      --bg-card-hover: #1e293b;
+      --bg-code: #0b1120;
+      --border-color: #243247;
+      --border-focus: #3b82f6;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-subtle: #64748b;
+      
+      --layer-pres-blue: #3b82f6;
+      --layer-pres-blue-bg: rgba(59, 130, 246, 0.12);
+      --layer-dom-purple: #a855f7;
+      --layer-dom-purple-bg: rgba(168, 85, 247, 0.12);
+      --layer-data-orange: #f97316;
+      --layer-data-orange-bg: rgba(249, 115, 22, 0.12);
+      --layer-sql-green: #10b981;
+      --layer-sql-green-bg: rgba(16, 185, 129, 0.12);
+      
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      line-height: 1.5;
+      display: flex;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    #sidebar {
+      width: 290px;
+      background-color: var(--bg-secondary);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      z-index: 100;
+    }
+
+    .sidebar-header {
+      padding: 24px 20px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .brand-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #fff;
+    }
+
+    .brand-badge {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      padding: 2px 8px;
+      border-radius: 9999px;
+      font-weight: 700;
+    }
+
+    .presenter-meta {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .presenter-meta strong {
+      color: #fff;
+      display: block;
+    }
+
+    .nav-sections {
+      flex: 1;
+      padding: 16px 12px;
+      overflow-y: auto;
+    }
+
+    .nav-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: var(--text-subtle);
+      margin: 16px 8px 8px 8px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      margin-bottom: 2px;
+    }
+
+    .nav-item:hover {
+      background-color: var(--bg-card);
+      color: #fff;
+    }
+
+    .nav-item.active {
+      background-color: rgba(59, 130, 246, 0.15);
+      color: var(--layer-pres-blue);
+      font-weight: 600;
+    }
+
+    #main-content {
+      margin-left: 290px;
+      flex: 1;
+      padding: 32px 40px 80px 40px;
+      max-width: 1440px;
+    }
+
+    header.top-banner {
+      margin-bottom: 32px;
+      padding: 24px;
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.6), rgba(15, 23, 42, 0.8));
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    .top-banner h1 {
+      font-size: 1.85rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .role-badge {
+      font-size: 0.75rem;
+      background: rgba(168, 85, 247, 0.2);
+      border: 1px solid rgba(168, 85, 247, 0.4);
+      color: #d8b4fe;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-weight: 600;
+    }
+
+    .top-banner p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      max-width: 900px;
+    }
+
+    .layer-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .layer-tag {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .layer-tag.pres {
+      background: var(--layer-pres-blue-bg);
+      color: var(--layer-pres-blue);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .layer-tag.dom {
+      background: var(--layer-dom-purple-bg);
+      color: var(--layer-dom-purple);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+    }
+
+    .layer-tag.data {
+      background: var(--layer-data-orange-bg);
+      color: var(--layer-data-orange);
+      border: 1px solid rgba(249, 115, 22, 0.3);
+    }
+
+    .layer-tag.sql {
+      background: var(--layer-sql-green-bg);
+      color: var(--layer-sql-green);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .search-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 24px;
+      margin-bottom: 40px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .search-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+
+    .search-header h2 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .search-input-wrapper {
+      position: relative;
+      margin-bottom: 18px;
+    }
+
+    .search-input {
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 14px 18px 14px 44px;
+      font-size: 0.95rem;
+      color: #fff;
+      font-family: inherit;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .search-input:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-subtle);
+      pointer-events: none;
+    }
+
+    .table-container {
+      overflow-x: auto;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      max-height: 520px;
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.85rem;
+    }
+
+    .data-table th {
+      background: #0f172a;
+      color: var(--text-muted);
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 0.725rem;
+      letter-spacing: 0.05em;
+      padding: 12px 16px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .data-table td {
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      vertical-align: top;
+      color: #cbd5e1;
+    }
+
+    .data-table tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .btn-vscode {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(59, 130, 246, 0.12);
+      border: 1px solid rgba(59, 130, 246, 0.35);
+      color: #60a5fa;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      text-decoration: none;
+      font-weight: 600;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+
+    .btn-vscode:hover {
+      background: #3b82f6;
+      color: #fff;
+      transform: translateY(-1px);
+    }
+
+    .code-pill {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.2);
+    }
+
+    .manifest-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(440px, 1fr));
+      gap: 20px;
+    }
+
+    .manifest-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 20px;
+    }
+
+    .manifest-card-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .manifest-item {
+      padding: 12px;
+      border-radius: 8px;
+      background: var(--bg-card);
+      margin-bottom: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .manifest-item-left {
+      flex: 1;
+    }
+
+    .manifest-item-name {
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: #fff;
+    }
+
+    .manifest-item-path {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-subtle);
+      margin: 3px 0 6px 0;
+    }
+
+    .manifest-item-desc {
+      font-size: 0.775rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .tabs-nav {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .tab-btn {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+
+    .tab-btn.active {
+      background: #1e293b;
+      color: #fff;
+      border-color: var(--border-focus);
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+    }
+
+    .trace-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 28px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+    }
+
+    .trace-header {
+      margin-bottom: 24px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .trace-title {
+      font-size: 1.35rem;
+      font-weight: 800;
+      margin-bottom: 6px;
+      color: #fff;
+    }
+
+    .trace-desc {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+
+    .flowchart-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 28px;
+    }
+
+    .flow-steps {
+      display: flex;
+      align-items: stretch;
+      gap: 10px;
+      overflow-x: auto;
+      padding: 4px 0 10px 0;
+    }
+
+    .flow-step-card {
+      flex: 1;
+      min-width: 200px;
+      background: #0f172a;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .flow-step-title {
+      font-weight: 700;
+      font-size: 0.9rem;
+      margin: 8px 0 4px 0;
+      color: #fff;
+    }
+
+    .flow-step-sub {
+      font-size: 0.775rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+      margin-bottom: 14px;
+      flex: 1;
+    }
+
+    .flow-arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-subtle);
+      font-size: 1.4rem;
+      padding: 0 4px;
+    }
+
+    .code-box-wrapper {
+      margin-top: 24px;
+      background: var(--bg-code);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .code-box-header {
+      background: #0f172a;
+      padding: 12px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .code-file-path {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: #cbd5e1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .code-header-link {
+      color: #38bdf8;
+      text-decoration: none;
+      font-weight: 600;
+      transition: color 0.15s ease;
+    }
+
+    .code-header-link:hover {
+      color: #93c5fd;
+      text-decoration: underline;
+    }
+
+    .btn-copy {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: var(--text-main);
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.15s ease;
+    }
+
+    .btn-copy:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .code-snippet {
+      padding: 18px 0;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      line-height: 1.6;
+    }
+
+    .code-line {
+      display: flex;
+      padding: 0 16px;
+    }
+
+    .code-line:hover {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .code-line.highlight {
+      background: rgba(59, 130, 246, 0.15);
+      border-left: 3px solid var(--layer-pres-blue);
+    }
+
+    .line-number {
+      width: 44px;
+      color: var(--text-subtle);
+      user-select: none;
+      text-align: right;
+      padding-right: 18px;
+      flex-shrink: 0;
+    }
+
+    .line-content {
+      flex: 1;
+      white-space: pre;
+    }
+
+    .token-keyword { color: #f43f5e; font-weight: 600; }
+    .token-type { color: #38bdf8; }
+    .token-func { color: #a78bfa; font-weight: 600; }
+    .token-string { color: #34d399; }
+    .token-comment { color: #64748b; font-style: italic; }
+    .token-num { color: #fbbf24; }
+
+    .callout-breakdown {
+      background: rgba(15, 23, 42, 0.7);
+      border-top: 1px solid var(--border-color);
+      padding: 16px 20px;
+    }
+
+    .callout-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #94a3b8;
+      margin-bottom: 12px;
+    }
+
+    .callout-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+    }
+
+    .callout-item {
+      background: var(--bg-card);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 0.8rem;
+      color: #cbd5e1;
+      line-height: 1.45;
+    }
+
+    .callout-badge {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 700;
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-bottom: 4px;
+    }
+
+    .rationale-card {
+      margin-top: 24px;
+      padding: 20px 24px;
+      background: rgba(245, 158, 11, 0.06);
+      border: 1px solid rgba(245, 158, 11, 0.25);
+      border-radius: 12px;
+      display: flex;
+      gap: 16px;
+    }
+
+    .rationale-icon {
+      font-size: 1.6rem;
+      color: #f59e0b;
+      line-height: 1;
+      margin-top: 2px;
+    }
+
+    .rationale-content h4 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #fbbf24;
+      margin-bottom: 6px;
+    }
+
+    .rationale-content p {
+      font-size: 0.875rem;
+      color: #e2e8f0;
+      line-height: 1.5;
+    }
+
+    .defense-pill {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: var(--bg-primary); }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+  </style>
+</head>
+<body>
+
+<!-- DYNAMIC WORKSPACE PATH BANNER -->
+<style>
+.billalert-workspace-banner {
+    position: sticky;
+    top: 0;
+    z-index: 99999;
+    background: linear-gradient(90deg, #0F172A, #1E1B4B);
+    border-bottom: 2px solid #6366F1;
+    padding: 8px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    font-size: 12px;
+    color: #E2E8F0;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+.billalert-workspace-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.billalert-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 700;
+    color: #A5B4FC;
+}
+.billalert-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #10B981;
+    box-shadow: 0 0 8px #10B981;
+}
+.billalert-workspace-input {
+    background: #090D16;
+    border: 1px solid #4338CA;
+    color: #38BDF8;
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 12px;
+    width: 440px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.billalert-workspace-input:focus {
+    border-color: #818CF8;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
+}
+.billalert-btn-save {
+    background: #4F46E5;
+    border: 1px solid #6366F1;
+    color: #fff;
+    padding: 5px 14px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.billalert-btn-save:hover {
+    background: #4338CA;
+}
+.billalert-btn-reset {
+    background: #334155;
+    border: 1px solid #475569;
+    color: #94A3B8;
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.billalert-btn-reset:hover {
+    background: #475569;
+    color: #fff;
+}
+.billalert-detection-badge {
+    font-size: 11px;
+    color: #A5B4FC;
+    white-space: nowrap;
+}
+.billalert-notification-toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: #10B981;
+    color: #0F172A;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 10px 18px;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    z-index: 100000;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.3s, transform 0.3s;
+    pointer-events: none;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+.billalert-notification-toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+</style>
+
+<div class="billalert-workspace-banner" id="billalertWorkspaceBanner">
+    <div class="billalert-workspace-controls">
+        <a href="INDEX_DEFENSE_HUB.html" style="color: #A5B4FC; text-decoration: none; font-weight: 700; margin-right: 8px; display: inline-flex; align-items: center; gap: 4px; background: rgba(99, 102, 241, 0.25); padding: 3px 10px; border-radius: 6px; border: 1px solid rgba(99, 102, 241, 0.4); font-size: 11px;">← Defense Hub</a>
+        <span class="billalert-status-pill">
+            <span class="billalert-status-dot"></span>
+            <span>Workspace:</span>
+        </span>
+        <input type="text" id="billalertLocalWorkspacePathInput" class="billalert-workspace-input" placeholder="Auto-detecting local repository path...">
+        <button class="billalert-btn-save" onclick="saveManualWorkspacePath()">Update Path</button>
+        <button class="billalert-btn-reset" onclick="resetAutoDetectedPath()">Reset Auto-Detect</button>
+    </div>
+    <span id="billalertPathDetectionStatus" class="billalert-detection-badge">⚡ Auto-detecting...</span>
+</div>
+<div id="billalertNotificationToast" class="billalert-notification-toast"></div>
+
+
+
+  <!-- Sticky Left Sidebar -->
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <div class="brand-title">
+        <span>⚡ BillAlert</span>
+        <span class="brand-badge">Admin Audit</span>
+      </div>
+      <div class="presenter-meta">
+        <strong>Presenter: Charles B. Carcallas</strong>
+        <span>Lead Architect &bull; Area President Module</span>
+        <div style="margin-top: 6px; font-size: 0.75rem; color: #38bdf8;">
+          Brgy. Tubod, Clarin, Bohol
+        </div>
+      </div>
+    </div>
+
+    <nav class="nav-sections">
+      <div class="nav-label">Interactive Defense</div>
+      <a class="nav-item active" onclick="scrollToSection('section-qa')">
+        <span class="icon">🎯</span> Instructor Q&A Quick Jump
+      </a>
+      <a class="nav-item" onclick="scrollToSection('section-manifest')">
+        <span class="icon">📂</span> Admin File Manifest (4-Layer)
+      </a>
+
+      <div class="nav-label">5 Main Admin Traces</div>
+      <a class="nav-item" onclick="switchTraceTab(0); scrollToSection('section-traces')">
+        <span class="icon">1️⃣</span> Post Amounts & Ceiling
+      </a>
+      <a class="nav-item" onclick="switchTraceTab(1); scrollToSection('section-traces')">
+        <span class="icon">2️⃣</span> Overdue & 48h Notices
+      </a>
+      <a class="nav-item" onclick="switchTraceTab(2); scrollToSection('section-traces')">
+        <span class="icon">3️⃣</span> Staff Account Provisioning
+      </a>
+      <a class="nav-item" onclick="switchTraceTab(3); scrollToSection('section-traces')">
+        <span class="icon">4️⃣</span> Household & Login Setup
+      </a>
+      <a class="nav-item" onclick="switchTraceTab(4); scrollToSection('section-traces')">
+        <span class="icon">5️⃣</span> Reserve Fund & Settlements
+      </a>
+
+      <div class="nav-label">Core Invariants</div>
+      <a class="nav-item" onclick="scrollToSection('section-invariants')">
+        <span class="icon">🛡️</span> Architectural Guardrails
+      </a>
+    </nav>
+  </aside>
+
+  <!-- Main Content View -->
+  <main id="main-content">
+    
+    <!-- Top Defense Banner -->
+    <header class="top-banner">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div>
+          <h1>
+            Admin (Area President) Defense Dashboard
+            <span class="role-badge">AdminUser &bull; /admin</span>
+          </h1>
+          <p>
+            Comprehensive technical auditor interface designed for live oral examination of the 
+            <strong>BillAlert</strong> application architecture. Verified against Dart 3.12, Flutter 3.44, 
+            PostgreSQL 15, and Deno Edge Functions in Barangay Tubod, Clarin, Bohol.
+          </p>
+        </div>
+        <div style="text-align: right;">
+          <div class="defense-pill">610 / 610 Tests Passing</div>
+          <div style="font-size: 0.75rem; color: var(--text-subtle); margin-top: 4px;">Zero Floating-Point Invariant Active</div>
+        </div>
+      </div>
+
+      <div class="layer-legend">
+        <span class="layer-tag pres">🔵 Presentation (UI / Controller / Router)</span>
+        <span class="layer-tag dom">🟣 Domain (Pure Dart &bull; Entities &bull; UseCases)</span>
+        <span class="layer-tag data">🟠 Data & Outbox (Drift &bull; SQLCipher &bull; Gateways)</span>
+        <span class="layer-tag sql">🟢 Supabase Backend (PostgreSQL RPC &bull; RLS &bull; Deno Edge)</span>
+      </div>
+    </header>
+
+    <!-- SECTION 1: INSTRUCTOR Q&A QUICK-JUMP SEARCH TABLE -->
+    <section id="section-qa" class="search-card">
+      <div class="search-header">
+        <div>
+          <h2>🎯 Instant Instructor Q&A Quick-Jump Matrix</h2>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">
+            Filter in real-time during live defense by typing any keyword (e.g. <em>ceiling, 48 hour, pondo, rls, outbox, password</em>).
+          </p>
+        </div>
+        <span id="search-counter" style="font-size: 0.8rem; font-weight: 700; color: #38bdf8;">Showing all 26 defense items</span>
+      </div>
+
+      <div class="search-input-wrapper">
+        <span class="search-icon">🔍</span>
+        <input 
+          type="text" 
+          id="qa-search" 
+          class="search-input" 
+          placeholder="Type keyword or instructor question to jump instantly to source code and defense answer..." 
+          onkeyup="filterQATable()"
+        >
+      </div>
+
+      <div class="table-container">
+        <table class="data-table" id="qa-table">
+          <thead>
+            <tr>
+              <th style="width: 20%;">Instructor Question / Screen Context</th>
+              <th style="width: 12%;">Layer</th>
+              <th style="width: 22%;">Key Symbol / Constraint</th>
+              <th style="width: 14%;">One-Click VS Code Link</th>
+              <th style="width: 32%;">1-Sentence Defense Soundbite</th>
+            </tr>
+          </thead>
+          <tbody>
+
+            <tr data-keywords="ceiling whole peso round money centavos 499 500 rounding difference pondo">
+              <td><strong>Whole-Peso Ceiling Rule</strong><br><small style="color:var(--text-subtle);">Admin › Amounts entry</small></td>
+              <td><span class="layer-tag dom">Domain</span></td>
+              <td><span class="code-pill">Money.roundUpToWholePeso()</span></td>
+              <td><a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/value_objects/money.dart:86">money.dart:86</a></td>
+              <td>Exact pesos stay unchanged, while any centavo fraction (e.g. ₱499.01) is rounded UP to the next integer peso (₱500.00) using integer arithmetic (centavos % 100) to fund the Reserve Fund (&quot;Pondo&quot;).</td>
+            </tr>
+
+            <tr data-keywords="tariff derivation multiply rate kwh calculate consumption transcription cooperative boheco">
+              <td><strong>Why no kWh-to-Peso tariff formula in Dart?</strong><br><small style="color:var(--text-subtle);">Architecture Invariant</small></td>
+              <td><span class="layer-tag dom">Domain</span></td>
+              <td><span class="code-pill">PostBillAmount</span></td>
+              <td><a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/usecases/admin/post_bill_amount.dart:17">post_bill_amount.dart:17</a></td>
+              <td>BillAlert is a transcription-first system; power rates and cooperative surcharges fluctuate monthly and are printed by BOHECO I, so the app transcribes verified figures rather than hallucinating tariff rates.</td>
+            </tr>
+
+            <tr data-keywords="pricing consistent constraint unpriced null bills check half state">
+              <td><strong>How is a half-priced bill prevented in the DB?</strong><br><small style="color:var(--text-subtle);">Database Invariant</small></td>
+              <td><span class="layer-tag sql">Supabase SQL</span></td>
+              <td><span class="code-pill">bills_pricing_consistent</span></td>
+              <td><a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/01_schema.sql:359">01_schema.sql:359</a></td>
+              <td>Database CHECK constraint mandates that total_amount, due_date, and priced_at are either ALL NULL (unpriced state) or ALL SET simultaneously, eliminating corrupt partial billing states.</td>
+            </tr>
+
+            <tr data-keywords="rpc post amount transaction lock for update ceiling notification ready">
+              <td><strong>What happens atomically when the Admin posts?</strong><br><small style="color:var(--text-subtle);">PostgreSQL Transaction</small></td>
+              <td><span class="layer-tag sql">Supabase SQL</span></td>
+              <td><span class="code-pill">fn_post_bill_amount()</span></td>
+              <td><a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/17_bill_cooperative_amount.sql:64">17_bill_cooperative_amount.sql:64</a></td>
+              <td>Locks the bill FOR UPDATE, applies ceil(p_amount), persists both total_amount and raw cooperative_amount, and automatically queues the consumer&#x27;s bill-ready notification in a single atomic transaction.</td>
+            </tr>
+
+            <tr data-keywords="48 hour statutory erc lawful disconnection window holidays weekend 3pm courtesy">
+              <td><strong>ERC 48-Hour Statutory Notice Calculation</strong><br><small style="color:var(--text-subtle);">Disconnection Law</small></td>
+              <td><span class="layer-tag sql">Supabase SQL</span></td>
+              <td><span class="code-pill">fn_earliest_lawful_disconnection()</span></td>
+              <td><a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/02_functions.sql:136">02_functions.sql:136</a></td>
+              <td>Adds 48 courtesy hours in Asia/Manila, checks business operating hours (8:00 AM - 3:00 PM), and automatically rolls the deadline forward if it lands on a weekend or Philippine legal holiday.</td>
+            </tr>
+
+            <tr data-keywords="captured_at offline sync timestamp lawful notice legal clock client uuid">
+              <td><strong>Why stamp capturedAt on device instead of now() on server?</strong><br><small style="color:var(--text-subtle);">Legal Semantics</small></td>
+              <td><span class="layer-tag dom">Domain</span></td>
+              <td><span class="code-pill">IssueNoticeOperation.capturedAt</span></td>
+              <td><a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/usecases/admin/issue_disconnection_notice.dart:14">issue_disconnection_notice.dart:14</a></td>
+              <td>If server sync time were used, a notice served offline on Friday afternoon would illegally rob the consumer of hours from their 48-hour statutory grace period; the device capture timestamp preserves the legal moment of service.</td>
+            </tr>
+
+            <tr data-keywords="superuser admin role rls area president scope staff_in_area boundaries">
+              <td><strong>Is the Admin a superuser across the whole barangay?</strong><br><small style="color:var(--text-subtle);">Security Architecture</small></td>
+              <td><span class="layer-tag sql">Supabase SQL</span></td>
+              <td><span class="code-pill">app.staff_in_area()</span></td>
+              <td><a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/04_rls.sql:11">04_rls.sql:11</a></td>
+              <td>No; the Admin is an Area President strictly confined to their own designated service area (1 through 4) via Row-Level Security policies that filter all writes by area_id = app.current_area().</td>
+            </tr>
+
+            <tr data-keywords="unique index staff role active cashier reader president uq_area_one_active_staff_per_role">
+              <td><strong>How is &quot;One Active Staff per Role per Area&quot; enforced?</strong><br><small style="color:var(--text-subtle);">Concurrency Control</small></td>
+              <td><span class="layer-tag sql">Supabase SQL</span></td>
+              <td><span class="code-pill">uq_area_one_active_staff_per_role</span></td>
+              <td><a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/01_schema.sql:218">01_schema.sql:218</a></td>
+              <td>A partial unique index on profiles(area_id, role) WHERE account_status = &#x27;active&#x27; mechanically prevents having more than one active Admin, Meter Reader, or Cashier in the same area.</td>
+            </tr>
+
+            <tr data-keywords="temporary password change gen-04 must_change_password security trap lockout">
+              <td><strong>How does temporary password security work? (GEN-04)</strong><br><small style="color:var(--text-subtle);">Auth Security</small></td>
+              <td><span class="layer-tag pres">Presentation</span></td>
+              <td><span class="code-pill">routerProvider · GEN-04</span></td>
+              <td><a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/router.dart:343">router.dart:343</a></td>
+              <td>When user.mustChangePassword == true, the GoRouter redirect traps the user exclusively on /change-password with zero navigation escape routes until a secret password is submitted.</td>
+            </tr>
+
+            <tr data-keywords="synthetic email mailbox username billalert.local auth identity emailforusername">
+              <td><strong>Why use synthetic email (username@billalert.local)?</strong><br><small style="color:var(--text-subtle);">Identity Architecture</small></td>
+              <td><span class="layer-tag data">Data</span></td>
+              <td><span class="code-pill">AuthRepositoryImpl.emailForUsername</span></td>
+              <td><a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/repositories/auth_repository_impl.dart:54">auth_repository_impl.dart:54</a></td>
+              <td>Rural consumers in Barangay Tubod do not manage email mailboxes; the system maps simple usernames into an internal synthetic domain for Supabase Auth while temporary passwords are handed over in person.</td>
+            </tr>
+
+            <tr data-keywords="pondo reserve fund rounding share credit cashier receipt regular transaction">
+              <td><strong>Where does the Reserve Fund (&quot;Pondo&quot;) cash come from?</strong><br><small style="color:var(--text-subtle);">Financial Flow</small></td>
+              <td><span class="layer-tag sql">Supabase SQL</span></td>
+              <td><span class="code-pill">fn_record_payment() rounding</span></td>
+              <td><a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/20261007105843_regular_rounding_reserve_credit.sql:44">20261007105843_regular_rounding_reserve_credit.sql:44</a></td>
+              <td>During regular cash settlement, the trigger extracts amount_paid - boheco_share and writes an atomic &#x27;rounding&#x27; credit line into pondo_ledger to build community liquidity.</td>
+            </tr>
+
+            <tr data-keywords="reader compensation 500 salary transport pondo reverse admin payout">
+              <td><strong>Who pays and reverses Meter Reader monthly compensation?</strong><br><small style="color:var(--text-subtle);">Staff Payroll</small></td>
+              <td><span class="layer-tag sql">Supabase SQL</span></td>
+              <td><span class="code-pill">fn_reverse_reader_compensation</span></td>
+              <td><a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/20261004070000_reader_monthly_compensation.sql:37">20261004070000_reader_monthly_compensation.sql:37</a></td>
+              <td>The Cashier initiates the ₱500 monthly payout (₱200 salary + ₱300 transport), but ONLY the Area President (Admin) is authorized to execute fn_reverse_reader_compensation if cash handover fails.</td>
+            </tr>
+
+            <tr data-keywords="view security invoker postgres bypass rls caller privileges leak">
+              <td><strong>Why are all SQL views set to security_invoker = on?</strong><br><small style="color:var(--text-subtle);">Database Security</small></td>
+              <td><span class="layer-tag sql">Supabase SQL</span></td>
+              <td><span class="code-pill">security_invoker = on</span></td>
+              <td><a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/03_views.sql:390">03_views.sql:390</a></td>
+              <td>Postgres views default to running as the table owner (postgres), bypassing RLS entirely; setting security_invoker = on forces all PostgREST view queries to evaluate the caller&#x27;s JWT permissions.</td>
+            </tr>
+
+            <tr data-keywords="result error exception ok err sealed try catch failure boundary">
+              <td><strong>Why does BillAlert use sealed Result&lt;T&gt; instead of throwing?</strong><br><small style="color:var(--text-subtle);">Error Handling</small></td>
+              <td><span class="layer-tag dom">Core / Domain</span></td>
+              <td><span class="code-pill">sealed class Result&lt;T&gt;</span></td>
+              <td><a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/core/result/result.dart:19">result.dart:19</a></td>
+              <td>Compiler-enforced exhaustiveness via pattern matching ensures every error path (Validation, Permission, Conflict, Network) is handled gracefully without crashing the UI with uncaught runtime exceptions.</td>
+            </tr>
+
+            <tr data-keywords="failure mapper postgrest exception postgres sqlstate code isolation">
+              <td><strong>Where is raw Postgres SQLSTATE mapped into UI failures?</strong><br><small style="color:var(--text-subtle);">Architectural Isolation</small></td>
+              <td><span class="layer-tag data">Data</span></td>
+              <td><span class="code-pill">FailureMapper.from()</span></td>
+              <td><a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/supabase/failure_mapper.dart:15">failure_mapper.dart:15</a></td>
+              <td>FailureMapper is the single gatekeeper that inspects Postgres codes (e.g. 23505 unique violation, P0001 raise exception) and maps them into safe, human-readable AppFailure objects.</td>
+            </tr>
+
+            <tr data-keywords="service role key edge function deno token admin create staff">
+              <td><strong>Why are staff created via Deno Edge Function instead of client SDK?</strong><br><small style="color:var(--text-subtle);">Credential Security</small></td>
+              <td><span class="layer-tag sql">Deno Edge</span></td>
+              <td><span class="code-pill">create-staff-account</span></td>
+              <td><a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/functions/create-staff-account/index.ts:18">index.ts:18</a></td>
+              <td>The high-privilege SUPABASE_SERVICE_ROLE_KEY must NEVER ship inside mobile app binaries; the Deno Edge Function validates the caller&#x27;s Admin JWT before invoking the Auth admin API server-side.</td>
+            </tr>
+
+            <tr data-keywords="double float binary money centavos rounding drift precision 0.1">
+              <td><strong>Why is binary float / double forbidden for Money?</strong><br><small style="color:var(--text-subtle);">Data Type Invariant</small></td>
+              <td><span class="layer-tag dom">Domain</span></td>
+              <td><span class="code-pill">Money(int centavos)</span></td>
+              <td><a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/value_objects/money.dart:11">money.dart:11</a></td>
+              <td>IEEE-754 binary floating-point accumulates precision drift on decimal fractions (e.g. 0.10 + 0.20 != 0.30); storing an immutable integer count of centavos guarantees exact arithmetic down to the last centavo.</td>
+            </tr>
+
+            <tr data-keywords="outbox offline sync drain queue sqlite encrypted sqlcipher syncservice">
+              <td><strong>How does the offline Outbox pipeline work?</strong><br><small style="color:var(--text-subtle);">Offline-First</small></td>
+              <td><span class="layer-tag data">Data / Outbox</span></td>
+              <td><span class="code-pill">SyncService._drain()</span></td>
+              <td><a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/sync/sync_service.dart:105">sync_service.dart:105</a></td>
+              <td>User submissions write immediately to the encrypted SQLite OutboxRows table; when network is detected, SyncService serializedly drains pending rows through SupabaseOutboxGateway with client UUIDs.</td>
+            </tr>
+
+            <tr data-keywords="idempotent client_uuid duplicate network drop retry safe">
+              <td><strong>How does client_uuid ensure idempotent RPC retry?</strong><br><small style="color:var(--text-subtle);">Distributed Systems</small></td>
+              <td><span class="layer-tag sql">Supabase SQL</span></td>
+              <td><span class="code-pill">p_client_uuid parameter</span></td>
+              <td><a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/02_functions.sql:575">02_functions.sql:575</a></td>
+              <td>Every phone mints a client UUID when saving locally; if sync drops mid-flight and retries, PostgreSQL locates the existing client_uuid and returns the existing record rather than double-inserting.</td>
+            </tr>
+
+            <tr data-keywords="notice document elapsed ready to close 48 hours clock server truth">
+              <td><strong>Does NoticeDocumentScreen check elapsed time via phone clock?</strong><br><small style="color:var(--text-subtle);">Clock Independence</small></td>
+              <td><span class="layer-tag pres">Presentation</span></td>
+              <td><span class="code-pill">NoticeDocumentScreen · elapsed</span></td>
+              <td><a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/admin/notice_document_screen.dart:16">notice_document_screen.dart:16</a></td>
+              <td>No; the screen strictly renders the server&#x27;s computed notice_period_elapsed boolean from v_active_disconnection_warnings to prevent a user from tampering with their phone clock to trigger disconnections.</td>
+            </tr>
+
+            <tr data-keywords="revise due date rejected past offline sync outbox edit post">
+              <td><strong>What happens if an Admin posts offline and the due date passes?</strong><br><small style="color:var(--text-subtle);">Edge Case Handling</small></td>
+              <td><span class="layer-tag data">Data</span></td>
+              <td><span class="code-pill">reviseRejectedDueDate()</span></td>
+              <td><a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/repositories/outbox_repository_impl.dart:40">outbox_repository_impl.dart:40</a></td>
+              <td>If the server rejects a sync because the due date expired while queued, OutboxRepositoryImpl.reviseRejectedDueDate() allows the Admin to supply a fresh valid due date without losing the record.</td>
+            </tr>
+
+            <tr data-keywords="time zone asia/manila pst utc+8 clock phclock dst phdate">
+              <td><strong>How is Philippine Time consistently guaranteed?</strong><br><small style="color:var(--text-subtle);">Time Management</small></td>
+              <td><span class="layer-tag dom">Domain</span></td>
+              <td><span class="code-pill">PhDate &amp; PhClock</span></td>
+              <td><a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/value_objects/ph_date.dart:15">ph_date.dart:15</a></td>
+              <td>All calendar cycles and deadlines are explicitly anchored to fixed UTC+08:00 (Asia/Manila) with zero daylight savings adjustments, eliminating server/client timezone drift.</td>
+            </tr>
+
+            <tr data-keywords="household registration split login two phase createconsumer createlogin">
+              <td><strong>Why are household creation and login provisioning decoupled?</strong><br><small style="color:var(--text-subtle);">Resilient Provisioning</small></td>
+              <td><span class="layer-tag dom">Domain</span></td>
+              <td><span class="code-pill">RegisterHousehold</span></td>
+              <td><a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/usecases/admin/register_household.dart:30">register_household.dart:30</a></td>
+              <td>Creating a household is a client-level RLS operation, but creating an auth login requires Edge Function service credentials; separating them ensures a taken username does not wipe out a valid registered household record.</td>
+            </tr>
+
+            <tr data-keywords="close notice outcome settled cancelled referred evidence receipt">
+              <td><strong>What prevents an Admin from falsely marking a notice &quot;Settled&quot;?</strong><br><small style="color:var(--text-subtle);">Statutory Audit</small></td>
+              <td><span class="layer-tag sql">Supabase SQL</span></td>
+              <td><span class="code-pill">fn_close_disconnection_notice</span></td>
+              <td><a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/02_functions.sql:633">02_functions.sql:633</a></td>
+              <td>The notice review view (fn_notice_review) cross-checks all overdue bills against settled receipts; &quot;Settled&quot; cannot be chosen in UI or stored procedure unless official cash payment receipts exist.</td>
+            </tr>
+
+            <tr data-keywords="dependency inversion rule pure dart imports architecture domain imports nothing">
+              <td><strong>How is the Clean Architecture Inward Dependency Rule proven?</strong><br><small style="color:var(--text-subtle);">Architecture Enforcement</small></td>
+              <td><span class="layer-tag dom">Test / Architecture</span></td>
+              <td><span class="code-pill">domain_has_no_dependencies_test</span></td>
+              <td><a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/test/architecture/domain_has_no_dependencies_test.dart:1">domain_has_no_dependencies_test.dart:1</a></td>
+              <td>Automated architectural guard tests mechanically inspect all AST imports in lib/domain/ and fail the build if Flutter, Supabase, Drift, HTTP or even intl are referenced.</td>
+            </tr>
+
+            <tr data-keywords="account management transfer president handover activity audit">
+              <td><strong>How does the Admin manage account handovers and transfers?</strong><br><small style="color:var(--text-subtle);">Account Lifecycle</small></td>
+              <td><span class="layer-tag data">Data</span></td>
+              <td><span class="code-pill">AccountManagementRepository</span></td>
+              <td><a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/repositories/account_management_repository.dart:14">account_management_repository.dart:14</a></td>
+              <td>Admin executes fn_manage_account, fn_assign_staff, and president successor transfers via AccountManagementRepository with audit trail logging in settlement_audit and Deno manage-accounts.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SECTION 2: COMPLETE ADMIN FILE MANIFEST -->
+    <section id="section-manifest" style="margin-bottom: 40px;">
+      <div style="margin-bottom: 20px;">
+        <h2 style="font-size: 1.4rem; font-weight: 800; display: flex; align-items: center; gap: 10px;">
+          📂 Complete Admin File Manifest (Categorized Across 4 Layers)
+        </h2>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">
+          Every file touched or operated by the Area President (Admin) role. Click any button to open directly in VS Code.
+        </p>
+      </div>
+
+      <div class="manifest-grid">
+
+        <div class="manifest-card">
+          <div class="manifest-card-title">
+            <span class="layer-tag pres">Presentation</span>
+            <span>Presentation Layer (UI, Controllers &amp; Routing) (22 files)</span>
+          </div>
+          
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">PostBillAmountScreen &amp; Controller</div>
+              <div class="manifest-item-path">lib/presentation/admin/post_bill_amount_screen.dart:31</div>
+              <div class="manifest-item-desc">Queue of unpriced meter captures; whole-peso ceiling preview button; due date picker with today barrier.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/admin/post_bill_amount_screen.dart:31">Open :31</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">PostBillAmountController</div>
+              <div class="manifest-item-path">lib/presentation/admin/post_bill_amount_controller.dart:68</div>
+              <div class="manifest-item-desc">Riverpod Notifier managing queue state, text-to-Money parsing, and auto-sync queue drain.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/admin/post_bill_amount_controller.dart:68">Open :68</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">AdminOverdueWorkspaceScreen</div>
+              <div class="manifest-item-path">lib/presentation/admin/overdue_workspace_screen.dart:79</div>
+              <div class="manifest-item-desc">Comprehensive overdue delinquent household workspace, notice history, and BOHECO cutoff trip management.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/admin/overdue_workspace_screen.dart:79">Open :79</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">ServeNoticeScreen &amp; Controller</div>
+              <div class="manifest-item-path">lib/presentation/admin/serve_notice_screen.dart:21</div>
+              <div class="manifest-item-desc">Statutory disconnection notice issuance stamping local device capture time for the legal 48-hour clock.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/admin/serve_notice_screen.dart:21">Open :21</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">ServeNoticeController</div>
+              <div class="manifest-item-path">lib/presentation/admin/serve_notice_controller.dart:101</div>
+              <div class="manifest-item-desc">Loads overdue households, filters blocked cases, validates notice issuance, and triggers outbox sync.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/admin/serve_notice_controller.dart:101">Open :101</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">NoticeDocumentScreen</div>
+              <div class="manifest-item-path">lib/presentation/admin/notice_document_screen.dart:16</div>
+              <div class="manifest-item-desc">Official statutory notice document rendering server-evaluated lawful deadline and notice_period_elapsed flag.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/admin/notice_document_screen.dart:16">Open :16</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">NoticeDocumentController</div>
+              <div class="manifest-item-path">lib/presentation/admin/notice_document_controller.dart:40</div>
+              <div class="manifest-item-desc">Loads notice review details, validates closure outcomes, and coordinates online RPC execution.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/admin/notice_document_controller.dart:40">Open :40</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">AdminAccountsScreen</div>
+              <div class="manifest-item-path">lib/presentation/admin/accounts_screen.dart:8</div>
+              <div class="manifest-item-desc">Primary hub for staff provisioning, account lifecycle, successor transfer, and role auditing.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/admin/accounts_screen.dart:8">Open :8</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">AccountManagementScreen</div>
+              <div class="manifest-item-path">lib/presentation/admin/account_management_screen.dart:18</div>
+              <div class="manifest-item-desc">Multi-page management workspace for staff assignment, president transfer, and account activity.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/admin/account_management_screen.dart:18">Open :18</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">AccountManagementProviders</div>
+              <div class="manifest-item-path">lib/presentation/admin/account_management_providers.dart:14</div>
+              <div class="manifest-item-desc">Riverpod providers managing account rows, transfer requests, and waiver histories.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/admin/account_management_providers.dart:14">Open :14</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">AdminCreateAccountScreen</div>
+              <div class="manifest-item-path">lib/presentation/admin/create_account_screen.dart:4</div>
+              <div class="manifest-item-desc">Entry route for provisioning new staff or consumer household profiles in the service area.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/admin/create_account_screen.dart:4">Open :4</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">AdminNewStaffController</div>
+              <div class="manifest-item-path">lib/presentation/admin/new_staff_controller.dart:24</div>
+              <div class="manifest-item-desc">Handles staff creation form validation, role assignment (reader/cashier), and temporary password display.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/admin/new_staff_controller.dart:24">Open :24</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">AdminResetPasswordController</div>
+              <div class="manifest-item-path">lib/presentation/admin/reset_password_controller.dart:53</div>
+              <div class="manifest-item-desc">Admin-initiated password reset controller generating temporary passwords with forced change flag.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/admin/reset_password_controller.dart:53">Open :53</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">AdminResetPasswordScreen</div>
+              <div class="manifest-item-path">lib/presentation/admin/reset_password_screen.dart:16</div>
+              <div class="manifest-item-desc">Form allowing Area President to select a staff member or consumer and reset their forgotten password.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/admin/reset_password_screen.dart:16">Open :16</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">AdminHouseholdLoginController</div>
+              <div class="manifest-item-path">lib/presentation/admin/household_login_controller.dart:53</div>
+              <div class="manifest-item-desc">Provisions smartphone credentials for an existing unlinked household in the Admin&#x27;s area.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/admin/household_login_controller.dart:53">Open :53</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">AdminNewConsumerController</div>
+              <div class="manifest-item-path">lib/presentation/admin/new_consumer_controller.dart:31</div>
+              <div class="manifest-item-desc">Controller coordinating two-phase consumer record creation followed by auth account generation.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/admin/new_consumer_controller.dart:31">Open :31</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">LinkedAccountScreen</div>
+              <div class="manifest-item-path">lib/presentation/admin/linked_account_screen.dart:18</div>
+              <div class="manifest-item-desc">Combined registration form capturing consumer number, names, meter serial, purok, and login username.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/admin/linked_account_screen.dart:18">Open :18</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">ReserveFundReportScreen</div>
+              <div class="manifest-item-path">lib/presentation/admin/reserve_fund_report_screen.dart:7</div>
+              <div class="manifest-item-desc">Community liquidity audit view verifying &#x27;Pondo&#x27; ledger entries, BOHECO trips, and Reader payroll.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/admin/reserve_fund_report_screen.dart:7">Open :7</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">SettlementPanel</div>
+              <div class="manifest-item-path">lib/presentation/common/settlement_panel.dart:63</div>
+              <div class="manifest-item-desc">Shared trip workspace: Cashier allocates, Reader confirms, Admin reviews and reverses compensation.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/common/settlement_panel.dart:63">Open :63</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">BillingScheduleScreen</div>
+              <div class="manifest-item-path">lib/presentation/admin/billing_schedule_screen.dart:25</div>
+              <div class="manifest-item-desc">Schedule workspace configuring monthly reading dates, payment windows, and cutoff deadlines.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/admin/billing_schedule_screen.dart:25">Open :25</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">GoRouter &amp; Admin Route Guards</div>
+              <div class="manifest-item-path">lib/presentation/router.dart:114</div>
+              <div class="manifest-item-desc">ShellRoute tab binding, /admin route guards, forced password change lockout (GEN-04), and mayVisit().</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/router.dart:114">Open :114</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">Admin Riverpod Providers Registry</div>
+              <div class="manifest-item-path">lib/presentation/providers.dart:191</div>
+              <div class="manifest-item-desc">Inward dependency binding for PostBillAmount, IssueDisconnectionNotice, and RecordNoticeOutcome.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/providers.dart:191">Open :191</a>
+          </div>
+        </div>
+
+        <div class="manifest-card">
+          <div class="manifest-card-title">
+            <span class="layer-tag dom">Domain</span>
+            <span>Domain Layer (Pure Dart Use Cases &amp; Entities) (13 files)</span>
+          </div>
+          
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">PostBillAmount Use Case</div>
+              <div class="manifest-item-path">lib/domain/usecases/admin/post_bill_amount.dart:24</div>
+              <div class="manifest-item-desc">Enforces whole-peso ceiling, checks positive amount, prevents past due dates, and enqueues PostAmountOperation.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/usecases/admin/post_bill_amount.dart:24">Open :24</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">IssueDisconnectionNotice Use Case</div>
+              <div class="manifest-item-path">lib/domain/usecases/admin/issue_disconnection_notice.dart:20</div>
+              <div class="manifest-item-desc">Verifies active household, prevents duplicate outbox notices, and stamps device capturedAt timestamp.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/usecases/admin/issue_disconnection_notice.dart:20">Open :20</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">RecordNoticeOutcome Use Case</div>
+              <div class="manifest-item-path">lib/domain/usecases/admin/issue_disconnection_notice.dart:91</div>
+              <div class="manifest-item-desc">Online-only notice closure (settled, cancelled, referred); owned by Charles with no outbox queueing.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/usecases/admin/issue_disconnection_notice.dart:91">Open :91</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">CreateStaffAccount Use Case</div>
+              <div class="manifest-item-path">lib/domain/usecases/admin/create_staff_account.dart:14</div>
+              <div class="manifest-item-desc">Validates username regex, generates temporary password via factory, and delegates to AuthRepository.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/usecases/admin/create_staff_account.dart:14">Open :14</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">RegisterHousehold Use Case</div>
+              <div class="manifest-item-path">lib/domain/usecases/admin/register_household.dart:35</div>
+              <div class="manifest-item-desc">Coordinates two-phase registration: persists consumer record under RLS, then provisions auth credentials.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/usecases/admin/register_household.dart:35">Open :35</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">CreateConsumer Use Case</div>
+              <div class="manifest-item-path">lib/domain/usecases/admin/create_consumer.dart:13</div>
+              <div class="manifest-item-desc">Persists physical consumer details (meter serial, consumer no, purok) without requiring mobile credentials.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/usecases/admin/create_consumer.dart:13">Open :13</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">CreateHouseholdLogin Use Case</div>
+              <div class="manifest-item-path">lib/domain/usecases/admin/create_household_login.dart:17</div>
+              <div class="manifest-item-desc">Validates username format and calls Edge Function to provision auth account for registered household.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/usecases/admin/create_household_login.dart:17">Open :17</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">ResetAccountPassword Use Case</div>
+              <div class="manifest-item-path">lib/domain/usecases/admin/reset_account_password.dart:14</div>
+              <div class="manifest-item-desc">Generates secure temporary password and flags account for forced replacement upon sign-in (GEN-04).</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/usecases/admin/reset_account_password.dart:14">Open :14</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">Money Value Object &amp; Ceiling</div>
+              <div class="manifest-item-path">lib/domain/value_objects/money.dart:11</div>
+              <div class="manifest-item-desc">Immutable centavo integer arithmetic; roundUpToWholePeso() at line 86 implements whole-peso ceiling.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/value_objects/money.dart:11">Open :11</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">Bill Entity &amp; Invariants</div>
+              <div class="manifest-item-path">lib/domain/entities/bill.dart:21</div>
+              <div class="manifest-item-desc">Owns isUnpriced state meaning; reflects database bills_pricing_consistent constraint.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/entities/bill.dart:21">Open :21</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">AdminUser Entity</div>
+              <div class="manifest-item-path">lib/domain/entities/app_user.dart:92</div>
+              <div class="manifest-item-desc">Role code &#x27;admin&#x27;, homeRoute &#x27;/admin&#x27;, permittedTabs: Amounts, Follow-up, Accounts, Profile.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/entities/app_user.dart:92">Open :92</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">PostAmountOperation &amp; IssueNoticeOperation</div>
+              <div class="manifest-item-path">lib/domain/outbox/outbox_operation.dart:101</div>
+              <div class="manifest-item-desc">Outbox operations carrying clientUuid and capturedAt for idempotent, offline-first synchronization.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/outbox/outbox_operation.dart:101">Open :101</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">PhDate &amp; PhClock Value Objects</div>
+              <div class="manifest-item-path">lib/domain/value_objects/ph_date.dart:13</div>
+              <div class="manifest-item-desc">PST calendar dates fixed to UTC+08:00 (Asia/Manila) with zero daylight saving adjustments.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/value_objects/ph_date.dart:13">Open :13</a>
+          </div>
+        </div>
+
+        <div class="manifest-card">
+          <div class="manifest-card-title">
+            <span class="layer-tag data">Data</span>
+            <span>Data Layer (Repositories, Outbox &amp; Gateways) (8 files)</span>
+          </div>
+          
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">BillRepositoryImpl</div>
+              <div class="manifest-item-path">lib/data/repositories/bill_repository_impl.dart:52</div>
+              <div class="manifest-item-desc">Queries v_readings_awaiting_amount at line 143; caches unpriced billing records.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/repositories/bill_repository_impl.dart:52">Open :52</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">NoticeRepositoryImpl</div>
+              <div class="manifest-item-path">lib/data/repositories/notice_repository_impl.dart:19</div>
+              <div class="manifest-item-desc">Queries v_active_disconnection_warnings at line 37; calls fn_close_disconnection_notice at line 184.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/repositories/notice_repository_impl.dart:19">Open :19</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">AccountManagementRepository</div>
+              <div class="manifest-item-path">lib/data/repositories/account_management_repository.dart:14</div>
+              <div class="manifest-item-desc">Manages staff assignments, waivers, handovers, and bridges to manage-accounts Edge Function.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/repositories/account_management_repository.dart:14">Open :14</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">AuthRepositoryImpl</div>
+              <div class="manifest-item-path">lib/data/repositories/auth_repository_impl.dart:33</div>
+              <div class="manifest-item-desc">emailForUsername at line 54; createStaffAccount at line 242; resetAccountPassword at line 338.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/repositories/auth_repository_impl.dart:33">Open :33</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">ConsumerRepositoryImpl</div>
+              <div class="manifest-item-path">lib/data/repositories/consumer_repository_impl.dart:42</div>
+              <div class="manifest-item-desc">Inserts consumer records under RLS; catches 23505 unique constraint violations.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/repositories/consumer_repository_impl.dart:42">Open :42</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">OutboxRepositoryImpl</div>
+              <div class="manifest-item-path">lib/data/repositories/outbox_repository_impl.dart:21</div>
+              <div class="manifest-item-desc">Encrypted SQLite storage using SQLCipher; reviseRejectedDueDate() at line 40.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/repositories/outbox_repository_impl.dart:21">Open :21</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">SupabaseOutboxGateway</div>
+              <div class="manifest-item-path">lib/data/sync/supabase_outbox_gateway.dart:13</div>
+              <div class="manifest-item-desc">Directs PostAmountOperation (line 46) and IssueNoticeOperation (line 94) to matching Supabase RPCs.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/sync/supabase_outbox_gateway.dart:13">Open :13</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">SettlementRepository</div>
+              <div class="manifest-item-path">lib/data/repositories/settlement_repository.dart:17</div>
+              <div class="manifest-item-desc">Queries fn_settlement_snapshot at line 22; calls fn_reverse_reader_compensation at line 37.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/repositories/settlement_repository.dart:17">Open :17</a>
+          </div>
+        </div>
+
+        <div class="manifest-card">
+          <div class="manifest-card-title">
+            <span class="layer-tag sql">Supabase Backend</span>
+            <span>Supabase Backend (RPCs, Views, Schema &amp; Edge) (16 files)</span>
+          </div>
+          
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">v_readings_awaiting_amount View</div>
+              <div class="manifest-item-path">supabase/migrations/03_views.sql:84</div>
+              <div class="manifest-item-desc">Admin&#x27;s unpriced billing queue sorted oldest-first with security_invoker = on.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/03_views.sql:84">Open :84</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">v_active_disconnection_warnings View</div>
+              <div class="manifest-item-path">supabase/migrations/03_views.sql:245</div>
+              <div class="manifest-item-desc">Active notices with server-side notice_period_elapsed calculation and overdue amounts.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/03_views.sql:245">Open :245</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">security_invoker = on Declarations</div>
+              <div class="manifest-item-path">supabase/migrations/03_views.sql:390</div>
+              <div class="manifest-item-desc">Explicit configuration forcing PostgREST views to evaluate caller JWT against table RLS.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/03_views.sql:390">Open :390</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">fn_post_bill_amount RPC</div>
+              <div class="manifest-item-path">supabase/migrations/17_bill_cooperative_amount.sql:64</div>
+              <div class="manifest-item-desc">Sets ceil(p_amount), cooperative_amount, due date, priced_by and queues notification atomically.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/17_bill_cooperative_amount.sql:64">Open :64</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">fn_earliest_lawful_disconnection RPC</div>
+              <div class="manifest-item-path">supabase/migrations/02_functions.sql:136</div>
+              <div class="manifest-item-desc">Computes 48-hour statutory window advancing past weekends, holidays, and 3:00 PM cutoff.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/02_functions.sql:136">Open :136</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">fn_issue_disconnection_notice RPC</div>
+              <div class="manifest-item-path">supabase/migrations/02_functions.sql:559</div>
+              <div class="manifest-item-desc">Validates overdue payable bill, formats notice number (DN-YYYY-MMDD-XXXX), and queues SMS.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/02_functions.sql:559">Open :559</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">fn_close_disconnection_notice RPC</div>
+              <div class="manifest-item-path">supabase/migrations/02_functions.sql:633</div>
+              <div class="manifest-item-desc">Closes notice with outcome (settled, cancelled, referred); references external handover.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/02_functions.sql:633">Open :633</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">uq_area_one_active_staff_per_role</div>
+              <div class="manifest-item-path">supabase/migrations/01_schema.sql:218</div>
+              <div class="manifest-item-desc">Partial unique index enforcing at most one active Admin, Reader, and Cashier per service area.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/01_schema.sql:218">Open :218</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">bills_pricing_consistent Constraint</div>
+              <div class="manifest-item-path">supabase/migrations/01_schema.sql:359</div>
+              <div class="manifest-item-desc">Database CHECK constraint mandating total_amount, due_date, and priced_at are all null or all set.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/01_schema.sql:359">Open :359</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">Pondo &amp; BOHECO Settlement Schema</div>
+              <div class="manifest-item-path">supabase/migrations/20261004015207_pondo_boheco_settlement.sql:5</div>
+              <div class="manifest-item-desc">Defines boheco_trips (line 5), bill_settlements (line 13), and pondo_ledger (line 25).</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/20261004015207_pondo_boheco_settlement.sql:5">Open :5</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">Reader Monthly Compensation &amp; Reversal</div>
+              <div class="manifest-item-path">supabase/migrations/20261004070000_reader_monthly_compensation.sql:3</div>
+              <div class="manifest-item-desc">Creates reader_compensation (line 3); fn_reverse_reader_compensation at line 37 is Admin-only.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/20261004070000_reader_monthly_compensation.sql:3">Open :3</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">Regular Rounding Reserve Credit</div>
+              <div class="manifest-item-path">supabase/migrations/20261007105843_regular_rounding_reserve_credit.sql:44</div>
+              <div class="manifest-item-desc">Trigger logic crediting surplus rounding (amount_paid - boheco_share) into pondo_ledger.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/20261007105843_regular_rounding_reserve_credit.sql:44">Open :44</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">create-staff-account Edge Function</div>
+              <div class="manifest-item-path">supabase/functions/create-staff-account/index.ts:18</div>
+              <div class="manifest-item-desc">Deno runtime validating Admin JWT before invoking service-role createUser with synthetic email.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/functions/create-staff-account/index.ts:18">Open :18</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">manage-accounts Edge Function</div>
+              <div class="manifest-item-path">supabase/functions/manage-accounts/index.ts:44</div>
+              <div class="manifest-item-desc">Deno endpoint coordinating account lifecycle, ban durations, and staff handover RPCs.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/functions/manage-accounts/index.ts:44">Open :44</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">create-household-login Edge Function</div>
+              <div class="manifest-item-path">supabase/functions/create-household-login/index.ts:34</div>
+              <div class="manifest-item-desc">Validates Admin service area scope, provisions auth user, and links profile_id to consumer.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/functions/create-household-login/index.ts:34">Open :34</a>
+          </div>
+
+          <div class="manifest-item">
+            <div class="manifest-item-left">
+              <div class="manifest-item-name">reset-account-password Edge Function</div>
+              <div class="manifest-item-path">supabase/functions/reset-account-password/index.ts:39</div>
+              <div class="manifest-item-desc">Sets new password server-side, terminates active sessions, and forces change on next login.</div>
+            </div>
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/functions/reset-account-password/index.ts:39">Open :39</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 3: 5 DEEP-DIVE EXECUTION TRACES -->
+    <section id="section-traces">
+      <div style="margin-bottom: 20px;">
+        <h2 style="font-size: 1.4rem; font-weight: 800; display: flex; align-items: center; gap: 10px;">
+          🔬 Deep-Dive Execution Traces (The 5 Main Admin Functions)
+        </h2>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">
+          Select any tab below to review the complete cross-layer execution pipeline with verbatim source code and defense rationale.
+        </p>
+      </div>
+
+      <!-- Tab Buttons -->
+      <div class="tabs-nav">
+        <button class="tab-btn active" onclick="switchTraceTab(0)">
+          <span>1. Post Cooperative Amounts</span>
+        </button>
+        <button class="tab-btn" onclick="switchTraceTab(1)">
+          <span>2. Overdue Workspace &amp; 48h Notice</span>
+        </button>
+        <button class="tab-btn" onclick="switchTraceTab(2)">
+          <span>3. Staff Account Provisioning</span>
+        </button>
+        <button class="tab-btn" onclick="switchTraceTab(3)">
+          <span>4. Household Setup &amp; Login</span>
+        </button>
+        <button class="tab-btn" onclick="switchTraceTab(4)">
+          <span>5. Reserve Fund ("Pondo") Audit</span>
+        </button>
+      </div>
+
+      <!-- TAB 1: POST BILL AMOUNT & CEILING RULE -->
+      <div id="trace-panel-0" class="trace-card">
+        <div class="trace-header">
+          <div class="trace-title">Main Function 1: Posting Cooperative Bill Amounts &amp; Whole-Peso Ceiling</div>
+          <div class="trace-desc">
+            The cooperative returns billing statements ~7 days after meter capture. The Area President types the printed 
+            peso figure, the application applies the required whole-peso ceiling rule, commits to SQLite outbox, drains to 
+            PostgreSQL, and queues the consumer alert in one transaction.
+          </div>
+        </div>
+
+        <div class="flowchart-container">
+          <div style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: var(--text-subtle); margin-bottom: 12px;">
+            Execution Pipeline Architecture
+          </div>
+          <div class="flow-steps">
+            <div class="flow-step-card">
+              <div class="flow-step-header">
+                <span class="layer-tag pres">UI Presentation</span>
+              </div>
+              <div class="flow-step-title">PostBillAmountScreen</div>
+              <div class="flow-step-sub">Shows unpriced queue; renders review button with ceiling preview: <em>"Review · ₱659.00 (rounded up)"</em>.</div>
+              <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/admin/post_bill_amount_screen.dart:1010">post_bill_amount_screen.dart:1010</a>
+            </div>
+
+            <div class="flow-arrow">➔</div>
+
+            <div class="flow-step-card">
+              <div class="flow-step-header">
+                <span class="layer-tag pres">Riverpod Controller</span>
+              </div>
+              <div class="flow-step-title">PostBillAmountController</div>
+              <div class="flow-step-sub">Parses text to Money, validates positive amount, generates ClientUuid, and triggers outbox sync.</div>
+              <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/admin/post_bill_amount_controller.dart:169">post_bill_amount_controller.dart:169</a>
+            </div>
+
+            <div class="flow-arrow">➔</div>
+
+            <div class="flow-step-card">
+              <div class="flow-step-header">
+                <span class="layer-tag dom">Domain UseCase</span>
+              </div>
+              <div class="flow-step-title">PostBillAmount &amp; Money</div>
+              <div class="flow-step-sub">Executes <span class="code-pill">amount.roundUpToWholePeso()</span>, verifies bill is unpriced, checks due date &gt; today.</div>
+              <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/usecases/admin/post_bill_amount.dart:81">post_bill_amount.dart:81</a>
+            </div>
+
+            <div class="flow-arrow">➔</div>
+
+            <div class="flow-step-card">
+              <div class="flow-step-header">
+                <span class="layer-tag data">Data &amp; Gateway</span>
+              </div>
+              <div class="flow-step-title">SupabaseOutboxGateway</div>
+              <div class="flow-step-sub">Submits PostAmountOperation to remote Supabase RPC with <span class="code-pill">p_client_uuid</span> for idempotency.</div>
+              <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/sync/supabase_outbox_gateway.dart:46">supabase_outbox_gateway.dart:46</a>
+            </div>
+
+            <div class="flow-arrow">➔</div>
+
+            <div class="flow-step-card">
+              <div class="flow-step-header">
+                <span class="layer-tag sql">Supabase SQL</span>
+              </div>
+              <div class="flow-step-title">fn_post_bill_amount</div>
+              <div class="flow-step-sub">Locks FOR UPDATE, sets ceil(p_amount), sets cooperative_amount, updates due_date, queues notification.</div>
+              <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/17_bill_cooperative_amount.sql:101">17_bill_cooperative_amount.sql:101</a>
+            </div>
+          </div>
+        </div>
+
+
+    <div class="code-box-wrapper">
+      <div class="code-box-header">
+        <div class="code-file-path">
+          <span style="color:#64748b; margin-right:4px;">📄</span>
+          <a class="code-header-link" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/17_bill_cooperative_amount.sql:91">supabase/migrations/17_bill_cooperative_amount.sql:91 (Lines 91–115)</a>
+        </div>
+        <button class="btn-copy" onclick="copySnippet('snippet-trace-1')">Copy Code</button>
+      </div>
+      <div class="code-snippet" id="snippet-trace-1">
+<div class="code-line"><span class="line-number">91</span><span class="line-content">  <span class="token-keyword">if</span> p_amount <span class="token-keyword">is</span> <span class="token-keyword">null</span> <span class="token-keyword">or</span> p_amount &lt;= <span class="token-num">0</span> <span class="token-keyword">then</span></span></div>
+<div class="code-line"><span class="line-number">92</span><span class="line-content">    <span class="token-keyword">raise exception</span> &#x27;The amount due must be greater than zero&#x27;;</span></div>
+<div class="code-line"><span class="line-number">93</span><span class="line-content">  <span class="token-keyword">end</span> <span class="token-keyword">if</span>;</span></div>
+<div class="code-line"><span class="line-number">94</span><span class="line-content">  <span class="token-keyword">if</span> p_due_date <span class="token-keyword">is</span> <span class="token-keyword">null</span> <span class="token-keyword">then</span></span></div>
+<div class="code-line"><span class="line-number">95</span><span class="line-content">    <span class="token-keyword">raise exception</span> &#x27;A due date must be supplied with the amount&#x27;;</span></div>
+<div class="code-line"><span class="line-number">96</span><span class="line-content">  <span class="token-keyword">end</span> <span class="token-keyword">if</span>;</span></div>
+<div class="code-line highlight"><span class="line-number">97</span><span class="line-content">  <span class="token-keyword">if</span> p_due_date &lt; <span class="token-func">fn_ph_today</span>(p_posted_at) <span class="token-keyword">then</span></span></div>
+<div class="code-line highlight"><span class="line-number">98</span><span class="line-content">    <span class="token-keyword">raise exception</span> &#x27;The due date (%) <span class="token-keyword">is</span> already in the past&#x27;, p_due_date;</span></div>
+<div class="code-line"><span class="line-number">99</span><span class="line-content">  <span class="token-keyword">end</span> <span class="token-keyword">if</span>;</span></div>
+<div class="code-line"><span class="line-number">100</span><span class="line-content"></span></div>
+<div class="code-line highlight"><span class="line-number">101</span><span class="line-content">  <span class="token-keyword">update</span> bills</span></div>
+<div class="code-line highlight"><span class="line-number">102</span><span class="line-content">     <span class="token-keyword">set</span> total_amount       = <span class="token-func">ceil</span>(p_amount),</span></div>
+<div class="code-line highlight"><span class="line-number">103</span><span class="line-content">         cooperative_amount = p_amount,</span></div>
+<div class="code-line"><span class="line-number">104</span><span class="line-content">         due_date     = p_due_date,</span></div>
+<div class="code-line"><span class="line-number">105</span><span class="line-content">         priced_at    = p_posted_at,</span></div>
+<div class="code-line"><span class="line-number">106</span><span class="line-content">         priced_by    = app.<span class="token-func">current_user_id</span>()</span></div>
+<div class="code-line"><span class="line-number">107</span><span class="line-content">   <span class="token-keyword">where</span> id = p_bill_id;</span></div>
+<div class="code-line"><span class="line-number">108</span><span class="line-content"></span></div>
+<div class="code-line"><span class="line-number">109</span><span class="line-content">  v_msg := <span class="token-func">fn_render_bill_message</span>(p_bill_id);</span></div>
+<div class="code-line"><span class="line-number">110</span><span class="line-content"></span></div>
+<div class="code-line"><span class="line-number">111</span><span class="line-content">  <span class="token-comment">-- FR-13: the bill-ready alert fires HERE, not at capture.</span></span></div>
+<div class="code-line highlight"><span class="line-number">112</span><span class="line-content">  v_notif := <span class="token-func">fn_queue_notification</span>(</span></div>
+<div class="code-line highlight"><span class="line-number">113</span><span class="line-content">    v_bill.consumer_id, &#x27;bill_ready&#x27;, s.billready_channel,</span></div>
+<div class="code-line"><span class="line-number">114</span><span class="line-content">    v_msg, p_bill_id, <span class="token-keyword">null</span>, v_bill.billing_cycle_id</span></div>
+<div class="code-line"><span class="line-number">115</span><span class="line-content">  );</span></div>
+      </div>
+      <div class="callout-breakdown">
+        <div class="callout-title">🔍 Inline Line-by-Line Technical Defense Callouts</div>
+        <div class="callout-grid">
+          
+  <div class="callout-item">
+    <span class="callout-badge">Lines 91–99</span>
+    <strong>Strict Preconditions:</strong> Validates <code>p_amount > 0</code>, rejects NULL due date, and verifies <code>p_due_date >= fn_ph_today()</code>. Past due dates are rejected at the database level.
+  </div>
+  <div class="callout-item">
+    <span class="callout-badge">Lines 101–107</span>
+    <strong>Whole-Peso Ceiling & Audit:</strong> Sets <code>total_amount = ceil(p_amount)</code> while preserving raw <code>cooperative_amount = p_amount</code>. Records <code>priced_by = app.current_user_id()</code>.
+  </div>
+  <div class="callout-item">
+    <span class="callout-badge">Lines 109–115</span>
+    <strong>FR-13 Atomic Alert Queue:</strong> Calls <code>fn_queue_notification()</code> with channel <code>s.billready_channel</code> in the same transaction. The alert fires upon pricing, never upon reading capture.
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+
+        <div class="rationale-card">
+          <div class="rationale-icon">💡</div>
+          <div class="rationale-content">
+            <h4>Defense Defense Rationale: Ceiling vs Nearest-Peso Rounding</h4>
+            <p>
+              Standard commercial rounding (₱499.40 ➔ ₱499.00) would cause an immediate cash deficit during cooperative remittance. 
+              BillAlert enforces a mathematical ceiling (<span class="code-pill">ceil</span>): ₱499.01 becomes ₱500.00. The surplus 99 centavos 
+              funds the Reserve Fund ("Pondo") and the Meter Reader's ₱500 monthly compensation.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: OVERDUE WORKSPACE & DISCONNECTION NOTICE -->
+      <div id="trace-panel-1" class="trace-card" style="display:none;">
+        <div class="trace-header">
+          <div class="trace-title">Main Function 2: Overdue Workspace &amp; Statutory Disconnection Notices</div>
+          <div class="trace-desc">
+            Governed by Section 5 of the Energy Regulatory Commission (ERC) Consumer Guidelines. A notice can only be 
+            served against payable bills that are past due. The server computes the earliest lawful disconnection time, 
+            ensuring a full 48-hour period falling strictly between 8:00 AM – 3:00 PM on non-holiday weekdays.
+          </div>
+        </div>
+
+        <div class="flowchart-container">
+          <div style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: var(--text-subtle); margin-bottom: 12px;">
+            Execution Pipeline Architecture
+          </div>
+          <div class="flow-steps">
+            <div class="flow-step-card">
+              <div class="flow-step-header">
+                <span class="layer-tag pres">UI Presentation</span>
+              </div>
+              <div class="flow-step-title">AdminOverdueWorkspaceScreen</div>
+              <div class="flow-step-sub">Tabbed view listing delinquent consumers; taps into ServeNoticeScreen or NoticeDocumentScreen.</div>
+              <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/admin/overdue_workspace_screen.dart:79">overdue_workspace_screen.dart:79</a>
+            </div>
+
+            <div class="flow-arrow">➔</div>
+
+            <div class="flow-step-card">
+              <div class="flow-step-header">
+                <span class="layer-tag dom">Domain UseCase</span>
+              </div>
+              <div class="flow-step-title">IssueDisconnectionNotice</div>
+              <div class="flow-step-sub">Verifies household is active, verifies no duplicate notice in outbox, creates IssueNoticeOperation.</div>
+              <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/usecases/admin/issue_disconnection_notice.dart:20">issue_disconnection_notice.dart:20</a>
+            </div>
+
+            <div class="flow-arrow">➔</div>
+
+            <div class="flow-step-card">
+              <div class="flow-step-header">
+                <span class="layer-tag data">Outbox / Data</span>
+              </div>
+              <div class="flow-step-title">OutboxRepository &bull; capturedAt</div>
+              <div class="flow-step-sub">Local SQLite write preserves the exact second the Admin served notice in the field.</div>
+              <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/outbox/outbox_operation.dart:195">outbox_operation.dart:195</a>
+            </div>
+
+            <div class="flow-arrow">➔</div>
+
+            <div class="flow-step-card">
+              <div class="flow-step-header">
+                <span class="layer-tag sql">Supabase SQL</span>
+              </div>
+              <div class="flow-step-title">fn_earliest_lawful_disconnection</div>
+              <div class="flow-step-sub">Adds 48 courtesy hours in Asia/Manila, checks 8AM-3PM window, advances past weekends and holidays.</div>
+              <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/02_functions.sql:136">02_functions.sql:136</a>
+            </div>
+
+            <div class="flow-arrow">➔</div>
+
+            <div class="flow-step-card">
+              <div class="flow-step-header">
+                <span class="layer-tag pres">Notice Document</span>
+              </div>
+              <div class="flow-step-title">NoticeDocumentScreen</div>
+              <div class="flow-step-sub">Renders formal document. Only permits Admin to close notice (Settled / Cancelled / Referred).</div>
+              <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/admin/notice_document_screen.dart:16">notice_document_screen.dart:16</a>
+            </div>
+          </div>
+        </div>
+
+
+    <div class="code-box-wrapper">
+      <div class="code-box-header">
+        <div class="code-file-path">
+          <span style="color:#64748b; margin-right:4px;">📄</span>
+          <a class="code-header-link" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/02_functions.sql:152">supabase/migrations/02_functions.sql:152 (Lines 152–176)</a>
+        </div>
+        <button class="btn-copy" onclick="copySnippet('snippet-trace-2')">Copy Code</button>
+      </div>
+      <div class="code-snippet" id="snippet-trace-2">
+<div class="code-line"><span class="line-number">152</span><span class="line-content">  <span class="token-keyword">loop</span></span></div>
+<div class="code-line"><span class="line-number">153</span><span class="line-content">    v_guard := v_guard + <span class="token-num">1</span>;</span></div>
+<div class="code-line"><span class="line-number">154</span><span class="line-content">    <span class="token-keyword">if</span> v_guard &gt; <span class="token-num">60</span> <span class="token-keyword">then</span></span></div>
+<div class="code-line"><span class="line-number">155</span><span class="line-content">      <span class="token-keyword">raise exception</span> &#x27;could <span class="token-keyword">not</span> resolve a lawful disconnection window within <span class="token-num">60</span> days of %&#x27;, p_served_at;</span></div>
+<div class="code-line"><span class="line-number">156</span><span class="line-content">    <span class="token-keyword">end</span> <span class="token-keyword">if</span>;</span></div>
+<div class="code-line"><span class="line-number">157</span><span class="line-content"></span></div>
+<div class="code-line highlight"><span class="line-number">158</span><span class="line-content">    <span class="token-keyword">if</span> v_local::time &lt; <span class="token-func">make_time</span>(s.disconnection_window_start_hour, <span class="token-num">0</span>, <span class="token-num">0</span>) <span class="token-keyword">then</span></span></div>
+<div class="code-line highlight"><span class="line-number">159</span><span class="line-content">      v_local := <span class="token-func">date_trunc</span>(&#x27;day&#x27;, v_local) + <span class="token-func">make_interval</span>(hours =&gt; s.disconnection_window_start_hour);</span></div>
+<div class="code-line"><span class="line-number">160</span><span class="line-content">    <span class="token-keyword">end</span> <span class="token-keyword">if</span>;</span></div>
+<div class="code-line"><span class="line-number">161</span><span class="line-content"></span></div>
+<div class="code-line highlight"><span class="line-number">162</span><span class="line-content">    <span class="token-keyword">if</span> v_local::time &gt; <span class="token-func">make_time</span>(s.disconnection_window_end_hour, <span class="token-num">0</span>, <span class="token-num">0</span>) <span class="token-keyword">then</span></span></div>
+<div class="code-line highlight"><span class="line-number">163</span><span class="line-content">      v_local := <span class="token-func">date_trunc</span>(&#x27;day&#x27;, v_local) + <span class="token-keyword">interval</span> &#x27;<span class="token-num">1</span> day&#x27;</span></div>
+<div class="code-line"><span class="line-number">164</span><span class="line-content">                 + <span class="token-func">make_interval</span>(hours =&gt; s.disconnection_window_start_hour);</span></div>
+<div class="code-line"><span class="line-number">165</span><span class="line-content">      <span class="token-keyword">continue</span>;</span></div>
+<div class="code-line"><span class="line-number">166</span><span class="line-content">    <span class="token-keyword">end</span> <span class="token-keyword">if</span>;</span></div>
+<div class="code-line"><span class="line-number">167</span><span class="line-content"></span></div>
+<div class="code-line highlight"><span class="line-number">168</span><span class="line-content">    <span class="token-keyword">if</span> <span class="token-func">extract</span>(isodow <span class="token-keyword">from</span> v_local) &gt;= <span class="token-num">6</span></span></div>
+<div class="code-line highlight"><span class="line-number">169</span><span class="line-content">       <span class="token-keyword">or</span> <span class="token-keyword">exists</span> (<span class="token-keyword">select</span> <span class="token-num">1</span> <span class="token-keyword">from</span> ph_holidays <span class="token-keyword">where</span> holiday_date = v_local::date) <span class="token-keyword">then</span></span></div>
+<div class="code-line highlight"><span class="line-number">170</span><span class="line-content">      v_local := <span class="token-func">date_trunc</span>(&#x27;day&#x27;, v_local) + <span class="token-keyword">interval</span> &#x27;<span class="token-num">1</span> day&#x27;</span></div>
+<div class="code-line"><span class="line-number">171</span><span class="line-content">                 + <span class="token-func">make_interval</span>(hours =&gt; s.disconnection_window_start_hour);</span></div>
+<div class="code-line"><span class="line-number">172</span><span class="line-content">      <span class="token-keyword">continue</span>;</span></div>
+<div class="code-line"><span class="line-number">173</span><span class="line-content">    <span class="token-keyword">end</span> <span class="token-keyword">if</span>;</span></div>
+<div class="code-line"><span class="line-number">174</span><span class="line-content"></span></div>
+<div class="code-line"><span class="line-number">175</span><span class="line-content">    <span class="token-keyword">exit</span>;</span></div>
+<div class="code-line"><span class="line-number">176</span><span class="line-content">  <span class="token-keyword">end</span> <span class="token-keyword">loop</span>;</span></div>
+      </div>
+      <div class="callout-breakdown">
+        <div class="callout-title">🔍 Inline Line-by-Line Technical Defense Callouts</div>
+        <div class="callout-grid">
+          
+  <div class="callout-item">
+    <span class="callout-badge">Lines 152–156</span>
+    <strong>Infinite Loop Guard:</strong> Increments <code>v_guard</code> and raises exception if resolution exceeds 60 days, preventing runaway execution on corrupt holiday calendars.
+  </div>
+  <div class="callout-item">
+    <span class="callout-badge">Lines 158–166</span>
+    <strong>ERC 8AM–3PM Lawful Window:</strong> If local time is before 8:00 AM, snaps to 8:00 AM. If past 3:00 PM, advances to 8:00 AM the following morning (payment counters close at 3:00 PM).
+  </div>
+  <div class="callout-item">
+    <span class="callout-badge">Lines 168–174</span>
+    <strong>Weekend & Holiday Roll-Forward:</strong> Checks <code>extract(isodow from v_local) >= 6</code> (Sat/Sun) or membership in <code>ph_holidays</code>. Automatically shifts deadline to 8:00 AM on next business day.
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+
+        <div class="rationale-card">
+          <div class="rationale-icon">⚖️</div>
+          <div class="rationale-content">
+            <h4>Defense Rationale: Disconnection Window Legal Compliance</h4>
+            <p>
+              Under ERC rules, utilities cannot cut power on weekends or holidays, nor after 3:00 PM (when payment counters close). 
+              If notice is served on a Thursday at 2:00 PM, 48 hours lands on Saturday at 2:00 PM. <span class="code-pill">fn_earliest_lawful_disconnection</span> 
+              automatically advances the lawful window to Monday at 8:00 AM, protecting the consumer's right to settle.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: STAFF ACCOUNT PROVISIONING -->
+      <div id="trace-panel-2" class="trace-card" style="display:none;">
+        <div class="trace-header">
+          <div class="trace-title">Main Function 3: Staff Account Management (Meter Reader &amp; Cashier)</div>
+          <div class="trace-desc">
+            The Area President provisions accounts for their area's Meter Reader and Cashier. The service-role key is 
+            strictly isolated inside Deno Edge Functions; the mobile client passes only the authenticated Admin JWT. 
+            The database mechanically enforces that each area has at most one active holder of each role.
+          </div>
+        </div>
+
+        <div class="flowchart-container">
+          <div style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: var(--text-subtle); margin-bottom: 12px;">
+            Execution Pipeline Architecture
+          </div>
+          <div class="flow-steps">
+            <div class="flow-step-card">
+              <div class="flow-step-header">
+                <span class="layer-tag pres">UI Form</span>
+              </div>
+              <div class="flow-step-title">AdminAccountsScreen</div>
+              <div class="flow-step-sub">Admin navigates to Create Account or Manage Accounts; inputs username, names, and assigns role.</div>
+              <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/admin/accounts_screen.dart:8">accounts_screen.dart:8</a>
+            </div>
+
+            <div class="flow-arrow">➔</div>
+
+            <div class="flow-step-card">
+              <div class="flow-step-header">
+                <span class="layer-tag dom">Domain UseCase</span>
+              </div>
+              <div class="flow-step-title">CreateStaffAccount</div>
+              <div class="flow-step-sub">Validates username regex, generates temporary password via factory, delegates to AuthRepository.</div>
+              <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/usecases/admin/create_staff_account.dart:14">create_staff_account.dart:14</a>
+            </div>
+
+            <div class="flow-arrow">➔</div>
+
+            <div class="flow-step-card">
+              <div class="flow-step-header">
+                <span class="layer-tag data">Data Repository</span>
+              </div>
+              <div class="flow-step-title">AuthRepositoryImpl</div>
+              <div class="flow-step-sub">Invokes Edge Function <span class="code-pill">'create-staff-account'</span> with Admin's bearer JWT in header.</div>
+              <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/repositories/auth_repository_impl.dart:242">auth_repository_impl.dart:242</a>
+            </div>
+
+            <div class="flow-arrow">➔</div>
+
+            <div class="flow-step-card">
+              <div class="flow-step-header">
+                <span class="layer-tag sql">Deno Edge Function</span>
+              </div>
+              <div class="flow-step-title">create-staff-account/index.ts</div>
+              <div class="flow-step-sub">Verifies caller is active Admin; uses Supabase service_role to create auth user with synthetic email.</div>
+              <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/functions/create-staff-account/index.ts:47">create-staff-account/index.ts:47</a>
+            </div>
+
+            <div class="flow-arrow">➔</div>
+
+            <div class="flow-step-card">
+              <div class="flow-step-header">
+                <span class="layer-tag sql">Database Constraint</span>
+              </div>
+              <div class="flow-step-title">uq_area_one_active_staff</div>
+              <div class="flow-step-sub">Enforces at most one active reader and cashier per area. Rejection returns clear conflict failure.</div>
+              <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/01_schema.sql:218">01_schema.sql:218</a>
+            </div>
+          </div>
+        </div>
+
+
+    <div class="code-box-wrapper">
+      <div class="code-box-header">
+        <div class="code-file-path">
+          <span style="color:#64748b; margin-right:4px;">📄</span>
+          <a class="code-header-link" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/functions/create-staff-account/index.ts:47">supabase/functions/create-staff-account/index.ts:47 (Lines 47–71)</a>
+        </div>
+        <button class="btn-copy" onclick="copySnippet('snippet-trace-3')">Copy Code</button>
+      </div>
+      <div class="code-snippet" id="snippet-trace-3">
+<div class="code-line highlight"><span class="line-number">47</span><span class="line-content">  <span class="token-keyword">const</span> { data: userData, error: userError } = <span class="token-keyword">await</span> callerClient.auth.<span class="token-func">getUser</span>();</span></div>
+<div class="code-line"><span class="line-number">48</span><span class="line-content">  <span class="token-keyword">if</span> (userError || !userData.user) {</span></div>
+<div class="code-line"><span class="line-number">49</span><span class="line-content">    <span class="token-keyword">return</span> <span class="token-func">reply</span>({ ok: false, kind: &quot;permission&quot;, message: &quot;Your session has expired. Sign in again.&quot; }, 401);</span></div>
+<div class="code-line"><span class="line-number">50</span><span class="line-content">  }</span></div>
+<div class="code-line"><span class="line-number">51</span><span class="line-content"></span></div>
+<div class="code-line highlight"><span class="line-number">52</span><span class="line-content">  <span class="token-keyword">const</span> { data: profile, error: profileError } = <span class="token-keyword">await</span> callerClient</span></div>
+<div class="code-line"><span class="line-number">53</span><span class="line-content">    .<span class="token-keyword">from</span>(&quot;profiles&quot;)</span></div>
+<div class="code-line"><span class="line-number">54</span><span class="line-content">    .<span class="token-func">select</span>(&quot;id, role, area_id, account_status&quot;)</span></div>
+<div class="code-line"><span class="line-number">55</span><span class="line-content">    .<span class="token-func">eq</span>(&quot;id&quot;, userData.user.id)</span></div>
+<div class="code-line"><span class="line-number">56</span><span class="line-content">    .<span class="token-func">maybeSingle</span>();</span></div>
+<div class="code-line"><span class="line-number">57</span><span class="line-content"></span></div>
+<div class="code-line highlight"><span class="line-number">58</span><span class="line-content">  <span class="token-keyword">if</span> (</span></div>
+<div class="code-line highlight"><span class="line-number">59</span><span class="line-content">    profileError || !profile || profile.role !== &quot;admin&quot; ||</span></div>
+<div class="code-line highlight"><span class="line-number">60</span><span class="line-content">    profile.account_status !== &quot;active&quot; || !profile.area_id</span></div>
+<div class="code-line"><span class="line-number">61</span><span class="line-content">  ) {</span></div>
+<div class="code-line"><span class="line-number">62</span><span class="line-content">    <span class="token-comment">// Business failures use a successful HTTP response so the Flutter client</span></span></div>
+<div class="code-line"><span class="line-number">63</span><span class="line-content">    <span class="token-comment">// can read the safe, specific message instead of receiving an opaque</span></span></div>
+<div class="code-line"><span class="line-number">64</span><span class="line-content">    <span class="token-comment">// FunctionsHttpError for every non-2xx status.</span></span></div>
+<div class="code-line highlight"><span class="line-number">65</span><span class="line-content">    <span class="token-keyword">return</span> <span class="token-func">reply</span>({ ok: false, kind: &quot;permission&quot;, message: &quot;Only an active Area President can create a staff account.&quot; });</span></div>
+<div class="code-line"><span class="line-number">66</span><span class="line-content">  }</span></div>
+<div class="code-line"><span class="line-number">67</span><span class="line-content"></span></div>
+<div class="code-line"><span class="line-number">68</span><span class="line-content">  <span class="token-keyword">let</span> body: Record&lt;string, unknown&gt;;</span></div>
+<div class="code-line"><span class="line-number">69</span><span class="line-content">  <span class="token-keyword">try</span> {</span></div>
+<div class="code-line"><span class="line-number">70</span><span class="line-content">    body = <span class="token-keyword">await</span> request.<span class="token-func">json</span>();</span></div>
+<div class="code-line"><span class="line-number">71</span><span class="line-content">  } <span class="token-keyword">catch</span> {</span></div>
+      </div>
+      <div class="callout-breakdown">
+        <div class="callout-title">🔍 Inline Line-by-Line Technical Defense Callouts</div>
+        <div class="callout-grid">
+          
+  <div class="callout-item">
+    <span class="callout-badge">Lines 47–50</span>
+    <strong>Caller Identity Authentication:</strong> Calls <code>callerClient.auth.getUser()</code> using the Bearer token passed in the request header; rejects expired sessions with HTTP 401.
+  </div>
+  <div class="callout-item">
+    <span class="callout-badge">Lines 52–66</span>
+    <strong>Active Area President Authorization:</strong> Verifies <code>role === 'admin'</code>, <code>account_status === 'active'</code>, and non-null <code>area_id</code>. Only an active Area President may provision staff.
+  </div>
+  <div class="callout-item">
+    <span class="callout-badge">Lines 68–73</span>
+    <strong>Payload Parsing & HTTP 200 Protocol:</strong> Parses request JSON. Returns business validation failures as HTTP 200 with structured JSON so the mobile app avoids opaque FunctionsHttpError.
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+
+        <div class="rationale-card">
+          <div class="rationale-icon">🔐</div>
+          <div class="rationale-content">
+            <h4>Defense Rationale: Service-Role Isolation</h4>
+            <p>
+              Client apps must never possess administrative database master credentials. By isolating <span class="code-pill">createUser</span> 
+              inside Deno Edge Functions and strictly validating the caller's JWT against the caller's assigned area, 
+              cross-area staff creation is mechanically impossible.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: HOUSEHOLD REGISTRATION & CONSUMER LOGIN -->
+      <div id="trace-panel-3" class="trace-card" style="display:none;">
+        <div class="trace-header">
+          <div class="trace-title">Main Function 4: Household Registration &amp; Consumer Login Provisioning</div>
+          <div class="trace-desc">
+            A household must exist as a consumer entity (meter serial, consumer number, purok) before being granted an 
+            authenticated login. RegisterHousehold coordinates the consumer insertion under caller RLS and provisions 
+            credentials via create-household-login Edge Function.
+          </div>
+        </div>
+
+        <div class="flowchart-container">
+          <div style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: var(--text-subtle); margin-bottom: 12px;">
+            Execution Pipeline Architecture
+          </div>
+          <div class="flow-steps">
+            <div class="flow-step-card">
+              <div class="flow-step-header">
+                <span class="layer-tag pres">UI Presentation</span>
+              </div>
+              <div class="flow-step-title">LinkedAccountScreen</div>
+              <div class="flow-step-sub">Admin enters household details: consumer number, name, meter serial number, purok, mobile number.</div>
+              <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/admin/linked_account_screen.dart:18">linked_account_screen.dart:18</a>
+            </div>
+
+            <div class="flow-arrow">➔</div>
+
+            <div class="flow-step-card">
+              <div class="flow-step-header">
+                <span class="layer-tag dom">Domain UseCase</span>
+              </div>
+              <div class="flow-step-title">RegisterHousehold</div>
+              <div class="flow-step-sub">Pre-checks consumer details and username format; executes CreateConsumer followed by CreateHouseholdLogin.</div>
+              <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/usecases/admin/register_household.dart:35">register_household.dart:35</a>
+            </div>
+
+            <div class="flow-arrow">➔</div>
+
+            <div class="flow-step-card">
+              <div class="flow-step-header">
+                <span class="layer-tag data">Data Layer</span>
+              </div>
+              <div class="flow-step-title">ConsumerRepositoryImpl</div>
+              <div class="flow-step-sub">Inserts row into <span class="code-pill">consumers</span> table; catches 23505 duplicate meter number violations.</div>
+              <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/repositories/consumer_repository_impl.dart:42">consumer_repository_impl.dart:42</a>
+            </div>
+
+            <div class="flow-arrow">➔</div>
+
+            <div class="flow-step-card">
+              <div class="flow-step-header">
+                <span class="layer-tag sql">Deno Edge</span>
+              </div>
+              <div class="flow-step-title">create-household-login</div>
+              <div class="flow-step-sub">Verifies household is in Admin's area; provisions auth.users row and links <span class="code-pill">consumers.profile_id</span>.</div>
+              <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/functions/create-household-login/index.ts:34">create-household-login/index.ts:34</a>
+            </div>
+          </div>
+        </div>
+
+
+    <div class="code-box-wrapper">
+      <div class="code-box-header">
+        <div class="code-file-path">
+          <span style="color:#64748b; margin-right:4px;">📄</span>
+          <a class="code-header-link" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/usecases/admin/register_household.dart:57">lib/domain/usecases/admin/register_household.dart:57 (Lines 57–82)</a>
+        </div>
+        <button class="btn-copy" onclick="copySnippet('snippet-trace-4')">Copy Code</button>
+      </div>
+      <div class="code-snippet" id="snippet-trace-4">
+<div class="code-line highlight"><span class="line-number">57</span><span class="line-content">    <span class="token-keyword">final</span> <span class="token-type">ValidationFailure</span>? invalid =</span></div>
+<div class="code-line"><span class="line-number">58</span><span class="line-content">        CreateConsumer.<span class="token-func">check</span>(</span></div>
+<div class="code-line"><span class="line-number">59</span><span class="line-content">          consumerNo: consumerNo,</span></div>
+<div class="code-line"><span class="line-number">60</span><span class="line-content">          firstName: firstName,</span></div>
+<div class="code-line"><span class="line-number">61</span><span class="line-content">          lastName: lastName,</span></div>
+<div class="code-line"><span class="line-number">62</span><span class="line-content">        ) ??</span></div>
+<div class="code-line highlight"><span class="line-number">63</span><span class="line-content">        CreateHouseholdLogin.<span class="token-func">checkUsername</span>(username);</span></div>
+<div class="code-line highlight"><span class="line-number">64</span><span class="line-content">    <span class="token-keyword">if</span> (invalid != null) <span class="token-keyword">return</span> <span class="token-keyword">Err</span>&lt;<span class="token-type">RegisteredHousehold</span>&gt;(invalid);</span></div>
+<div class="code-line"><span class="line-number">65</span><span class="line-content"></span></div>
+<div class="code-line highlight"><span class="line-number">66</span><span class="line-content">    <span class="token-keyword">final</span> <span class="token-keyword">Result</span>&lt;<span class="token-type">Consumer</span>&gt; saved = <span class="token-keyword">await</span> <span class="token-func">createConsumer</span>(</span></div>
+<div class="code-line"><span class="line-number">67</span><span class="line-content">      consumerNo: consumerNo,</span></div>
+<div class="code-line"><span class="line-number">68</span><span class="line-content">      firstName: firstName,</span></div>
+<div class="code-line"><span class="line-number">69</span><span class="line-content">      lastName: lastName,</span></div>
+<div class="code-line"><span class="line-number">70</span><span class="line-content">      contactNumber: contactNumber,</span></div>
+<div class="code-line"><span class="line-number">71</span><span class="line-content">      purok: purok,</span></div>
+<div class="code-line"><span class="line-number">72</span><span class="line-content">      meterSerialNo: meterSerialNo,</span></div>
+<div class="code-line"><span class="line-number">73</span><span class="line-content">      areaId: areaId,</span></div>
+<div class="code-line"><span class="line-number">74</span><span class="line-content">      createdBy: createdBy,</span></div>
+<div class="code-line"><span class="line-number">75</span><span class="line-content">    );</span></div>
+<div class="code-line"><span class="line-number">76</span><span class="line-content"></span></div>
+<div class="code-line highlight"><span class="line-number">77</span><span class="line-content">    <span class="token-keyword">return</span> <span class="token-keyword">switch</span> (saved) {</span></div>
+<div class="code-line"><span class="line-number">78</span><span class="line-content">      <span class="token-keyword">Err</span>(:<span class="token-keyword">final</span> failure) =&gt; <span class="token-keyword">Err</span>&lt;<span class="token-type">RegisteredHousehold</span>&gt;(failure),</span></div>
+<div class="code-line highlight"><span class="line-number">79</span><span class="line-content">      <span class="token-keyword">Ok</span>(:<span class="token-keyword">final</span> value) =&gt; <span class="token-keyword">Ok</span>&lt;<span class="token-type">RegisteredHousehold</span>&gt;(</span></div>
+<div class="code-line"><span class="line-number">80</span><span class="line-content">        <span class="token-keyword">await</span> <span class="token-func">_signIn</span>(value, username),</span></div>
+<div class="code-line"><span class="line-number">81</span><span class="line-content">      ),</span></div>
+<div class="code-line"><span class="line-number">82</span><span class="line-content">    };</span></div>
+      </div>
+      <div class="callout-breakdown">
+        <div class="callout-title">🔍 Inline Line-by-Line Technical Defense Callouts</div>
+        <div class="callout-grid">
+          
+  <div class="callout-item">
+    <span class="callout-badge">Lines 57–64</span>
+    <strong>Pre-flight Domain Validation:</strong> Simultaneously validates consumer identifiers (name, consumer number) and checks username regex (3–50 chars) before making network round-trips.
+  </div>
+  <div class="callout-item">
+    <span class="callout-badge">Lines 66–75</span>
+    <strong>Phase 1 — Consumer Persistence:</strong> Calls <code>createConsumer()</code> to persist the household under caller RLS. Physical meter registration succeeds even if credentials require subsequent retries.
+  </div>
+  <div class="callout-item">
+    <span class="callout-badge">Lines 77–82</span>
+    <strong>Phase 2 — Auth Provisioning Pattern:</strong> Pattern matches on the sealed <code>Result<Consumer></code>; on success, invokes <code>_signIn(value, username)</code> to request auth credentials from the server.
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+
+        <div class="rationale-card">
+          <div class="rationale-icon">🏡</div>
+          <div class="rationale-content">
+            <h4>Defense Rationale: Two-Phase Household Decoupling</h4>
+            <p>
+              In rural electrification, physical meters and consumer accounts exist regardless of whether the resident owns a smartphone. 
+              By decoupling consumer record persistence from auth user generation, household utility tracking proceeds smoothly even if 
+              an initial username choice experiences a collision.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 5: RESERVE FUND & SETTLEMENTS -->
+      <div id="trace-panel-4" class="trace-card" style="display:none;">
+        <div class="trace-header">
+          <div class="trace-title">Main Function 5: Reserve Fund ("Pondo") Audit, BOHECO Settlements &amp; Payroll</div>
+          <div class="trace-desc">
+            Centavos accumulated from the whole-peso ceiling populate the Reserve Fund. The Area President monitors the 
+            liquidity balance, audits BOHECO remittance cutoff trips (<span class="code-pill">boheco_trips</span>), and oversees Meter Reader 
+            salary/transportation payouts with authoritative reversal privileges.
+          </div>
+        </div>
+
+        <div class="flowchart-container">
+          <div style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: var(--text-subtle); margin-bottom: 12px;">
+            Execution Pipeline Architecture
+          </div>
+          <div class="flow-steps">
+            <div class="flow-step-card">
+              <div class="flow-step-header">
+                <span class="layer-tag pres">UI Presentation</span>
+              </div>
+              <div class="flow-step-title">ReserveFundReportScreen</div>
+              <div class="flow-step-sub">Presents SettlementPanel with live fund balance, pending trips, and reader compensation status.</div>
+              <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/admin/reserve_fund_report_screen.dart:7">reserve_fund_report_screen.dart:7</a>
+            </div>
+
+            <div class="flow-arrow">➔</div>
+
+            <div class="flow-step-card">
+              <div class="flow-step-header">
+                <span class="layer-tag pres">Settlement Widget</span>
+              </div>
+              <div class="flow-step-title">SettlementPanel</div>
+              <div class="flow-step-sub">Allows Admin review of BOHECO trip allocations, direct remittances, and reader salary payouts.</div>
+              <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/common/settlement_panel.dart:63">settlement_panel.dart:63</a>
+            </div>
+
+            <div class="flow-arrow">➔</div>
+
+            <div class="flow-step-card">
+              <div class="flow-step-header">
+                <span class="layer-tag data">Repository</span>
+              </div>
+              <div class="flow-step-title">SettlementRepository</div>
+              <div class="flow-step-sub">Executes <span class="code-pill">fn_settlement_snapshot</span>, manages offline cash, calls compensation reversal.</div>
+              <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/repositories/settlement_repository.dart:17">settlement_repository.dart:17</a>
+            </div>
+
+            <div class="flow-arrow">➔</div>
+
+            <div class="flow-step-card">
+              <div class="flow-step-header">
+                <span class="layer-tag sql">Database Ledger</span>
+              </div>
+              <div class="flow-step-title">pondo_ledger &amp; Compensation</div>
+              <div class="flow-step-sub">Atomic immutable ledger tracking <span class="code-pill">'rounding'</span>, <span class="code-pill">'withdrawal'</span>, and <span class="code-pill">'correction'</span>.</div>
+              <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/20261004015207_pondo_boheco_settlement.sql:25">20261004015207_pondo_boheco_settlement.sql:25</a>
+            </div>
+          </div>
+        </div>
+
+
+    <div class="code-box-wrapper">
+      <div class="code-box-header">
+        <div class="code-file-path">
+          <span style="color:#64748b; margin-right:4px;">📄</span>
+          <a class="code-header-link" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/20261007105843_regular_rounding_reserve_credit.sql:35">supabase/migrations/20261007105843_regular_rounding_reserve_credit.sql:35 (Lines 35–54)</a>
+        </div>
+        <button class="btn-copy" onclick="copySnippet('snippet-trace-5')">Copy Code</button>
+      </div>
+      <div class="code-snippet" id="snippet-trace-5">
+<div class="code-line highlight"><span class="line-number">35</span><span class="line-content"> v:=app.<span class="token-func">record_payment_core_v18</span>(p_bill_ids,p_amounts,p_cash_tendered,<span class="token-func">now</span>(),p_client_uuid);</span></div>
+<div class="code-line highlight"><span class="line-number">36</span><span class="line-content"> <span class="token-keyword">if</span> repayment <span class="token-keyword">then</span></span></div>
+<div class="code-line"><span class="line-number">37</span><span class="line-content">  <span class="token-keyword">update</span> payment_transactions <span class="token-keyword">set</span> collection_kind=&#x27;pondo_repayment&#x27; <span class="token-keyword">where</span> id=v;</span></div>
+<div class="code-line"><span class="line-number">38</span><span class="line-content">  <span class="token-keyword">insert into</span> <span class="token-func">pondo_ledger</span>(area_id,amount,kind,transaction_id,actor_id,reason,client_uuid)</span></div>
+<div class="code-line"><span class="line-number">39</span><span class="line-content">  <span class="token-keyword">select</span> a,<span class="token-func">sum</span>(amount_paid),&#x27;repayment&#x27;,v,auth.<span class="token-func">uid</span>(),&#x27;Full reserve fund repayment&#x27;,p_client_uuid <span class="token-keyword">from</span> payments <span class="token-keyword">where</span> transaction_id=v;</span></div>
+<div class="code-line"><span class="line-number">40</span><span class="line-content">  <span class="token-keyword">update</span> bill_settlements <span class="token-keyword">set</span> state=&#x27;settled&#x27;,transaction_id=v,updated_at=<span class="token-func">now</span>() <span class="token-keyword">where</span> bill_id=<span class="token-func">any</span>(p_bill_ids);</span></div>
+<div class="code-line"><span class="line-number">41</span><span class="line-content"> <span class="token-keyword">else</span></span></div>
+<div class="code-line"><span class="line-number">42</span><span class="line-content">  <span class="token-comment">-- The payment view allocates actual cash to BOHECO first, then rounding.</span></span></div>
+<div class="code-line"><span class="line-number">43</span><span class="line-content">  <span class="token-comment">-- Partial payments below the cooperative amount contribute zero here.</span></span></div>
+<div class="code-line highlight"><span class="line-number">44</span><span class="line-content">  <span class="token-keyword">select</span> <span class="token-keyword">coalesce</span>(<span class="token-func">sum</span>(h.amount_paid-<span class="token-keyword">coalesce</span>(h.boheco_share,h.amount_paid)),<span class="token-num">0</span>)</span></div>
+<div class="code-line highlight"><span class="line-number">45</span><span class="line-content">   into collected_rounding</span></div>
+<div class="code-line"><span class="line-number">46</span><span class="line-content">   <span class="token-keyword">from</span> public.v_payment_history h <span class="token-keyword">join</span> public.payments p <span class="token-keyword">on</span> p.id=h.payment_id</span></div>
+<div class="code-line"><span class="line-number">47</span><span class="line-content">   <span class="token-keyword">where</span> p.transaction_id=v;</span></div>
+<div class="code-line highlight"><span class="line-number">48</span><span class="line-content">  <span class="token-keyword">if</span> collected_rounding&gt;<span class="token-num">0</span> <span class="token-keyword">then</span></span></div>
+<div class="code-line highlight"><span class="line-number">49</span><span class="line-content">   <span class="token-keyword">insert into</span> public.<span class="token-func">pondo_ledger</span>(area_id,amount,kind,transaction_id,actor_id,reason,client_uuid)</span></div>
+<div class="code-line highlight"><span class="line-number">50</span><span class="line-content">   <span class="token-keyword">values</span>(a,collected_rounding,&#x27;rounding&#x27;,v,auth.<span class="token-func">uid</span>(),&#x27;Rounding <span class="token-keyword">from</span> regular collection&#x27;,p_client_uuid);</span></div>
+<div class="code-line"><span class="line-number">51</span><span class="line-content">  <span class="token-keyword">end</span> <span class="token-keyword">if</span>;</span></div>
+<div class="code-line"><span class="line-number">52</span><span class="line-content"> <span class="token-keyword">end</span> <span class="token-keyword">if</span>; return v;</span></div>
+<div class="code-line"><span class="line-number">53</span><span class="line-content"><span class="token-keyword">end</span> $$;</span></div>
+<div class="code-line"><span class="line-number">54</span><span class="line-content"></span></div>
+      </div>
+      <div class="callout-breakdown">
+        <div class="callout-title">🔍 Inline Line-by-Line Technical Defense Callouts</div>
+        <div class="callout-grid">
+          
+  <div class="callout-item">
+    <span class="callout-badge">Lines 35–40</span>
+    <strong>Reserve Repayment Branch:</strong> If payment covers a BOHECO settlement route ('pondo'), records <code>pondo_repayment</code> transaction and credits <code>sum(amount_paid)</code> back to <code>pondo_ledger</code>.
+  </div>
+  <div class="callout-item">
+    <span class="callout-badge">Lines 42–47</span>
+    <strong>Priority Allocation to BOHECO:</strong> In regular payments, sums <code>amount_paid - coalesce(boheco_share, amount_paid)</code>. Cash is credited to BOHECO's wholesale power share first.
+  </div>
+  <div class="callout-item">
+    <span class="callout-badge">Lines 48–52</span>
+    <strong>Rounding Reserve Fund Credit:</strong> Only surplus centavos exceeding the cooperative amount are credited as <code>'rounding'</code> in <code>pondo_ledger</code>, funding community liquidity.
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+
+        <div class="rationale-card">
+          <div class="rationale-icon">💰</div>
+          <div class="rationale-content">
+            <h4>Defense Rationale: Priority Cash Allocation</h4>
+            <p>
+              In partial payments, cash collected is credited to BOHECO's base cooperative amount first. 
+              The Reserve Fund is credited ONLY when the payment exceeds the cooperative share. This guarantees that 
+              the cooperative is never short-changed on its wholesale power bill.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 4: ARCHITECTURAL INVARIANTS & GUARDRAILS -->
+    <section id="section-invariants" style="margin-top: 40px;">
+      <div style="margin-bottom: 20px;">
+        <h2 style="font-size: 1.4rem; font-weight: 800; display: flex; align-items: center; gap: 10px;">
+          🛡️ Core Invariants &amp; Architectural Guardrails
+        </h2>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">
+          Non-negotiable architectural constraints proven through unit, widget, and architectural test guards.
+        </p>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
+        <div class="manifest-card">
+          <h3 style="font-size: 1rem; color: #38bdf8; margin-bottom: 8px;">1. Zero Floating-Point Precision Invariant</h3>
+          <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;">
+            Money is stored strictly as integer centavos (<span class="code-pill">int centavos</span>). Dart <span class="code-pill">double</span> 
+            is completely banned from the repository and use cases to eliminate binary representation drift. Tested via 
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/test/domain/money_test.dart:1">money_test.dart:1</a>
+          </p>
+        </div>
+
+        <div class="manifest-card">
+          <h3 style="font-size: 1rem; color: #c084fc; margin-bottom: 8px;">2. Pure Domain Layer Boundary</h3>
+          <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;">
+            <span class="code-pill">lib/domain/</span> imports zero external packages — no Flutter, Supabase, Drift, or intl. 
+            Automated architectural tests parse every import in domain and fail the test suite if forbidden dependencies appear. 
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/test/architecture/domain_has_no_dependencies_test.dart:1">domain_has_no_dependencies_test.dart:1</a>
+          </p>
+        </div>
+
+        <div class="manifest-card">
+          <h3 style="font-size: 1rem; color: #fb923c; margin-bottom: 8px;">3. Offline-First Idempotent Outbox</h3>
+          <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;">
+            All staff mutations write immediately to local SQLCipher-encrypted SQLite tables. Network drops during synchronization 
+            are safely retried using the client-generated UUID (<span class="code-pill">p_client_uuid</span>). 
+            <a class="btn-vscode" href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/test/data/outbox_repository_test.dart:1">outbox_repository_test.dart:1</a>
+          </p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    function switchTraceTab(index) {
+      const buttons = document.querySelectorAll('.tab-btn');
+      buttons.forEach((btn, idx) => {
+        if (idx === index) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+
+      for (let i = 0; i < 5; i++) {
+        const panel = document.getElementById(`trace-panel-${i}`);
+        if (panel) {
+          panel.style.display = i === index ? 'block' : 'none';
+        }
+      }
+    }
+
+    function scrollToSection(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+
+    function filterQATable() {
+      const input = document.getElementById('qa-search');
+      const filter = input.value.toLowerCase().trim();
+      const table = document.getElementById('qa-table');
+      const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+      let visibleCount = 0;
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const text = row.textContent.toLowerCase();
+        const keywords = row.getAttribute('data-keywords') || '';
+        
+        if (text.includes(filter) || keywords.toLowerCase().includes(filter)) {
+          row.style.display = '';
+          visibleCount++;
+        } else {
+          row.style.display = 'none';
+        }
+      }
+
+      const counter = document.getElementById('search-counter');
+      if (filter === '') {
+        counter.textContent = `Showing all ${rows.length} defense items`;
+        counter.style.color = '#38bdf8';
+      } else {
+        counter.textContent = `Found ${visibleCount} matching items for "${filter}"`;
+        counter.style.color = visibleCount > 0 ? '#34d399' : '#f43f5e';
+      }
+    }
+
+    function copySnippet(elementId) {
+      const el = document.getElementById(elementId);
+      if (!el) return;
+      const text = el.innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        alert('Code snippet copied to clipboard!');
+      });
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        const search = document.getElementById('qa-search');
+        if (search) {
+          search.focus();
+          search.scrollIntoView({ behavior: 'smooth' });
+        }
+      }
+      if (e.target.tagName !== 'INPUT') {
+        if (e.key >= '1' && e.key <= '5') {
+          switchTraceTab(parseInt(e.key) - 1);
+          scrollToSection('section-traces');
+        }
+      }
+    });
+  </script>
+
+
+<!-- DYNAMIC WORKSPACE PATH ENGINE -->
+<script>
+(function() {
+    const ORIGINAL_AUTHOR_PATH = "c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert";
+
+    function showWorkspaceToast(msg) {
+        if (typeof showToast === 'function') {
+            try { showToast(msg); return; } catch (e) {}
+        }
+        const toast = document.getElementById('billalertNotificationToast');
+        if (toast) {
+            toast.innerText = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3500);
+        } else {
+            alert(msg);
+        }
+    }
+
+    function detectLocalFolderPath() {
+        if (window.location.protocol === 'file:') {
+            let path = window.location.href;
+            path = path.replace(/^file:\/\/\//i, '');
+            path = path.replace(/\/[^\/]+\.html([?#].*)?$/i, '');
+            path = path.replace(/\\/g, '/');
+            return path;
+        }
+        return ORIGINAL_AUTHOR_PATH;
+    }
+
+    function getEffectiveBasePath() {
+        const stored = localStorage.getItem('billalert_team_path');
+        if (stored && stored.trim().length > 0) {
+            return stored.trim();
+        }
+        return detectLocalFolderPath();
+    }
+
+    function rewriteAllDeepLinks(basePath) {
+        if (!basePath) return;
+        let normalizedBase = basePath.replace(/\\/g, '/').replace(/\/+$/, '');
+        let encodedBase = normalizedBase.split('/').map((seg, idx) => {
+            if (idx === 0 && seg.endsWith(':')) return seg;
+            return encodeURIComponent(decodeURIComponent(seg));
+        }).join('/');
+
+        let count = 0;
+        document.querySelectorAll('a[href^="vscode://file/"]').forEach(link => {
+            if (!link.dataset.relPath) {
+                let href = link.getAttribute('href');
+                const marker = 'BillAlert/';
+                const markerIndex = href.indexOf(marker);
+                if (markerIndex !== -1) {
+                    link.dataset.relPath = href.substring(markerIndex + marker.length);
+                } else if (href.includes(ORIGINAL_AUTHOR_PATH)) {
+                    link.dataset.relPath = href.replace(ORIGINAL_AUTHOR_PATH + '/', '');
+                }
+            }
+            if (link.dataset.relPath) {
+                link.setAttribute('href', `vscode://file/${encodedBase}/${link.dataset.relPath}`);
+                count++;
+            }
+        });
+
+        const input = document.getElementById('billalertLocalWorkspacePathInput') || document.getElementById('localWorkspacePathInput');
+        if (input) {
+            input.value = decodeURIComponent(encodedBase);
+        }
+        const status = document.getElementById('billalertPathDetectionStatus') || document.getElementById('pathDetectionStatus');
+        if (status) {
+            const isCustom = localStorage.getItem('billalert_team_path');
+            if (isCustom) {
+                status.innerHTML = `<span style="color: #F59E0B; font-weight: 700;">● Custom Path (${count} links connected)</span>`;
+            } else {
+                status.innerHTML = `<span style="color: #10B981; font-weight: 700;">● Auto-Detected (${count} links connected to this PC)</span>`;
+            }
+        }
+    }
+
+    window.saveManualWorkspacePath = function() {
+        const input = document.getElementById('billalertLocalWorkspacePathInput') || document.getElementById('localWorkspacePathInput');
+        if (!input) return;
+        let val = input.value.trim();
+        if (!val) return;
+        val = val.replace(/\\/g, '/');
+        localStorage.setItem('billalert_team_path', val);
+        rewriteAllDeepLinks(val);
+        showWorkspaceToast("Workspace path updated! Clicking buttons opens files on your laptop.");
+    };
+
+    window.resetAutoDetectedPath = function() {
+        localStorage.removeItem('billalert_team_path');
+        const autoPath = detectLocalFolderPath();
+        rewriteAllDeepLinks(autoPath);
+        showWorkspaceToast("Reset to auto-detected local path.");
+    };
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            rewriteAllDeepLinks(getEffectiveBasePath());
+        });
+    } else {
+        rewriteAllDeepLinks(getEffectiveBasePath());
+    }
+})();
+</script>
+
+</body>
+</html>

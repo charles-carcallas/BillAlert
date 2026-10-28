@@ -1,0 +1,2245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BillAlert Consumer Defense Dashboard — Krisha Mae I. Basio</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #111827;
+      --card-border: #1f293d;
+      --card-hover: #1b2438;
+      --accent-blue: #38bdf8;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-purple: #a855f7;
+      --accent-rose: #f43f5e;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --code-bg: #030712;
+      --code-border: #1e293b;
+      --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+      --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      line-height: 1.5;
+      padding: 24px;
+    }
+
+    /* Container */
+    .container {
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    header {
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.95));
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 28px 32px;
+      margin-bottom: 24px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      position: relative;
+      overflow: hidden;
+    }
+    header::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, #38bdf8, #10b981, #f59e0b);
+    }
+    .header-top {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+    .role-title {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .role-badge {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-blue);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+    .defender-tag {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--accent-emerald);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .header-subtitle {
+      color: var(--text-muted);
+      font-size: 15px;
+      max-width: 900px;
+    }
+    .header-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 13px;
+    }
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-muted);
+    }
+    .meta-item strong {
+      color: var(--text-main);
+    }
+
+    /* Jump link button */
+    .vscode-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(56, 189, 248, 0.12);
+      color: var(--accent-blue);
+      text-decoration: none;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: var(--font-mono);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      transition: all 0.2s ease;
+      font-weight: 500;
+    }
+    .vscode-link:hover {
+      background: rgba(56, 189, 248, 0.25);
+      border-color: var(--accent-blue);
+      color: #fff;
+      transform: translateY(-1px);
+    }
+    .vscode-link.small {
+      padding: 2px 6px;
+      font-size: 11px;
+    }
+
+    /* Section Styling */
+    section {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 28px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.3);
+    }
+    .section-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      padding-bottom: 12px;
+    }
+    .section-title span.badge {
+      font-size: 12px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-muted);
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-weight: normal;
+    }
+
+    /* Section 4: Live Search Bar Table */
+    .search-box-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .search-input-group {
+      display: flex;
+      gap: 10px;
+    }
+    .search-input {
+      flex: 1;
+      background: var(--code-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 12px 18px;
+      font-size: 15px;
+      color: var(--text-main);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .search-input:focus {
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+    }
+    .search-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .search-pill-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-right: 4px;
+    }
+    .pill {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-muted);
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .pill:hover, .pill.active {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--accent-blue);
+      color: var(--accent-blue);
+    }
+
+    /* Search Results Table */
+    .table-container {
+      overflow-x: auto;
+      border-radius: 10px;
+      border: 1px solid var(--card-border);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13px;
+    }
+    thead th {
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-muted);
+      font-weight: 600;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--card-border);
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 0.5px;
+    }
+    tbody tr {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      transition: background-color 0.15s;
+    }
+    tbody tr:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+    tbody td {
+      padding: 14px 16px;
+      vertical-align: middle;
+    }
+    .layer-tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .layer-pres { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+    .layer-dom  { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .layer-data { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .layer-sql  { background: rgba(168, 85, 247, 0.15); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.3); }
+
+    /* Clean Architecture 4-Layer Manifest Grid */
+    .manifest-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 16px;
+    }
+    .manifest-layer-card {
+      background: var(--code-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .manifest-layer-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .manifest-layer-title {
+      font-size: 15px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .manifest-file-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .manifest-file-item {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 10px 12px;
+      transition: all 0.2s;
+    }
+    .manifest-file-item:hover {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+    .manifest-file-name {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .manifest-file-name code {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+    .manifest-file-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* Tabs for Section 2 */
+    .tabs-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 12px;
+      margin-bottom: 24px;
+    }
+    .tab-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .tab-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-main);
+    }
+    .tab-btn.active {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: var(--accent-blue);
+      color: var(--accent-blue);
+    }
+    .tab-content {
+      display: none;
+      animation: fadeIn 0.25s ease;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Flowchart Visualizer */
+    .flow-diagram {
+      background: var(--code-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .flow-title {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .flow-chain {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+    .flow-step {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1;
+      min-width: 170px;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .flow-step:hover {
+      transform: translateY(-2px);
+      border-color: var(--accent-blue);
+    }
+    .flow-step-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      font-weight: 700;
+    }
+    .flow-step-name {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 600;
+      color: #fff;
+    }
+    .flow-step-action {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .flow-arrow {
+      color: var(--accent-blue);
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    /* Code Box with Syntax Styling and Line Numbers */
+    .code-box {
+      background: var(--code-bg);
+      border: 1px solid var(--code-border);
+      border-radius: 10px;
+      margin: 16px 0;
+      overflow: hidden;
+      font-family: var(--font-mono);
+    }
+    .code-header {
+      background: rgba(255, 255, 255, 0.03);
+      border-bottom: 1px solid var(--code-border);
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .code-file-path {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      color: #cbd5e1;
+    }
+    .code-lines-container {
+      display: flex;
+      padding: 14px 0;
+      overflow-x: auto;
+      font-size: 12.5px;
+      line-height: 1.6;
+    }
+    .line-numbers {
+      padding: 0 16px;
+      border-right: 1px solid rgba(255, 255, 255, 0.08);
+      color: #475569;
+      text-align: right;
+      user-select: none;
+    }
+    .code-content {
+      padding: 0 16px;
+      color: #e2e8f0;
+      white-space: pre;
+      flex: 1;
+    }
+
+    /* Syntax highlight mocks */
+    .c-kw { color: #f43f5e; font-weight: 600; }
+    .c-type { color: #38bdf8; }
+    .c-fn { color: #a855f7; }
+    .c-str { color: #10b981; }
+    .c-com { color: #64748b; font-style: italic; }
+    .c-val { color: #fbbf24; }
+
+    /* Defense Explanation Callout */
+    .defense-card {
+      background: rgba(16, 185, 129, 0.05);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin-top: 14px;
+    }
+    .defense-card.urgent {
+      background: rgba(245, 158, 11, 0.06);
+      border-color: rgba(245, 158, 11, 0.3);
+    }
+    .defense-card.security {
+      background: rgba(168, 85, 247, 0.06);
+      border-color: rgba(168, 85, 247, 0.3);
+    }
+    .defense-title {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .defense-card p {
+      font-size: 13.5px;
+      color: #cbd5e1;
+      line-height: 1.5;
+    }
+
+    /* Section 3: Team Handoff Matrix */
+    .handoff-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      gap: 20px;
+    }
+    .handoff-card {
+      background: var(--code-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      position: relative;
+    }
+    .handoff-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .handoff-role-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 18px;
+    }
+    .handoff-reader { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+    .handoff-admin  { background: rgba(168, 85, 247, 0.15); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.3); }
+    .handoff-cashier { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
+
+    .handoff-title {
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .handoff-author {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .handoff-step-box {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 12.5px;
+      line-height: 1.45;
+    }
+    .handoff-step-box strong {
+      color: var(--text-main);
+    }
+    .handoff-live-action {
+      border-left: 2px solid var(--accent-amber);
+      padding-left: 10px;
+      margin-top: 6px;
+      font-size: 12px;
+      color: #fde68a;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 24px 0;
+      color: var(--text-muted);
+      font-size: 13px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      body { padding: 12px; }
+      .manifest-grid, .handoff-grid { grid-template-columns: 1fr; }
+      .flow-chain { flex-direction: column; align-items: stretch; }
+      .flow-arrow { text-align: center; transform: rotate(90deg); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- DYNAMIC WORKSPACE PATH BANNER -->
+<style>
+.billalert-workspace-banner {
+    position: sticky;
+    top: 0;
+    z-index: 99999;
+    background: linear-gradient(90deg, #0F172A, #1E1B4B);
+    border-bottom: 2px solid #6366F1;
+    padding: 8px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    font-size: 12px;
+    color: #E2E8F0;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+.billalert-workspace-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.billalert-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 700;
+    color: #A5B4FC;
+}
+.billalert-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #10B981;
+    box-shadow: 0 0 8px #10B981;
+}
+.billalert-workspace-input {
+    background: #090D16;
+    border: 1px solid #4338CA;
+    color: #38BDF8;
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 12px;
+    width: 440px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.billalert-workspace-input:focus {
+    border-color: #818CF8;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
+}
+.billalert-btn-save {
+    background: #4F46E5;
+    border: 1px solid #6366F1;
+    color: #fff;
+    padding: 5px 14px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.billalert-btn-save:hover {
+    background: #4338CA;
+}
+.billalert-btn-reset {
+    background: #334155;
+    border: 1px solid #475569;
+    color: #94A3B8;
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.billalert-btn-reset:hover {
+    background: #475569;
+    color: #fff;
+}
+.billalert-detection-badge {
+    font-size: 11px;
+    color: #A5B4FC;
+    white-space: nowrap;
+}
+.billalert-notification-toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: #10B981;
+    color: #0F172A;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 10px 18px;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    z-index: 100000;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.3s, transform 0.3s;
+    pointer-events: none;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+.billalert-notification-toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+</style>
+
+<div class="billalert-workspace-banner" id="billalertWorkspaceBanner">
+    <div class="billalert-workspace-controls">
+        <a href="INDEX_DEFENSE_HUB.html" style="color: #A5B4FC; text-decoration: none; font-weight: 700; margin-right: 8px; display: inline-flex; align-items: center; gap: 4px; background: rgba(99, 102, 241, 0.25); padding: 3px 10px; border-radius: 6px; border: 1px solid rgba(99, 102, 241, 0.4); font-size: 11px;">← Defense Hub</a>
+        <span class="billalert-status-pill">
+            <span class="billalert-status-dot"></span>
+            <span>Workspace:</span>
+        </span>
+        <input type="text" id="billalertLocalWorkspacePathInput" class="billalert-workspace-input" placeholder="Auto-detecting local repository path...">
+        <button class="billalert-btn-save" onclick="saveManualWorkspacePath()">Update Path</button>
+        <button class="billalert-btn-reset" onclick="resetAutoDetectedPath()">Reset Auto-Detect</button>
+    </div>
+    <span id="billalertPathDetectionStatus" class="billalert-detection-badge">⚡ Auto-detecting...</span>
+</div>
+<div id="billalertNotificationToast" class="billalert-notification-toast"></div>
+
+
+
+<div class="container">
+
+  <!-- ===================================================================== -->
+  <!-- HEADER -->
+  <!-- ===================================================================== -->
+  <header>
+    <div class="header-top">
+      <div class="role-title">
+        <span>BillAlert Defense Dashboard</span>
+        <span class="role-badge">Consumer Role</span>
+        <span class="defender-tag">Krisha Mae I. Basio</span>
+      </div>
+      <div>
+        <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/router.dart:289" class="vscode-link">
+          <span>⚡ Open Consumer Router (L289)</span>
+        </a>
+      </div>
+    </div>
+    <div class="header-subtitle">
+      Zero-hallucination interactive defense guide for the Consumer Role (<code>ConsumerUser</code>, home route <code>/consumer</code>). Every architecture layer, entity calculation, offline Drift SQLite cache, Supabase RLS policy, and team handoff is 100% verified on disk and deep-linked into VS Code.
+    </div>
+    <div class="header-meta">
+      <div class="meta-item">👤 <strong>User Entity:</strong> <code>ConsumerUser</code></div>
+      <div class="meta-item">🛣️ <strong>Home Route:</strong> <code>/consumer</code></div>
+      <div class="meta-item">📱 <strong>Tabs:</strong> Current Bill, History, Inbox, Profile</div>
+      <div class="meta-item">🔒 <strong>Security Model:</strong> <code>security_invoker = on</code> &amp; <code>app.current_consumer_id()</code></div>
+      <div class="meta-item">💾 <strong>Offline Cache:</strong> Drift SQLite &amp; <code>CacheOwner</code> Isolation</div>
+      <div class="meta-item">🎯 <strong>Verification:</strong> 100% Disk-Audited</div>
+    </div>
+  </header>
+
+  <!-- ===================================================================== -->
+  <!-- SECTION 4: REAL-TIME INSTRUCTOR Q&A SEARCH TABLE (TOP PRIORITY) -->
+  <!-- ===================================================================== -->
+  <section id="qa-search-section">
+    <div class="section-title">
+      <span>Instant Instructor Defense Q&A &amp; Symbol Search</span>
+      <span class="badge" id="search-result-count">Showing 14 key defense items</span>
+    </div>
+
+    <div class="search-box-wrap">
+      <div class="search-input-group">
+        <input type="text" id="defenseSearchInput" class="search-input" placeholder="Type keyword to filter defense answers (e.g. 'unpriced', 'awaiting', 'qr', 'receipt', 'contact', 'phone', 'inbox', 'rls', 'cache')..." autofocus>
+      </div>
+      <div class="search-pills">
+        <span class="search-pill-label">Fast Filters:</span>
+        <button class="pill" onclick="filterByPill('all')">All</button>
+        <button class="pill" onclick="filterByPill('unpriced')">unpriced</button>
+        <button class="pill" onclick="filterByPill('awaiting')">awaiting</button>
+        <button class="pill" onclick="filterByPill('qr')">qr</button>
+        <button class="pill" onclick="filterByPill('receipt')">receipt</button>
+        <button class="pill" onclick="filterByPill('contact')">contact</button>
+        <button class="pill" onclick="filterByPill('phone')">phone</button>
+        <button class="pill" onclick="filterByPill('inbox')">inbox</button>
+        <button class="pill" onclick="filterByPill('notification')">notification</button>
+        <button class="pill" onclick="filterByPill('rls')">rls</button>
+        <button class="pill" onclick="filterByPill('cache')">cache</button>
+      </div>
+    </div>
+
+    <div class="table-container">
+      <table id="qaTable">
+        <thead>
+          <tr>
+            <th style="width: 180px;">UI Element / Topic</th>
+            <th style="width: 110px;">Layer</th>
+            <th style="width: 220px;">Exact Symbol / Function</th>
+            <th>Plain-English Defense Answer</th>
+            <th style="width: 140px;">VS Code Link</th>
+          </tr>
+        </thead>
+        <tbody id="qaTableBody">
+          <!-- Item 1: Unpriced / Awaiting -->
+          <tr data-keywords="unpriced awaiting 7-day cooperative lag bill status balance">
+            <td><strong>Current Bill Amount</strong><br><span style="color:var(--text-muted);font-size:11px;">Awaiting amount state</span></td>
+            <td><span class="layer-tag layer-dom">Domain</span></td>
+            <td><code>Bill.isUnpriced</code></td>
+            <td>Evaluates <code>totalAmount == null</code> while consumption is recorded; forces UI to display "Awaiting amount" instead of ₱0 debt during the cooperative's 7-day tariff delay.</td>
+            <td><a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/entities/bill.dart:143" class="vscode-link small">bill.dart:143</a></td>
+          </tr>
+
+          <!-- Item 2: Unpriced Screen Header -->
+          <tr data-keywords="unpriced awaiting headline screen total unpaid pending current bill">
+            <td><strong>CurrentBillScreen</strong><br><span style="color:var(--text-muted);font-size:11px;">Pending amount badge</span></td>
+            <td><span class="layer-tag layer-pres">Presentation</span></td>
+            <td><code>_showsPending &amp; _totalUnpaid</code></td>
+            <td>When unpriced and no previous bills are owed, renders "Amount pending" and "Awaiting the cooperative amount" so households never mistake lack of pricing for a free month.</td>
+            <td><a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/consumer/current_bill_screen.dart:247" class="vscode-link small">current_bill_screen:247</a></td>
+          </tr>
+
+          <!-- Item 3: Meter Dials on Sheet -->
+          <tr data-keywords="dial meter reading consumption previous present sheet details">
+            <td><strong>BillDetailsSheet</strong><br><span style="color:var(--text-muted);font-size:11px;">Audit dial verification</span></td>
+            <td><span class="layer-tag layer-pres">Presentation</span></td>
+            <td><code>_InformationCard</code></td>
+            <td>Shows Previous Reading, Present Reading, and Difference in kWh as clear arithmetic, allowing the consumer to audit the meter reader's dials before the bill is even priced.</td>
+            <td><a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/consumer/bill_details_sheet.dart:564" class="vscode-link small">bill_details_sheet:564</a></td>
+          </tr>
+
+          <!-- Item 4: QR Code Receipt -->
+          <tr data-keywords="qr code receipt verification digital receipt receipt_no biec">
+            <td><strong>Digital Receipt QR</strong><br><span style="color:var(--text-muted);font-size:11px;">Scannable QR reference</span></td>
+            <td><span class="layer-tag layer-pres">Presentation</span></td>
+            <td><code>ReceiptQrCode</code></td>
+            <td>Encodes exclusively the server-issued <code>verificationCode</code> (no cash or PII) with a quiet zone in black-on-white, allowing instant cashier cross-verification against counter records.</td>
+            <td><a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/common/receipt_qr_code.dart:6" class="vscode-link small">receipt_qr_code:6</a></td>
+          </tr>
+
+          <!-- Item 5: Receipt Screen Navigation -->
+          <tr data-keywords="receipt receipt_no payment summary verification copy biec">
+            <td><strong>ConsumerReceiptScreen</strong><br><span style="color:var(--text-muted);font-size:11px;">Official digital proof</span></td>
+            <td><span class="layer-tag layer-pres">Presentation</span></td>
+            <td><code>consumerReceiptProvider</code></td>
+            <td>Looks up the household's receipt by <code>receiptNo</code> (`BIEC-YYYY-MM-XXXXXX`), displaying settled billing cycles, change due, timestamp, and verification code with 1-click clipboard copy.</td>
+            <td><a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/consumer/receipt_screen.dart:16" class="vscode-link small">receipt_screen:16</a></td>
+          </tr>
+
+          <!-- Item 6: History Multi-Bill Grouping -->
+          <tr data-keywords="history payment summary grouping v_payment_history multi-bill receipts">
+            <td><strong>History Controller</strong><br><span style="color:var(--text-muted);font-size:11px;">Payment &amp; bill history</span></td>
+            <td><span class="layer-tag layer-pres">Presentation</span></td>
+            <td><code>HistoryController._doLoad()</code></td>
+            <td>Groups multi-bill payments into a single <code>PaymentSummary</code> per receipt number so a three-month settlement is not misreported as three separate counter payments.</td>
+            <td><a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/consumer/history_controller.dart:91" class="vscode-link small">history_controller:91</a></td>
+          </tr>
+
+          <!-- Item 7: Contact Number Validation -->
+          <tr data-keywords="contact phone number update sms normalization mobile 0917 e.164">
+            <td><strong>SMS Contact Update</strong><br><span style="color:var(--text-muted);font-size:11px;">Household phone number</span></td>
+            <td><span class="layer-tag layer-dom">Domain</span></td>
+            <td><code>UpdateOwnContactNumber</code></td>
+            <td>Validates non-empty input on client and delegates to the server-owned trigger <code>trg_consumers_normalize_contact</code> to guarantee strict E.164 formatting without client parsing discrepancies.</td>
+            <td><a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/usecases/consumer/update_own_contact_number.dart:10" class="vscode-link small">update_own_contact_number:10</a></td>
+          </tr>
+
+          <!-- Item 8: Contact RPC Security -->
+          <tr data-keywords="contact fn_update_own_contact_number rpc postgres check unique phone">
+            <td><strong>Contact Number RPC</strong><br><span style="color:var(--text-muted);font-size:11px;">Zero-privilege DB update</span></td>
+            <td><span class="layer-tag layer-sql">Supabase SQL</span></td>
+            <td><code>fn_update_own_contact_number</code></td>
+            <td>Restricts mutation exclusively to <code>contact_number</code> for the calling authenticated consumer, enforcing <code>uq_consumers_contact_number</code> to prevent mobile number hijacking across households.</td>
+            <td><a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/10_consumer_contact_number.sql:21" class="vscode-link small">10_consumer_contact_number:21</a></td>
+          </tr>
+
+          <!-- Item 9: Phone Alerts Gate -->
+          <tr data-keywords="phone alerts gate notification periodic 15-minute background tray refresh">
+            <td><strong>PhoneAlertsGate</strong><br><span style="color:var(--text-muted);font-size:11px;">App-active alert sync</span></td>
+            <td><span class="layer-tag layer-pres">Presentation</span></td>
+            <td><code>PhoneAlertsGate._refresh()</code></td>
+            <td>Runs immediate alert refresh on app launch and every 60 seconds while open, scheduling local Android notifications at 08:00 AM before bill due dates.</td>
+            <td><a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/consumer/phone_alerts_gate.dart:130" class="vscode-link small">phone_alerts_gate:130</a></td>
+          </tr>
+
+          <!-- Item 10: Tapped Notification Deep Linking -->
+          <tr data-keywords="open tapped notice notification deep link show bill show inbox cross-user isolation">
+            <td><strong>OpenTappedNotice</strong><br><span style="color:var(--text-muted);font-size:11px;">Payload spoofing defense</span></td>
+            <td><span class="layer-tag layer-dom">Domain</span></td>
+            <td><code>OpenTappedNotice.call()</code></td>
+            <td>Verifies whether a tapped tray notice actually belongs to the household signed in RIGHT NOW, routing to <code>ShowBill</code> or safely degrading to <code>ShowInbox</code> with an explanatory message if accounts switched.</td>
+            <td><a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/usecases/consumer/open_tapped_notice.dart:44" class="vscode-link small">open_tapped_notice:44</a></td>
+          </tr>
+
+          <!-- Item 11: Workmanager Background Polling -->
+          <tr data-keywords="workmanager background alerts polling 15 minutes isolate android phone">
+            <td><strong>Background Alerts</strong><br><span style="color:var(--text-muted);font-size:11px;">Headless Android check</span></td>
+            <td><span class="layer-tag layer-data">Data / Isolate</span></td>
+            <td><code>phoneAlertsCallbackDispatcher</code></td>
+            <td>Runs a headless Dart isolate every 15 minutes via Android Workmanager; polls queued notices directly from Supabase and pops local tray alerts without requiring expensive Firebase FCM tokens.</td>
+            <td><a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/notifications/workmanager_background_alerts.dart:25" class="vscode-link small">workmanager_background_alerts:25</a></td>
+          </tr>
+
+          <!-- Item 12: RLS Security Invoker Views -->
+          <tr data-keywords="rls security_invoker views privacy isolation v_consumer_current_bill v_bill_status">
+            <td><strong>Security Invoker Views</strong><br><span style="color:var(--text-muted);font-size:11px;">Postgres view security</span></td>
+            <td><span class="layer-tag layer-sql">Supabase SQL</span></td>
+            <td><code>security_invoker = on</code></td>
+            <td>Forces Postgres views (`v_consumer_current_bill`, `v_bill_status`, `v_payment_history`) to execute with querying role permissions, preventing consumers from snooping on neighboring households' bills.</td>
+            <td><a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/03_views.sql:390" class="vscode-link small">03_views.sql:390</a></td>
+          </tr>
+
+          <!-- Item 13: RLS Policy Scoping -->
+          <tr data-keywords="rls policy app.current_consumer_id current_consumer_id bills consumers">
+            <td><strong>Current Consumer Scoping</strong><br><span style="color:var(--text-muted);font-size:11px;">Database RLS policy</span></td>
+            <td><span class="layer-tag layer-sql">Supabase SQL</span></td>
+            <td><code>bills_select_scoped</code></td>
+            <td>Enforces <code>c.profile_id = app.current_user_id()</code>; Supabase queries execute through JWT claims so a consumer's PostgREST query returns ONLY their own household's rows.</td>
+            <td><a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/04_rls.sql:114" class="vscode-link small">04_rls.sql:114</a></td>
+          </tr>
+
+          <!-- Item 14: Shared-Device Cache Isolation -->
+          <tr data-keywords="cache cacheowner shared device clear cached data cacheepoch sqlite drift">
+            <td><strong>Cache Isolation</strong><br><span style="color:var(--text-muted);font-size:11px;">Shared phone protection</span></td>
+            <td><span class="layer-tag layer-data">Data / Drift</span></td>
+            <td><code>AppDatabase.clearCachedData()</code></td>
+            <td>Bumps <code>cacheEpoch</code> to cancel in-flight queries and wipes <code>cached_bills</code>, <code>cached_payments</code>, <code>cached_notifications</code>, and <code>cache_owner</code> upon sign-out to prevent data leaks on shared devices.</td>
+            <td><a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/local/app_database.dart:184" class="vscode-link small">app_database.dart:184</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <!-- SECTION 1: COMPLETE CONSUMER FILE MANIFEST (4-LAYER GRID) -->
+  <!-- ===================================================================== -->
+  <section id="manifest-section">
+    <div class="section-title">
+      <span>Section 1: Complete Consumer File Manifest (4-Layer Clean Architecture)</span>
+      <span class="badge">Every file verified on disk</span>
+    </div>
+
+    <div class="manifest-grid">
+      <!-- 1. Presentation Layer -->
+      <div class="manifest-layer-card">
+        <div class="manifest-layer-header">
+          <div class="manifest-layer-title">
+            <span class="layer-tag layer-pres">Presentation</span>
+            <span>Flutter &amp; Riverpod</span>
+          </div>
+          <span style="font-size:12px;color:var(--text-muted);">UI &amp; State</span>
+        </div>
+        <div class="manifest-file-list">
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>current_bill_screen.dart</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/consumer/current_bill_screen.dart:1" class="vscode-link small">open:1</a>
+            </div>
+            <div class="manifest-file-desc">Renders current billing status, pending unpriced indicator, total debt rollup, and links to detailed breakdown.</div>
+          </div>
+
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>current_bill_controller.dart</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/consumer/current_bill_controller.dart:41" class="vscode-link small">open:41</a>
+            </div>
+            <div class="manifest-file-desc">State notifier coordinating <code>signedInConsumer()</code>, <code>currentBillFor()</code>, and past billing history into <code>CurrentBillState</code>.</div>
+          </div>
+
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>bill_details_sheet.dart</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/consumer/bill_details_sheet.dart:32" class="vscode-link small">open:32</a>
+            </div>
+            <div class="manifest-file-desc">Expandable bottom sheet revealing previous/present dial readings, kWh difference, reading date, and cooperative lifecycle progress.</div>
+          </div>
+
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>history_screen.dart</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/consumer/history_screen.dart:29" class="vscode-link small">open:29</a>
+            </div>
+            <div class="manifest-file-desc">Tabbed consumer archive allowing toggle between past monthly Statements and official Digital Receipts.</div>
+          </div>
+
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>history_controller.dart</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/consumer/history_controller.dart:27" class="vscode-link small">open:27</a>
+            </div>
+            <div class="manifest-file-desc">Loads past bills and cashier payments in parallel; groups raw database settlements by receipt number.</div>
+          </div>
+
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>receipt_screen.dart</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/consumer/receipt_screen.dart:50" class="vscode-link small">open:50</a>
+            </div>
+            <div class="manifest-file-desc">Renders official Bohol I Electric Cooperative digital receipt, verification code, settled bills, and QR code widget.</div>
+          </div>
+
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>receipt_qr_code.dart</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/common/receipt_qr_code.dart:6" class="vscode-link small">open:6</a>
+            </div>
+            <div class="manifest-file-desc">Renders high-contrast scannable QR image via <code>qr_flutter</code> containing only the unique receipt verification hash.</div>
+          </div>
+
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>inbox_screen.dart</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/consumer/inbox_screen.dart:31" class="vscode-link small">open:31</a>
+            </div>
+            <div class="manifest-file-desc">Interactive notification feed with read/unread filtering, deep-linking into notices, and mark-all-read action.</div>
+          </div>
+
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>inbox_controller.dart</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/consumer/inbox_controller.dart:26" class="vscode-link small">open:26</a>
+            </div>
+            <div class="manifest-file-desc">Manages consumer notification state, unread counter badges, and server-side read acknowledgment.</div>
+          </div>
+
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>phone_alerts_gate.dart</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/consumer/phone_alerts_gate.dart:24" class="vscode-link small">open:24</a>
+            </div>
+            <div class="manifest-file-desc">Wraps consumer shell; handles notification tap routing, permission requests, and foreground 60-second periodic polling.</div>
+          </div>
+
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>edit_contact_number_sheet.dart</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/consumer/edit_contact_number_sheet.dart:22" class="vscode-link small">open:22</a>
+            </div>
+            <div class="manifest-file-desc">Modal bottom sheet with final confirmation dialog for updating the household's SMS delivery number.</div>
+          </div>
+
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>contact_number_controller.dart</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/consumer/contact_number_controller.dart:22" class="vscode-link small">open:22</a>
+            </div>
+            <div class="manifest-file-desc">Notifier executing SMS update use case and tracking submission state and error banners.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Domain Layer -->
+      <div class="manifest-layer-card">
+        <div class="manifest-layer-header">
+          <div class="manifest-layer-title">
+            <span class="layer-tag layer-dom">Domain</span>
+            <span>Business Logic &amp; Entities</span>
+          </div>
+          <span style="font-size:12px;color:var(--text-muted);">Pure Dart</span>
+        </div>
+        <div class="manifest-file-list">
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>bill.dart</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/entities/bill.dart:16" class="vscode-link small">open:16</a>
+            </div>
+            <div class="manifest-file-desc">Core entity defining bill lifecycle rules: <code>isUnpriced</code>, <code>isPayable</code>, <code>isSettled</code>, <code>balance</code>, and overdue calculations.</div>
+          </div>
+
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>consumer.dart</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/entities/consumer.dart:33" class="vscode-link small">open:33</a>
+            </div>
+            <div class="manifest-file-desc">Consumer household entity holding meter serial number, address, assigned area, and last recorded readings.</div>
+          </div>
+
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>update_own_contact_number.dart</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/usecases/consumer/update_own_contact_number.dart:10" class="vscode-link small">open:10</a>
+            </div>
+            <div class="manifest-file-desc">Guards mobile update: enforces non-empty input and delegates normalization to server trigger.</div>
+          </div>
+
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>refresh_phone_alerts.dart</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/usecases/consumer/refresh_phone_alerts.dart:39" class="vscode-link small">open:39</a>
+            </div>
+            <div class="manifest-file-desc">Translates queued server push alerts into phone notifications; schedules 8:00 AM due-date reminders for unpaid bills.</div>
+          </div>
+
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>open_tapped_notice.dart</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/usecases/consumer/open_tapped_notice.dart:44" class="vscode-link small">open:44</a>
+            </div>
+            <div class="manifest-file-desc">Validates tapped notification against current session to prevent cross-account leaks on shared household phones.</div>
+          </div>
+
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>linked_household_provider.dart</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/auth/linked_household_provider.dart:10" class="vscode-link small">open:10</a>
+            </div>
+            <div class="manifest-file-desc">Asynchronously resolves the authenticated user profile to its linked consumer household row.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Data & Drift Layer -->
+      <div class="manifest-layer-card">
+        <div class="manifest-layer-header">
+          <div class="manifest-layer-title">
+            <span class="layer-tag layer-data">Data &amp; Drift</span>
+            <span>Repositories &amp; Cache</span>
+          </div>
+          <span style="font-size:12px;color:var(--text-muted);">SQLite &amp; Services</span>
+        </div>
+        <div class="manifest-file-list">
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>consumer_repository_impl.dart</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/repositories/consumer_repository_impl.dart:142" class="vscode-link small">open:142</a>
+            </div>
+            <div class="manifest-file-desc">Implements <code>signedInConsumer()</code> with local query caching and <code>updateOwnContactNumber()</code> via Postgres RPC.</div>
+          </div>
+
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>bill_repository_impl.dart</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/repositories/bill_repository_impl.dart:175" class="vscode-link small">open:175</a>
+            </div>
+            <div class="manifest-file-desc">Fetches <code>v_consumer_current_bill</code> and <code>v_bill_status</code>; caches unpriced bills in Drift SQLite <code>CachedBills</code>.</div>
+          </div>
+
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>payment_repository_impl.dart</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/repositories/payment_repository_impl.dart:80" class="vscode-link small">open:80</a>
+            </div>
+            <div class="manifest-file-desc">Reads <code>v_payment_history</code>, groups multi-bill handovers, and caches receipts in Drift <code>CachedPayments</code>.</div>
+          </div>
+
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>notification_repository_impl.dart</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/repositories/notification_repository_impl.dart:40" class="vscode-link small">open:40</a>
+            </div>
+            <div class="manifest-file-desc">Syncs <code>notifications</code> table to Drift <code>CachedNotifications</code>; handles server-side <code>markRead()</code>.</div>
+          </div>
+
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>tables.dart</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/local/tables.dart:64" class="vscode-link small">open:64</a>
+            </div>
+            <div class="manifest-file-desc">Declares Drift tables: <code>CachedBills</code>, <code>CachedPayments</code>, <code>CachedNotifications</code>, and <code>CacheOwner</code>.</div>
+          </div>
+
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>app_database.dart</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/local/app_database.dart:184" class="vscode-link small">open:184</a>
+            </div>
+            <div class="manifest-file-desc">Executes <code>clearCachedData()</code> to atomically wipe private consumer records and bumps <code>cacheEpoch</code> on sign-out.</div>
+          </div>
+
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>workmanager_background_alerts.dart</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/notifications/workmanager_background_alerts.dart:25" class="vscode-link small">open:25</a>
+            </div>
+            <div class="manifest-file-desc">Headless Workmanager isolate checking for queued bills and notices every 15 minutes without an active app window.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Supabase SQL & RLS Layer -->
+      <div class="manifest-layer-card">
+        <div class="manifest-layer-header">
+          <div class="manifest-layer-title">
+            <span class="layer-tag layer-sql">Supabase SQL</span>
+            <span>Views, RLS &amp; RPCs</span>
+          </div>
+          <span style="font-size:12px;color:var(--text-muted);">Database Layer</span>
+        </div>
+        <div class="manifest-file-list">
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>03_views.sql (v_consumer_current_bill)</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/03_views.sql:56" class="vscode-link small">open:56</a>
+            </div>
+            <div class="manifest-file-desc">View combining <code>v_bill_status</code> and <code>meter_readings</code>; deliberately includes unpriced bills to serve the 7-day cooperative lag.</div>
+          </div>
+
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>03_views.sql (v_payment_history)</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/03_views.sql:220" class="vscode-link small">open:220</a>
+            </div>
+            <div class="manifest-file-desc">View joining payments, billing cycles, and cashier transactions; supplies receipt number and verification codes.</div>
+          </div>
+
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>03_views.sql (security_invoker = on)</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/03_views.sql:390" class="vscode-link small">open:390</a>
+            </div>
+            <div class="manifest-file-desc">PostgreSQL view modifier applying querying user's RLS policies to all view queries, closing cross-household snooping.</div>
+          </div>
+
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>04_rls.sql (bills_select_scoped)</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/04_rls.sql:114" class="vscode-link small">open:114</a>
+            </div>
+            <div class="manifest-file-desc">RLS policy restricting bill reads to <code>c.profile_id = app.current_user_id()</code> for consumers and area staff.</div>
+          </div>
+
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>10_consumer_contact_number.sql</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/10_consumer_contact_number.sql:21" class="vscode-link small">open:21</a>
+            </div>
+            <div class="manifest-file-desc">Postgres RPC <code>fn_update_own_contact_number</code> and unique index <code>uq_consumers_contact_number</code>.</div>
+          </div>
+
+          <div class="manifest-file-item">
+            <div class="manifest-file-name">
+              <code>supabase/functions/send-sms</code>
+              <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/functions/send-sms/index.ts:24" class="vscode-link small">open:24</a>
+            </div>
+            <div class="manifest-file-desc">Edge function claiming queued SMS batches via <code>fn_claim_sms_batch</code> and dispatching over httpSMS.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <!-- SECTION 2: 5 MAIN CONSUMER FUNCTIONS (DEEP DIVES & VERBATIM CODE) -->
+  <!-- ===================================================================== -->
+  <section id="functions-section">
+    <div class="section-title">
+      <span>Section 2: 5 Main Consumer Functions (End-to-End Code &amp; Flow Deep Dives)</span>
+      <span class="badge">Click tabs to inspect complete 4-layer trace</span>
+    </div>
+
+    <!-- Tab Navigation -->
+    <div class="tabs-nav">
+      <button class="tab-btn active" onclick="switchTab(0)">1. Current Bill &amp; "Awaiting Amount" (7-Day Lag)</button>
+      <button class="tab-btn" onclick="switchTab(1)">2. History &amp; Digital Receipt (QR Verification)</button>
+      <button class="tab-btn" onclick="switchTab(2)">3. Multi-Channel Inbox &amp; Local Alerts</button>
+      <button class="tab-btn" onclick="switchTab(3)">4. Updating Household SMS Number</button>
+      <button class="tab-btn" onclick="switchTab(4)">5. RLS Security &amp; Drift Cache Isolation</button>
+    </div>
+
+    <!-- TAB 1: VIEWING CURRENT BILL & 7-DAY LAG -->
+    <div class="tab-content active" id="tab-0">
+      <h3 style="font-size:18px;margin-bottom:12px;color:var(--accent-blue);">1. Viewing Current Bill &amp; "Awaiting Amount" (7-Day Cooperative Lag State)</h3>
+      <p style="color:var(--text-muted);font-size:14px;margin-bottom:16px;">
+        Trace: <code>CurrentBillScreen</code> &amp; <code>BillDetailsSheet</code> → <code>CurrentBillController</code> → <code>ConsumerRepository.signedInConsumer()</code> &amp; <code>BillRepository.currentBillFor()</code> → <code>Bill.isUnpriced</code> (where <code>totalAmount == null</code> while <code>consumption</code> is already recorded) → <code>v_consumer_current_bill</code> &amp; <code>v_bill_status</code>.
+      </p>
+
+      <!-- Flow Diagram -->
+      <div class="flow-diagram">
+        <div class="flow-title">⚡ Interactive 4-Layer Trace — Current Bill &amp; Unpriced State</div>
+        <div class="flow-chain">
+          <div class="flow-step">
+            <span class="flow-step-label">1. Presentation (UI)</span>
+            <span class="flow-step-name">CurrentBillScreen</span>
+            <span class="flow-step-action">Shows "Amount pending" &amp; "Awaiting the cooperative amount"</span>
+            <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/consumer/current_bill_screen.dart:270" class="vscode-link small">L270-305</a>
+          </div>
+          <div class="flow-arrow">→</div>
+
+          <div class="flow-step">
+            <span class="flow-step-label">2. Controller</span>
+            <span class="flow-step-name">CurrentBillController</span>
+            <span class="flow-step-action">Resolves signedInConsumer() then currentBillFor(consumerId)</span>
+            <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/consumer/current_bill_controller.dart:87" class="vscode-link small">L87-148</a>
+          </div>
+          <div class="flow-arrow">→</div>
+
+          <div class="flow-step">
+            <span class="flow-step-label">3. Domain Entity</span>
+            <span class="flow-step-name">Bill.isUnpriced</span>
+            <span class="flow-step-action">totalAmount == null; balance is 0 until cooperative prices it</span>
+            <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/entities/bill.dart:140" class="vscode-link small">L140-155</a>
+          </div>
+          <div class="flow-arrow">→</div>
+
+          <div class="flow-step">
+            <span class="flow-step-label">4. Drift / Repository</span>
+            <span class="flow-step-name">BillRepositoryImpl</span>
+            <span class="flow-step-action">Queries v_consumer_current_bill; falls back to CachedBills</span>
+            <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/repositories/bill_repository_impl.dart:175" class="vscode-link small">L175-208</a>
+          </div>
+          <div class="flow-arrow">→</div>
+
+          <div class="flow-step">
+            <span class="flow-step-label">5. Supabase SQL</span>
+            <span class="flow-step-name">v_consumer_current_bill</span>
+            <span class="flow-step-action">Includes unpriced bills with meter_readings dial figures</span>
+            <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/03_views.sql:56" class="vscode-link small">L56-80</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Verbatim Code Box 1 -->
+      <div class="code-box">
+        <div class="code-header">
+          <div class="code-file-path">
+            <span>📄</span>
+            <span>lib/presentation/consumer/current_bill_screen.dart (Lines 270–296)</span>
+          </div>
+          <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/consumer/current_bill_screen.dart:270" class="vscode-link small">Open in VS Code</a>
+        </div>
+        <div class="code-lines-container">
+          <div class="line-numbers">270<br>271<br>272<br>273<br>274<br>275<br>276<br>277<br>278<br>279<br>280<br>281<br>282<br>283<br>284<br>285<br>286<br>287<br>288<br>289<br>290<br>291<br>292<br>293<br>294<br>295<br>296</div>
+          <div class="code-content">        children: &lt;Widget&gt;[
+          <span class="c-com">// "Amount due" was the balance of one month. It is only the whole</span>
+          <span class="c-com">// truth when nothing older is outstanding, so the label says which</span>
+          <span class="c-com">// of the two it is rather than quietly meaning both.</span>
+          <span class="c-type">Text</span>(_headline, style: text.bodyMedium),
+          <span class="c-kw">const</span> <span class="c-type">SizedBox</span>(height: <span class="c-val">4</span>),
+          <span class="c-type">Text</span>(
+            _showsPending ? <span class="c-str">'Amount pending'</span> : _totalUnpaid.format(),
+            style: text.headlineMedium?.copyWith(
+              fontSize: _showsPending ? <span class="c-val">28</span> : <span class="c-val">42</span>,
+              height: <span class="c-val">1.15</span>,
+              letterSpacing: <span class="c-val">-1</span>,
+              fontWeight: <span class="c-type">FontWeight</span>.w700,
+            ),
+          ),
+          <span class="c-com">// The total broken into the months it came from. Shown only when</span>
+          <span class="c-com">// there is something older, because with one bill the breakdown</span>
+          <span class="c-com">// would just repeat the figure above it.</span>
+          <span class="c-kw">if</span> (earlier.isNotEmpty) ...&lt;<span class="c-type">Widget</span>&gt;[
+            <span class="c-kw">const</span> <span class="c-type">SizedBox</span>(height: <span class="c-val">14</span>),
+            <span class="c-type">_UnpaidLine</span>(
+              label: bill.isUnpriced
+                  ? <span class="c-str">'${bill.cycle.displayName} (awaiting amount)'</span>
+                  : <span class="c-str">'${bill.cycle.displayName} (this bill)'</span>,
+              value: bill.isUnpriced ? <span class="c-kw">null</span> : bill.balance,
+            ),
+            <span class="c-kw">const</span> <span class="c-type">SizedBox</span>(height: <span class="c-val">6</span>),</div>
+        </div>
+      </div>
+
+      <!-- Verbatim Code Box 2: Domain Entity -->
+      <div class="code-box">
+        <div class="code-header">
+          <div class="code-file-path">
+            <span>📄</span>
+            <span>lib/domain/entities/bill.dart (Lines 140–162)</span>
+          </div>
+          <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/entities/bill.dart:140" class="vscode-link small">Open in VS Code</a>
+        </div>
+        <div class="code-lines-container">
+          <div class="line-numbers">140<br>141<br>142<br>143<br>144<br>145<br>146<br>147<br>148<br>149<br>150<br>151<br>152<br>153<br>154<br>155<br>156<br>157<br>158<br>159<br>160<br>161<br>162</div>
+          <div class="code-content">  <span class="c-com">/// The reading is in, the amount is not. The consumer can see their</span>
+  <span class="c-com">/// consumption but there is nothing to pay yet.</span>
+  <span class="c-type">bool</span> <span class="c-kw">get</span> isUnpriced =&gt; totalAmount == <span class="c-kw">null</span>;
+
+  <span class="c-com">/// The Admin has posted an amount, so this bill can be collected against.</span>
+  <span class="c-type">bool</span> <span class="c-kw">get</span> isPayable =&gt; totalAmount != <span class="c-kw">null</span> &amp;&amp; !isWaived;
+
+  <span class="c-com">/// What is still owed. Zero for an unpriced bill: nothing is owed on a</span>
+  <span class="c-com">/// reading the cooperative has not priced.</span>
+  <span class="c-type">Money</span> <span class="c-kw">get</span> balance =&gt;
+      (totalAmount ?? <span class="c-type">Money</span>.zero) - amountPaid - waiverAmount - externalPaid;
+
+  <span class="c-com">/// Paid in full.</span>
+  <span class="c-type">bool</span> <span class="c-kw">get</span> isSettled =&gt;
+      isWaived || (isPayable &amp;&amp; amountPaid + externalPaid &gt;= totalAmount!);
+
+  <span class="c-com">/// Something has been paid, but not all of it.</span>
+  <span class="c-type">bool</span> <span class="c-kw">get</span> isPartiallyPaid =&gt;
+      isPayable &amp;&amp;
+      !isSettled &amp;&amp;
+      !amountPaid.isZero &amp;&amp;
+      amountPaid &lt; totalAmount!;</div>
+        </div>
+      </div>
+
+      <!-- Plain English Defense Callout -->
+      <div class="defense-card">
+        <div class="defense-title" style="color:var(--accent-emerald);">🛡️ Defense Callout: The 7-Day Cooperative Lag &amp; Zero Debt Guarantee</div>
+        <p>
+          In Bohol rural electric distribution (BOHECO I), meter readers physically record dials on day 1, but the electric cooperative takes up to 7 days to calculate dynamic kilowatt-hour tariffs. A novice developer might show "₱0.00 Due" during this window, leading consumers to assume their electricity is free. In BillAlert, <code>Bill.isUnpriced</code> evaluates true, <code>balance</code> defaults to zero so older debts aren't artificially distorted, and the UI displays <strong>"Amount pending"</strong> and <strong>"Awaiting the cooperative amount"</strong>. Tapping into <code>BillDetailsSheet</code> shows the household their exact previous and present dial readings and energy consumed in kWh, providing full audit transparency before any money is owed.
+        </p>
+      </div>
+    </div>
+
+    <!-- TAB 2: BILL HISTORY & DIGITAL RECEIPT WITH QR -->
+    <div class="tab-content" id="tab-1">
+      <h3 style="font-size:18px;margin-bottom:12px;color:var(--accent-emerald);">2. Bill History &amp; Official Digital Receipt with QR Verification</h3>
+      <p style="color:var(--text-muted);font-size:14px;margin-bottom:16px;">
+        Trace: <code>HistoryScreen</code> &amp; <code>ConsumerReceiptScreen</code> → <code>HistoryController</code> → <code>v_payment_history</code> &amp; <code>CachedPayments</code> → Rendering <code>receipt_no</code> (<code>BIEC-YYYY-MM-XXXXXX</code>), <code>verification_code</code>, and scannable QR code widget (<code>ReceiptQrCode</code>).
+      </p>
+
+      <!-- Flow Diagram -->
+      <div class="flow-diagram">
+        <div class="flow-title">⚡ Interactive 4-Layer Trace — Official Receipt &amp; QR Verification</div>
+        <div class="flow-chain">
+          <div class="flow-step">
+            <span class="flow-step-label">1. Presentation (UI)</span>
+            <span class="flow-step-name">HistoryScreen</span>
+            <span class="flow-step-action">Lists receipts; tap routes to /consumer/receipt/:receiptNo</span>
+            <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/consumer/history_screen.dart:295" class="vscode-link small">L295-315</a>
+          </div>
+          <div class="flow-arrow">→</div>
+
+          <div class="flow-step">
+            <span class="flow-step-label">2. Presentation (Receipt)</span>
+            <span class="flow-step-name">ConsumerReceiptScreen</span>
+            <span class="flow-step-action">Renders BIEC receipt, settled cycles, &amp; ReceiptQrCode</span>
+            <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/consumer/receipt_screen.dart:50" class="vscode-link small">L50-85</a>
+          </div>
+          <div class="flow-arrow">→</div>
+
+          <div class="flow-step">
+            <span class="flow-step-label">3. QR Code Widget</span>
+            <span class="flow-step-name">ReceiptQrCode</span>
+            <span class="flow-step-action">Encodes verificationCode only via qr_flutter QrImageView</span>
+            <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/common/receipt_qr_code.dart:6" class="vscode-link small">L6-48</a>
+          </div>
+          <div class="flow-arrow">→</div>
+
+          <div class="flow-step">
+            <span class="flow-step-label">4. Drift / Repo</span>
+            <span class="flow-step-name">PaymentRepositoryImpl</span>
+            <span class="flow-step-action">Groups multi-bill rows into 1 PaymentSummary; caches to SQLite</span>
+            <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/repositories/payment_repository_impl.dart:80" class="vscode-link small">L80-110</a>
+          </div>
+          <div class="flow-arrow">→</div>
+
+          <div class="flow-step">
+            <span class="flow-step-label">5. Supabase SQL</span>
+            <span class="flow-step-name">v_payment_history</span>
+            <span class="flow-step-action">Joins payments, billing_cycles, &amp; payment_transactions</span>
+            <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/03_views.sql:220" class="vscode-link small">L220-241</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Verbatim Code Box 1: Receipt Screen Provider & QR -->
+      <div class="code-box">
+        <div class="code-header">
+          <div class="code-file-path">
+            <span>📄</span>
+            <span>lib/presentation/consumer/receipt_screen.dart (Lines 16–46)</span>
+          </div>
+          <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/consumer/receipt_screen.dart:16" class="vscode-link small">Open in VS Code</a>
+        </div>
+        <div class="code-lines-container">
+          <div class="line-numbers">16<br>17<br>18<br>19<br>20<br>21<br>22<br>23<br>24<br>25<br>26<br>27<br>28<br>29<br>30<br>31<br>32<br>33<br>34<br>35<br>36<br>37<br>38<br>39<br>40<br>41<br>42<br>43<br>44<br>45<br>46</div>
+          <div class="code-content"><span class="c-kw">final</span> consumerReceiptProvider = <span class="c-type">FutureProvider</span>.family&lt;<span class="c-type">PaymentSummary</span>?, <span class="c-type">String</span>&gt;((
+  <span class="c-type">Ref</span> ref,
+  <span class="c-type">String</span> receiptNo,
+) <span class="c-kw">async</span> {
+  ref.watch(authControllerProvider.select((s) =&gt; s.value?.accessScope));
+  <span class="c-kw">final</span> consumerResult = <span class="c-kw">await</span> ref
+      .watch(consumerRepositoryProvider)
+      .signedInConsumer();
+
+  <span class="c-kw">final</span> <span class="c-type">Consumer</span>? me = <span class="c-kw">switch</span> (consumerResult) {
+    <span class="c-type">Ok</span>(:<span class="c-kw">final</span> value) =&gt; value,
+    <span class="c-type">Err</span>(:<span class="c-kw">final</span> failure) =&gt; <span class="c-kw">throw</span> failure,
+  };
+
+  <span class="c-kw">if</span> (me == <span class="c-kw">null</span>) {
+    <span class="c-kw">throw</span> <span class="c-kw">const</span> <span class="c-type">PermissionFailure</span>(
+      <span class="c-str">'This is a household receipt, and the account you are signed in with '</span>
+      <span class="c-str">'is not attached to one.'</span>,
+    );
+  }
+
+  <span class="c-kw">final</span> result = <span class="c-kw">await</span> ref.watch(paymentRepositoryProvider).historyFor(me.id);
+  <span class="c-kw">final</span> <span class="c-type">List</span>&lt;<span class="c-type">PaymentSummary</span>&gt; receipts = <span class="c-kw">switch</span> (result) {
+    <span class="c-type">Ok</span>(:<span class="c-kw">final</span> value) =&gt; value,
+    <span class="c-type">Err</span>(:<span class="c-kw">final</span> failure) =&gt; <span class="c-kw">throw</span> failure,
+  };
+
+  <span class="c-kw">for</span> (<span class="c-kw">final</span> <span class="c-type">PaymentSummary</span> receipt <span class="c-kw">in</span> receipts) {
+    <span class="c-kw">if</span> (receipt.receiptNo == receiptNo) <span class="c-kw">return</span> receipt;
+  }
+  <span class="c-kw">return</span> <span class="c-kw">null</span>;</div>
+        </div>
+      </div>
+
+      <!-- Verbatim Code Box 2: ReceiptQrCode -->
+      <div class="code-box">
+        <div class="code-header">
+          <div class="code-file-path">
+            <span>📄</span>
+            <span>lib/presentation/common/receipt_qr_code.dart (Lines 6–30)</span>
+          </div>
+          <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/common/receipt_qr_code.dart:6" class="vscode-link small">Open in VS Code</a>
+        </div>
+        <div class="code-lines-container">
+          <div class="line-numbers">6<br>7<br>8<br>9<br>10<br>11<br>12<br>13<br>14<br>15<br>16<br>17<br>18<br>19<br>20<br>21<br>22<br>23<br>24<br>25<br>26<br>27<br>28<br>29<br>30</div>
+          <div class="code-content"><span class="c-kw">class</span> <span class="c-type">ReceiptQrCode</span> <span class="c-kw">extends</span> <span class="c-type">StatelessWidget</span> {
+  <span class="c-kw">final</span> <span class="c-type">String</span> verificationCode;
+
+  <span class="c-kw">const</span> <span class="c-type">ReceiptQrCode</span>({<span class="c-kw">required</span> <span class="c-kw">this</span>.verificationCode, <span class="c-kw">super</span>.key});
+
+  <span class="c-kw">@override</span>
+  <span class="c-type">Widget</span> <span class="c-fn">build</span>(<span class="c-type">BuildContext</span> context) {
+    <span class="c-kw">if</span> (verificationCode.trim().isEmpty) {
+      <span class="c-kw">return</span> <span class="c-kw">const</span> <span class="c-type">Text</span>(<span class="c-str">'Scannable reference unavailable.'</span>);
+    }
+    <span class="c-kw">return</span> <span class="c-type">Column</span>(
+      mainAxisSize: <span class="c-type">MainAxisSize</span>.min,
+      children: &lt;<span class="c-type">Widget</span>&gt;[
+        <span class="c-type">Center</span>(
+          <span class="c-type">child</span>: <span class="c-type">QrImageView</span>(
+            data: verificationCode,
+            size: <span class="c-val">200</span>,
+            <span class="c-com">// At least four modules of white quiet zone, even for version 1.</span>
+            <span class="c-com">// Keep black modules on white in either app theme.</span>
+            padding: <span class="c-kw">const</span> <span class="c-type">EdgeInsets</span>.all(<span class="c-val">32</span>),
+            backgroundColor: <span class="c-type">Colors</span>.white,
+            eyeStyle: <span class="c-kw">const</span> <span class="c-type">QrEyeStyle</span>(
+              eyeShape: <span class="c-type">QrEyeShape</span>.square,
+              color: <span class="c-type">Colors</span>.black,
+            ),</div>
+        </div>
+      </div>
+
+      <!-- Plain English Defense Callout -->
+      <div class="defense-card">
+        <div class="defense-title" style="color:var(--accent-emerald);">🛡️ Defense Callout: Offline-Safe Digital Receipt &amp; Privacy-Preserving QR</div>
+        <p>
+          BillAlert replaces paper receipts with legally verifiable digital receipts issued directly at Cristell's cashier counter. Notice two crucial architectural decisions: (1) <code>PaymentRepositoryImpl.historyFor()</code> groups individual bill rows into one single <code>PaymentSummary</code> per <code>receipt_no</code> (<code>BIEC-YYYY-MM-XXXXXX</code>). If a consumer settles 3 past months with ₱1,500 cash, they receive ONE receipt listing all 3 cycles, not 3 confusing duplicate payments. (2) The QR code generated by <code>ReceiptQrCode</code> stores only the cryptographic <code>verification_code</code> hash—it does NOT embed personal names or cash amounts. A cashier or auditor scans the QR code to pull the immutable server record, ensuring total financial privacy if someone else photographs the screen.
+        </p>
+      </div>
+    </div>
+
+    <!-- TAB 3: MULTI-CHANNEL NOTIFICATION INBOX & LOCAL ALERTS -->
+    <div class="tab-content" id="tab-2">
+      <h3 style="font-size:18px;margin-bottom:12px;color:var(--accent-amber);">3. Multi-Channel Notification Inbox &amp; Deep-Linked Local Alerts</h3>
+      <p style="color:var(--text-muted);font-size:14px;margin-bottom:16px;">
+        Trace: <code>InboxScreen</code> → <code>InboxController</code> → <code>RefreshPhoneAlerts</code> &amp; <code>OpenTappedNotice</code> → <code>notifications</code> table, <code>CachedNotifications</code>, <code>flutter_local_notifications</code> (<code>AndroidPhoneNotifier</code>), and <code>workmanager</code> background polling (<code>WorkmanagerBackgroundAlerts</code>).
+      </p>
+
+      <!-- Flow Diagram -->
+      <div class="flow-diagram">
+        <div class="flow-title">⚡ Interactive 4-Layer Trace — Push Inbox &amp; Local Notification Scheduling</div>
+        <div class="flow-chain">
+          <div class="flow-step">
+            <span class="flow-step-label">1. Presentation (UI)</span>
+            <span class="flow-step-name">InboxScreen</span>
+            <span class="flow-step-action">Displays unread count, marks read on tap, shows details</span>
+            <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/consumer/inbox_screen.dart:31" class="vscode-link small">L31-60</a>
+          </div>
+          <div class="flow-arrow">→</div>
+
+          <div class="flow-step">
+            <span class="flow-step-label">2. Gate &amp; Deep Link</span>
+            <span class="flow-step-name">PhoneAlertsGate</span>
+            <span class="flow-step-action">Calls OpenTappedNotice; navigates to ShowBill or ShowInbox</span>
+            <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/consumer/phone_alerts_gate.dart:151" class="vscode-link small">L151-186</a>
+          </div>
+          <div class="flow-arrow">→</div>
+
+          <div class="flow-step">
+            <span class="flow-step-label">3. Use Case</span>
+            <span class="flow-step-name">RefreshPhoneAlerts</span>
+            <span class="flow-step-action">Pushes queued notices; schedules 8:00 AM due reminder</span>
+            <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/usecases/consumer/refresh_phone_alerts.dart:39" class="vscode-link small">L39-100</a>
+          </div>
+          <div class="flow-arrow">→</div>
+
+          <div class="flow-step">
+            <span class="flow-step-label">4. Background Task</span>
+            <span class="flow-step-name">WorkmanagerAlerts</span>
+            <span class="flow-step-action">Headless isolate runs every 15 min without active app</span>
+            <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/notifications/workmanager_background_alerts.dart:25" class="vscode-link small">L25-78</a>
+          </div>
+          <div class="flow-arrow">→</div>
+
+          <div class="flow-step">
+            <span class="flow-step-label">5. Local Notifier</span>
+            <span class="flow-step-name">AndroidPhoneNotifier</span>
+            <span class="flow-step-action">Wraps flutter_local_notifications plugin on Android</span>
+            <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/notifications/android_phone_notifier.dart:15" class="vscode-link small">L15-40</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Verbatim Code Box 1: OpenTappedNotice -->
+      <div class="code-box">
+        <div class="code-header">
+          <div class="code-file-path">
+            <span>📄</span>
+            <span>lib/domain/usecases/consumer/open_tapped_notice.dart (Lines 66–94)</span>
+          </div>
+          <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/usecases/consumer/open_tapped_notice.dart:66" class="vscode-link small">Open in VS Code</a>
+        </div>
+        <div class="code-lines-container">
+          <div class="line-numbers">66<br>67<br>68<br>69<br>70<br>71<br>72<br>73<br>74<br>75<br>76<br>77<br>78<br>79<br>80<br>81<br>82<br>83<br>84<br>85<br>86<br>87<br>88<br>89<br>90<br>91<br>92<br>93<br>94</div>
+          <div class="code-content">  <span class="c-type">Future</span>&lt;<span class="c-type">TappedNoticeDestination</span>&gt; <span class="c-fn">_openBill</span>(<span class="c-type">BillId</span> id) <span class="c-kw">async</span> {
+    <span class="c-kw">final</span> <span class="c-type">Consumer</span>? household;
+    <span class="c-kw">switch</span> (<span class="c-kw">await</span> consumers.signedInConsumer()) {
+      <span class="c-kw">case</span> <span class="c-type">Err</span>():
+        <span class="c-kw">return</span> <span class="c-kw">const</span> <span class="c-type">ShowInbox</span>(explanation: couldNotOpen);
+      <span class="c-kw">case</span> <span class="c-type">Ok</span>(:<span class="c-kw">final</span> value):
+        household = value;
+    }
+    <span class="c-kw">if</span> (household == <span class="c-kw">null</span>) {
+      <span class="c-kw">return</span> <span class="c-kw">const</span> <span class="c-type">ShowInbox</span>(explanation: notOnThisAccount);
+    }
+
+    <span class="c-kw">final</span> <span class="c-type">Bill</span>? bill;
+    <span class="c-kw">switch</span> (<span class="c-kw">await</span> bills.byId(id, consumerId: household.id)) {
+      <span class="c-kw">case</span> <span class="c-type">Err</span>():
+        <span class="c-kw">return</span> <span class="c-kw">const</span> <span class="c-type">ShowInbox</span>(explanation: couldNotOpen);
+      <span class="c-kw">case</span> <span class="c-type">Ok</span>(:<span class="c-kw">final</span> value):
+        bill = value;
+    }
+
+    <span class="c-com">// Row-level security already hides another household's bill, so "not</span>
+    <span class="c-com">// found" is the usual answer for one. The comparison is the check the</span>
+    <span class="c-com">// requirement asks for, made here rather than assumed of the server.</span>
+    <span class="c-kw">if</span> (bill == <span class="c-kw">null</span> || bill.consumerId.value != household.id.value) {
+      <span class="c-kw">return</span> <span class="c-kw">const</span> <span class="c-type">ShowInbox</span>(explanation: notOnThisAccount);
+    }
+    <span class="c-kw">return</span> <span class="c-type">ShowBill</span>(bill);
+  }</div>
+        </div>
+      </div>
+
+      <!-- Verbatim Code Box 2: Workmanager Dispatcher -->
+      <div class="code-box">
+        <div class="code-header">
+          <div class="code-file-path">
+            <span>📄</span>
+            <span>lib/data/notifications/workmanager_background_alerts.dart (Lines 24–47)</span>
+          </div>
+          <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/notifications/workmanager_background_alerts.dart:24" class="vscode-link small">Open in VS Code</a>
+        </div>
+        <div class="code-lines-container">
+          <div class="line-numbers">24<br>25<br>26<br>27<br>28<br>29<br>30<br>31<br>32<br>33<br>34<br>35<br>36<br>37<br>38<br>39<br>40<br>41<br>42<br>43<br>44<br>45<br>46<br>47</div>
+          <div class="code-content"><span class="c-kw">@pragma</span>(<span class="c-str">'vm:entry-point'</span>)
+<span class="c-type">void</span> <span class="c-fn">phoneAlertsCallbackDispatcher</span>() {
+  <span class="c-type">Workmanager</span>().executeTask((<span class="c-type">String</span> task, <span class="c-type">Map</span>&lt;<span class="c-type">String</span>, <span class="c-kw">dynamic</span>&gt;? input) <span class="c-kw">async</span> {
+    <span class="c-kw">try</span> {
+      <span class="c-com">// Plugins implemented in Dart, such as the shared preferences that hold</span>
+      <span class="c-com">// the saved session, are not registered in a background isolate until</span>
+      <span class="c-com">// this is called.</span>
+      <span class="c-type">DartPluginRegistrant</span>.ensureInitialized();
+
+      <span class="c-kw">if</span> (!<span class="c-type">AppConfig</span>.isConfigured) <span class="c-kw">return</span> <span class="c-kw">true</span>;
+
+      <span class="c-kw">await</span> <span class="c-type">Supabase</span>.initialize(
+        url: <span class="c-type">AppConfig</span>.supabaseUrl,
+        publishableKey: <span class="c-type">AppConfig</span>.supabaseAnonKey,
+        <span class="c-com">// No screen, so no sign-in link can arrive, and the deep-link</span>
+        <span class="c-com">// listener this would otherwise start needs one.</span>
+        authOptions: <span class="c-kw">const</span> <span class="c-type">FlutterAuthClientOptions</span>(detectSessionInUri: <span class="c-kw">false</span>),
+        <span class="c-com">// The same limits as the app: skip at once with no network, and give</span>
+        <span class="c-com">// up on a stalled server rather than hold the background run open.</span>
+        httpClient: <span class="c-type">FailFastHttpClient</span>(<span class="c-type">NetworkStatus</span>()),
+      );
+
+      <span class="c-kw">final</span> <span class="c-type">AndroidPhoneNotifier</span> phone = <span class="c-type">AndroidPhoneNotifier</span>();
+      <span class="c-kw">await</span> phone.initialize();</div>
+        </div>
+      </div>
+
+      <!-- Plain English Defense Callout -->
+      <div class="defense-card urgent">
+        <div class="defense-title" style="color:var(--accent-amber);">🛡️ Defense Callout: FCM-Free Push Architecture &amp; Notification Session Spoofing Defense</div>
+        <p>
+          BillAlert does not rely on third-party Google Firebase Cloud Messaging (FCM) servers, which can fail or incur charges. Instead, it pairs <strong>server-side database queues</strong> with <strong>local Android notification scheduling</strong> via Workmanager background polling every 15 minutes. Furthermore, notice how <code>OpenTappedNotice</code> prevents session spoofing: on a shared family tablet, if Household A gets a bill reminder, logs out, and Household B logs in, tapping the old notification in the Android tray will NOT expose Household A's bill. <code>OpenTappedNotice</code> dynamically re-checks <code>bill.consumerId == household.id</code> and redirects gracefully to <code>ShowInbox(explanation: "That notification is about a bill that isn't on this account")</code>.
+        </p>
+      </div>
+    </div>
+
+    <!-- TAB 4: UPDATING HOUSEHOLD SMS NUMBER -->
+    <div class="tab-content" id="tab-3">
+      <h3 style="font-size:18px;margin-bottom:12px;color:var(--accent-purple);">4. Updating Household SMS Contact Number</h3>
+      <p style="color:var(--text-muted);font-size:14px;margin-bottom:16px;">
+        Trace: <code>EditConsumerContactNumberSheet</code> → <code>ConsumerContactNumberController</code> → <code>UpdateOwnContactNumber</code> (Philippine mobile number validation) → <code>ConsumerRepository.updateOwnContactNumber</code> → <code>fn_update_own_contact_number</code> RPC → <code>trg_consumers_normalize_contact</code> &amp; <code>uq_consumers_contact_number</code>.
+      </p>
+
+      <!-- Flow Diagram -->
+      <div class="flow-diagram">
+        <div class="flow-title">⚡ Interactive 4-Layer Trace — Self-Service SMS Contact Update</div>
+        <div class="flow-chain">
+          <div class="flow-step">
+            <span class="flow-step-label">1. Presentation (UI)</span>
+            <span class="flow-step-name">EditContactSheet</span>
+            <span class="flow-step-action">Shows confirmation modal with target SMS warning</span>
+            <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/consumer/edit_contact_number_sheet.dart:60" class="vscode-link small">L60-86</a>
+          </div>
+          <div class="flow-arrow">→</div>
+
+          <div class="flow-step">
+            <span class="flow-step-label">2. Controller</span>
+            <span class="flow-step-name">ContactController</span>
+            <span class="flow-step-action">Invokes updateOwnContactNumberProvider</span>
+            <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/consumer/contact_number_controller.dart:27" class="vscode-link small">L27-51</a>
+          </div>
+          <div class="flow-arrow">→</div>
+
+          <div class="flow-step">
+            <span class="flow-step-label">3. Use Case</span>
+            <span class="flow-step-name">UpdateOwnContactNumber</span>
+            <span class="flow-step-action">Checks non-empty; leaves formatting to server trigger</span>
+            <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/domain/usecases/consumer/update_own_contact_number.dart:10" class="vscode-link small">L10-27</a>
+          </div>
+          <div class="flow-arrow">→</div>
+
+          <div class="flow-step">
+            <span class="flow-step-label">4. Drift / Repo</span>
+            <span class="flow-step-name">ConsumerRepoImpl</span>
+            <span class="flow-step-action">Calls fn_update_own_contact_number RPC; updates SQLite</span>
+            <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/repositories/consumer_repository_impl.dart:169" class="vscode-link small">L169-195</a>
+          </div>
+          <div class="flow-arrow">→</div>
+
+          <div class="flow-step">
+            <span class="flow-step-label">5. Supabase SQL</span>
+            <span class="flow-step-name">fn_update_own_contact</span>
+            <span class="flow-step-action">Security Definer RPC + trg_consumers_normalize_contact</span>
+            <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/10_consumer_contact_number.sql:21" class="vscode-link small">L21-65</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Verbatim Code Box 1: SQL RPC -->
+      <div class="code-box">
+        <div class="code-header">
+          <div class="code-file-path">
+            <span>📄</span>
+            <span>supabase/migrations/10_consumer_contact_number.sql (Lines 21–52)</span>
+          </div>
+          <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/10_consumer_contact_number.sql:21" class="vscode-link small">Open in VS Code</a>
+        </div>
+        <div class="code-lines-container">
+          <div class="line-numbers">21<br>22<br>23<br>24<br>25<br>26<br>27<br>28<br>29<br>30<br>31<br>32<br>33<br>34<br>35<br>36<br>37<br>38<br>39<br>40<br>41<br>42<br>43<br>44<br>45<br>46<br>47<br>48<br>49<br>50<br>51<br>52</div>
+          <div class="code-content"><span class="c-kw">create or replace function</span> <span class="c-fn">fn_update_own_contact_number</span>(
+  p_contact_number <span class="c-type">text</span>
+) <span class="c-kw">returns</span> <span class="c-type">text</span>
+<span class="c-kw">language</span> plpgsql
+<span class="c-kw">security definer</span>
+<span class="c-kw">set</span> search_path = public, pg_temp
+<span class="c-kw">as</span> $$
+<span class="c-kw">declare</span>
+  v_saved <span class="c-type">text</span>;
+<span class="c-kw">begin</span>
+  <span class="c-kw">if</span> app.current_user_id() <span class="c-kw">is null or</span> app.current_role() &lt;&gt; <span class="c-str">'consumer'</span> <span class="c-kw">then</span>
+    <span class="c-kw">raise exception using</span>
+      errcode = <span class="c-str">'42501'</span>,
+      message = <span class="c-str">'Only a signed-in consumer may change a household SMS number'</span>;
+  <span class="c-kw">end if</span>;
+
+  <span class="c-kw">if</span> nullif(trim(coalesce(p_contact_number, <span class="c-str">''</span>)), <span class="c-str">''</span>) <span class="c-kw">is null then</span>
+    <span class="c-kw">raise exception</span> <span class="c-str">'Enter the mobile number that should receive SMS alerts'</span>;
+  <span class="c-kw">end if</span>;
+
+  <span class="c-com">-- Raw text on purpose. trg_consumers_normalize_contact normalizes it before</span>
+  <span class="c-com">-- the CHECK and unique index validate the stored value.</span>
+  <span class="c-kw">update</span> consumers
+     <span class="c-kw">set</span> contact_number = p_contact_number
+   <span class="c-kw">where</span> profile_id = app.current_user_id()
+   <span class="c-kw">returning</span> contact_number <span class="c-kw">into</span> v_saved;
+
+  <span class="c-kw">if not found then</span>
+    <span class="c-kw">raise</span> no_data_found;
+  <span class="c-kw">end if</span>;
+
+  <span class="c-kw">return</span> v_saved;</div>
+        </div>
+      </div>
+
+      <!-- Verbatim Code Box 2: Repository RPC Call -->
+      <div class="code-box">
+        <div class="code-header">
+          <div class="code-file-path">
+            <span>📄</span>
+            <span>lib/data/repositories/consumer_repository_impl.dart (Lines 169–192)</span>
+          </div>
+          <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/repositories/consumer_repository_impl.dart:169" class="vscode-link small">Open in VS Code</a>
+        </div>
+        <div class="code-lines-container">
+          <div class="line-numbers">169<br>170<br>171<br>172<br>173<br>174<br>175<br>176<br>177<br>178<br>179<br>180<br>181<br>182<br>183<br>184<br>185<br>186<br>187<br>188<br>189<br>190<br>191<br>192</div>
+          <div class="code-content">  <span class="c-kw">@override</span>
+  <span class="c-type">Future</span>&lt;<span class="c-type">Result</span>&lt;<span class="c-type">String</span>&gt;&gt; <span class="c-fn">updateOwnContactNumber</span>(<span class="c-type">String</span> contactNumber) <span class="c-kw">async</span> {
+    <span class="c-kw">try</span> {
+      <span class="c-kw">final</span> value = <span class="c-kw">await</span> _client.rpc&lt;<span class="c-kw">dynamic</span>&gt;(
+        <span class="c-str">'fn_update_own_contact_number'</span>,
+        params: &lt;<span class="c-type">String</span>, <span class="c-kw">dynamic</span>&gt;{<span class="c-str">'p_contact_number'</span>: contactNumber},
+      );
+      <span class="c-kw">if</span> (value <span class="c-kw">is!</span> <span class="c-type">String</span> || value.isEmpty) {
+        <span class="c-kw">return</span> <span class="c-kw">const</span> <span class="c-type">Err</span>&lt;<span class="c-type">String</span>&gt;(
+          <span class="c-type">ServerFailure</span>(
+            <span class="c-str">'The server did not confirm the saved SMS number. Please refresh '</span>
+            <span class="c-str">'your Profile before trying again.'</span>,
+          ),
+        );
+      }
+      <span class="c-com">// The staff roster may contain many households; never rewrite all of it.</span>
+      <span class="c-kw">final</span> own = <span class="c-kw">await</span> signedInConsumer();
+      <span class="c-kw">if</span> (own <span class="c-kw">case</span> <span class="c-type">Ok</span>(value: <span class="c-kw">final</span> consumer?)) {
+        <span class="c-kw">await</span> (_db.update(
+          _db.cachedConsumers,
+        )..where((t) =&gt; t.id.equals(consumer.id.value))).write(
+          <span class="c-type">CachedConsumersCompanion</span>(contactNumber: <span class="c-type">Value</span>&lt;<span class="c-type">String</span>?&gt;(value)),
+        );
+      }
+      <span class="c-kw">return</span> <span class="c-type">Ok</span>&lt;<span class="c-type">String</span>&gt;(value);</div>
+        </div>
+      </div>
+
+      <!-- Plain English Defense Callout -->
+      <div class="defense-card security">
+        <div class="defense-title" style="color:var(--accent-purple);">🛡️ Defense Callout: Server-Side Mobile Normalization &amp; Injection Prevention</div>
+        <p>
+          A common security flaw in mobile apps is letting users execute arbitrary SQL updates on their own account row. In BillAlert, the consumer has ZERO direct UPDATE privileges on the <code>consumers</code> table. Instead, they must call <code>fn_update_own_contact_number</code>. Notice how: (1) The RPC derives the target row exclusively from <code>app.current_user_id()</code>; no consumer ID can be passed from the phone, eliminating IDOR vulnerabilities. (2) The input string is passed unformatted to trigger <code>trg_consumers_normalize_contact</code>, which converts Philippine numbers (e.g. <code>0917 555 0142</code> or <code>+63 917-555-0142</code>) into canonical E.164 (<code>+639175550142</code>). (3) The partial index <code>uq_consumers_contact_number</code> stops two households from registering the same phone number.
+        </p>
+      </div>
+    </div>
+
+    <!-- TAB 5: RLS & SHARED-DEVICE CACHE ISOLATION -->
+    <div class="tab-content" id="tab-4">
+      <h3 style="font-size:18px;margin-bottom:12px;color:var(--accent-rose);">5. Row-Level Security (RLS) &amp; Shared-Device Cache Isolation</h3>
+      <p style="color:var(--text-muted);font-size:14px;margin-bottom:16px;">
+        Trace: How <code>04_rls.sql</code> (<code>app.current_consumer_id()</code>) and <code>security_invoker = on</code> views guarantee a household only sees its own rows, and how <code>CacheOwner</code> in Drift wipes/isolates offline SQLite data when switching users.
+      </p>
+
+      <!-- Flow Diagram -->
+      <div class="flow-diagram">
+        <div class="flow-title">⚡ Interactive 4-Layer Trace — PostgreSQL RLS &amp; Local Drift Cache Isolation</div>
+        <div class="flow-chain">
+          <div class="flow-step">
+            <span class="flow-step-label">1. Auth Session</span>
+            <span class="flow-step-name">authControllerProvider</span>
+            <span class="flow-step-action">Issues Supabase JWT carrying auth.uid() &amp; role='consumer'</span>
+            <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/presentation/auth/auth_controller.dart:50" class="vscode-link small">auth_ctrl:50</a>
+          </div>
+          <div class="flow-arrow">→</div>
+
+          <div class="flow-step">
+            <span class="flow-step-label">2. Postgres RLS Helper</span>
+            <span class="flow-step-name">app.current_consumer_id()</span>
+            <span class="flow-step-action">Selects c.id from consumers where profile_id = auth.uid()</span>
+            <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/02_functions.sql:48" class="vscode-link small">02_functions:48</a>
+          </div>
+          <div class="flow-arrow">→</div>
+
+          <div class="flow-step">
+            <span class="flow-step-label">3. View Security</span>
+            <span class="flow-step-name">security_invoker = on</span>
+            <span class="flow-step-action">Prevents security-definer bypass; forces RLS on view joins</span>
+            <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/03_views.sql:390" class="vscode-link small">03_views:390</a>
+          </div>
+          <div class="flow-arrow">→</div>
+
+          <div class="flow-step">
+            <span class="flow-step-label">4. Drift SQLite Cache</span>
+            <span class="flow-step-name">CacheOwner &amp; cacheEpoch</span>
+            <span class="flow-step-action">Guards offline tables; invalidates in-flight operations</span>
+            <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/local/tables.dart:178" class="vscode-link small">tables.dart:178</a>
+          </div>
+          <div class="flow-arrow">→</div>
+
+          <div class="flow-step">
+            <span class="flow-step-label">5. Cache Purge</span>
+            <span class="flow-step-name">clearCachedData()</span>
+            <span class="flow-step-action">Atomically deletes all cached tables on account logout</span>
+            <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/local/app_database.dart:184" class="vscode-link small">app_database:184</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Verbatim Code Box 1: Views Security Invoker -->
+      <div class="code-box">
+        <div class="code-header">
+          <div class="code-file-path">
+            <span>📄</span>
+            <span>supabase/migrations/03_views.sql (Lines 378–399)</span>
+          </div>
+          <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/supabase/migrations/03_views.sql:378" class="vscode-link small">Open in VS Code</a>
+        </div>
+        <div class="code-lines-container">
+          <div class="line-numbers">378<br>379<br>380<br>381<br>382<br>383<br>384<br>385<br>386<br>387<br>388<br>389<br>390<br>391<br>392<br>393<br>394<br>395<br>396<br>397<br>398<br>399</div>
+          <div class="code-content"><span class="c-com">-- WHAT THIS DOES</span>
+<span class="c-com">--</span>
+<span class="c-com">-- `security_invoker = on` makes the view execute as the querying role, so</span>
+<span class="c-com">-- the RLS policies on bills, consumers and payments apply normally. It</span>
+<span class="c-com">-- grants nothing: the caller still needs SELECT on the underlying tables,</span>
+<span class="c-com">-- which `authenticated` already has.</span>
+<span class="c-com">--</span>
+<span class="c-com">-- Requires PostgreSQL 15 or later. Supabase is well past that.</span>
+<span class="c-com">--</span>
+<span class="c-com">-- Every view is listed explicitly rather than looped over, so that adding</span>
+<span class="c-com">-- a view and forgetting this line shows up as a missing line in a diff.</span>
+<span class="c-com">-- =====================================================================</span>
+<span class="c-kw">alter view</span> v_bill_status                  <span class="c-kw">set</span> (security_invoker = <span class="c-kw">on</span>);
+<span class="c-kw">alter view</span> v_consumer_current_bill        <span class="c-kw">set</span> (security_invoker = <span class="c-kw">on</span>);
+<span class="c-kw">alter view</span> v_readings_awaiting_amount     <span class="c-kw">set</span> (security_invoker = <span class="c-kw">on</span>);
+<span class="c-kw">alter view</span> v_meter_reader_progress        <span class="c-kw">set</span> (security_invoker = <span class="c-kw">on</span>);
+<span class="c-kw">alter view</span> v_cashier_collection_progress  <span class="c-kw">set</span> (security_invoker = <span class="c-kw">on</span>);
+<span class="c-kw">alter view</span> v_consumer_outstanding         <span class="c-kw">set</span> (security_invoker = <span class="c-kw">on</span>);
+<span class="c-kw">alter view</span> v_cashier_daily_summary        <span class="c-kw">set</span> (security_invoker = <span class="c-kw">on</span>);
+<span class="c-kw">alter view</span> v_payment_history              <span class="c-kw">set</span> (security_invoker = <span class="c-kw">on</span>);
+<span class="c-kw">alter view</span> v_active_disconnection_warnings <span class="c-kw">set</span> (security_invoker = <span class="c-kw">on</span>);
+<span class="c-kw">alter view</span> v_notification_status          <span class="c-kw">set</span> (security_invoker = <span class="c-kw">on</span>);</div>
+        </div>
+      </div>
+
+      <!-- Verbatim Code Box 2: Drift SQLite Wipe -->
+      <div class="code-box">
+        <div class="code-header">
+          <div class="code-file-path">
+            <span>📄</span>
+            <span>lib/data/local/app_database.dart (Lines 182–204)</span>
+          </div>
+          <a href="vscode://file/c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert/lib/data/local/app_database.dart:182" class="vscode-link small">Open in VS Code</a>
+        </div>
+        <div class="code-lines-container">
+          <div class="line-numbers">182<br>183<br>184<br>185<br>186<br>187<br>188<br>189<br>190<br>191<br>192<br>193<br>194<br>195<br>196<br>197<br>198<br>199<br>200<br>201<br>202<br>203<br>204</div>
+          <div class="code-content">  <span class="c-type">int</span> cacheEpoch = <span class="c-val">0</span>;
+
+  <span class="c-type">Future</span>&lt;<span class="c-type">void</span>&gt; <span class="c-fn">clearCachedData</span>() <span class="c-kw">async</span> {
+    cacheEpoch++;
+    <span class="c-kw">await</span> transaction(() <span class="c-kw">async</span> {
+      <span class="c-kw">await</span> delete(cachedConsumers).go();
+      <span class="c-kw">await</span> delete(cachedBills).go();
+      <span class="c-kw">await</span> delete(cachedPayments).go();
+      <span class="c-kw">await</span> delete(cachedNotifications).go();
+      <span class="c-kw">await</span> delete(cachedQueries).go();
+      <span class="c-kw">await</span> delete(cacheOwner).go();
+      <span class="c-kw">await</span> delete(syncMeta).go();
+    });
+  }
+
+  <span class="c-com">/// Only ever called after the user has confirmed they accept losing</span>
+  <span class="c-com">/// whatever is still queued.</span>
+  <span class="c-type">Future</span>&lt;<span class="c-type">void</span>&gt; <span class="c-fn">clearOutbox</span>() <span class="c-kw">async</span> {
+    <span class="c-kw">await</span> transaction(() <span class="c-kw">async</span> {
+      <span class="c-kw">await</span> delete(outboxReadingKeys).go();
+      <span class="c-kw">await</span> delete(outboxRows).go();
+    });
+  }</div>
+        </div>
+      </div>
+
+      <!-- Plain English Defense Callout -->
+      <div class="defense-card security">
+        <div class="defense-title" style="color:var(--accent-rose);">🛡️ Defense Callout: The Security-Invoker Discovery &amp; SQLite Epoch Defense</div>
+        <p>
+          Standard PostgreSQL views run with <em>security definer</em> privileges (as the database administrator who created the view). Early in testing, selecting from raw tables correctly returned 1 row, but querying <code>v_consumer_current_bill</code> returned 5 rows from all neighboring consumers! To solve this, <code>alter view ... set (security_invoker = on)</code> was explicitly executed across all views. Now, Postgres strictly runs the underlying RLS policies (<code>bills_select_scoped</code>) as the calling client. Furthermore, for offline storage, <code>AppDatabase</code> tracks <code>cacheEpoch</code>. If an asynchronous network request returns right as a consumer signs out, <code>epoch != _db.cacheEpoch</code> triggers an immediate <code>AuthFailure('The signed-in account changed.')</code>, preventing stale data from writing over the newly logged-in household.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <!-- SECTION 3: CROSS-ROLE TEAMWORK & LIVE DEMO HANDOFF MAP -->
+  <!-- ===================================================================== -->
+  <section id="teamwork-section">
+    <div class="section-title">
+      <span>Section 3: Cross-Role Teamwork &amp; Data Handoff Map (Live Demo Transitions)</span>
+      <span class="badge">Demonstrating live presentation transitions</span>
+    </div>
+
+    <div class="handoff-grid">
+      <!-- 1. Upstream Mary Tiffany -->
+      <div class="handoff-card">
+        <div class="handoff-header">
+          <div class="handoff-role-icon handoff-reader">M</div>
+          <div>
+            <div class="handoff-title">Upstream from Meter Reader</div>
+            <div class="handoff-author">Mary Tiffany · <code>ReadingEntryScreen</code></div>
+          </div>
+        </div>
+        <div class="handoff-step-box">
+          <strong>1. Field Reading Recorded:</strong> Mary Tiffany records meter dials on <code>ReadingEntryScreen</code>. Her submission calls <code>fn_record_meter_reading</code> (or syncs from offline outbox).
+        </div>
+        <div class="handoff-step-box">
+          <strong>2. Unpriced Bill Generation:</strong> Postgres calculates <code>consumption = current - previous</code>, sets <code>meter_reading_id</code>, leaves <code>total_amount = NULL</code>, and flags status as <code>'unpriced'</code>.
+        </div>
+        <div class="handoff-step-box">
+          <strong>3. Krisha Mae's UI Updates:</strong> <code>v_consumer_current_bill</code> joins the new meter reading. Krisha Mae's <code>CurrentBillScreen</code> receives the row, identifies <code>bill.isUnpriced == true</code>, and displays <strong>"Amount pending"</strong> with <strong>"Awaiting the cooperative amount"</strong>.
+          <div class="handoff-live-action">
+            ⚡ <strong>Live Demo Cue:</strong> When Mary Tiffany submits her reading, Krisha Mae pulls-to-refresh: the kilowatt-hour consumption appears immediately with the 7-day cooperative lag banner!
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Upstream Charles -->
+      <div class="handoff-card">
+        <div class="handoff-header">
+          <div class="handoff-role-icon handoff-admin">A</div>
+          <div>
+            <div class="handoff-title">Upstream from Cooperative Admin</div>
+            <div class="handoff-author">Charles · <code>AmountsScreen</code> &amp; RPCs</div>
+          </div>
+        </div>
+        <div class="handoff-step-box">
+          <strong>1. Tariff Pricing Applied:</strong> Charles views the <code>v_readings_awaiting_amount</code> queue and calls <code>fn_post_bill_amount</code> with the official cooperative rate and due date.
+        </div>
+        <div class="handoff-step-box">
+          <strong>2. Automated Notification Trigger:</strong> The same Postgres transaction transitions the bill to <code>status = 'billed'</code> and inserts a push notification into <code>notifications</code> (<code>notif_type = 'bill_ready'</code>).
+        </div>
+        <div class="handoff-step-box">
+          <strong>3. Krisha Mae's Phone Alert:</strong> <code>PhoneAlertsGate</code> / <code>WorkmanagerBackgroundAlerts</code> syncs the alert. Android displays <em>"Your bill is ready - Tap to see it"</em>, and <code>CurrentBillScreen</code> shifts from "Awaiting amount" to the full Peso debt!
+          <div class="handoff-live-action">
+            ⚡ <strong>Live Demo Cue:</strong> Charles presses "Post Amount". Within seconds, Krisha Mae's notification tray fires and her screen updates to show the payable balance and due date!
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Upstream Cristell -->
+      <div class="handoff-card">
+        <div class="handoff-header">
+          <div class="handoff-role-icon handoff-cashier">C</div>
+          <div>
+            <div class="handoff-title">Upstream from Area Cashier</div>
+            <div class="handoff-author">Cristell · <code>CashierDesk</code> &amp; Counter Payments</div>
+          </div>
+        </div>
+        <div class="handoff-step-box">
+          <strong>1. Cash Counter Handover:</strong> Cristell receives physical cash at the counter and executes <code>RecordCashPayment</code> / <code>fn_record_payment</code>.
+        </div>
+        <div class="handoff-step-box">
+          <strong>2. Digital Receipt Generation:</strong> Postgres inserts into <code>payment_transactions</code> (generating <code>receipt_no = 'BIEC-YYYY-MM-XXXXXX'</code> and a SHA-256 <code>verification_code</code>) and marks the bill <code>status = 'paid'</code> (<code>isSettled == true</code>).
+        </div>
+        <div class="handoff-step-box">
+          <strong>3. Krisha Mae's Scannable Receipt:</strong> Krisha Mae's <code>HistoryScreen</code> updates. Tapping the settlement opens <code>ConsumerReceiptScreen</code>, rendering the official digital receipt and scannable <code>ReceiptQrCode</code>.
+          <div class="handoff-live-action">
+            ⚡ <strong>Live Demo Cue:</strong> Cristell hands over change; Krisha Mae opens History → Receipts, displaying the official Bohol I Electric Cooperative QR receipt on screen!
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <!-- FOOTER -->
+  <!-- ===================================================================== -->
+  <footer>
+    <div>BillAlert Capstone Project Defense · Bohol I Electric Cooperative (BOHECO I) Management System</div>
+    <div style="margin-top:6px;font-size:11.5px;color:#64748b;">
+      Role: <strong>Consumer</strong> · Assigned Student Defender: <strong>Krisha Mae I. Basio</strong> · Clean Architecture Layer Auditor
+    </div>
+  </footer>
+
+</div>
+
+<!-- ===================================================================== -->
+<!-- JAVASCRIPT: TAB SWITCHING & REAL-TIME SEARCH FILTER -->
+<!-- ===================================================================== -->
+<script>
+  // Tab Switching
+  function switchTab(index) {
+    const buttons = document.querySelectorAll('.tab-btn');
+    const tabs = document.querySelectorAll('.tab-content');
+
+    buttons.forEach((btn, i) => {
+      btn.classList.toggle('active', i === index);
+    });
+
+    tabs.forEach((tab, i) => {
+      tab.classList.toggle('active', i === index);
+    });
+  }
+
+  // Live Search Table Filter
+  const searchInput = document.getElementById('defenseSearchInput');
+  const tableBody = document.getElementById('qaTableBody');
+  const countBadge = document.getElementById('search-result-count');
+  const rows = tableBody.querySelectorAll('tr');
+
+  searchInput.addEventListener('input', function() {
+    filterTable(this.value.trim().toLowerCase());
+  });
+
+  function filterTable(query) {
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+      const keywords = row.getAttribute('data-keywords') || '';
+      const text = row.innerText.toLowerCase();
+      const combined = (keywords + ' ' + text).toLowerCase();
+
+      if (!query || combined.includes(query)) {
+        row.style.display = '';
+        visibleCount++;
+      } else {
+        row.style.display = 'none';
+      }
+    });
+
+    countBadge.textContent = query 
+      ? `Found ${visibleCount} matching defense answer${visibleCount === 1 ? '' : 's'}` 
+      : `Showing ${rows.length} key defense items`;
+  }
+
+  function filterByPill(keyword) {
+    const pills = document.querySelectorAll('.search-pills .pill');
+    pills.forEach(p => p.classList.remove('active'));
+
+    if (keyword === 'all') {
+      searchInput.value = '';
+      filterTable('');
+    } else {
+      searchInput.value = keyword;
+      filterTable(keyword.toLowerCase());
+      // highlight active pill
+      event.target.classList.add('active');
+    }
+  }
+</script>
+
+
+
+<!-- DYNAMIC WORKSPACE PATH ENGINE -->
+<script>
+(function() {
+    const ORIGINAL_AUTHOR_PATH = "c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert";
+
+    function showWorkspaceToast(msg) {
+        if (typeof showToast === 'function') {
+            try { showToast(msg); return; } catch (e) {}
+        }
+        const toast = document.getElementById('billalertNotificationToast');
+        if (toast) {
+            toast.innerText = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3500);
+        } else {
+            alert(msg);
+        }
+    }
+
+    function detectLocalFolderPath() {
+        if (window.location.protocol === 'file:') {
+            let path = window.location.href;
+            path = path.replace(/^file:\/\/\//i, '');
+            path = path.replace(/\/[^\/]+\.html([?#].*)?$/i, '');
+            path = path.replace(/\\/g, '/');
+            return path;
+        }
+        return ORIGINAL_AUTHOR_PATH;
+    }
+
+    function getEffectiveBasePath() {
+        const stored = localStorage.getItem('billalert_team_path');
+        if (stored && stored.trim().length > 0) {
+            return stored.trim();
+        }
+        return detectLocalFolderPath();
+    }
+
+    function rewriteAllDeepLinks(basePath) {
+        if (!basePath) return;
+        let normalizedBase = basePath.replace(/\\/g, '/').replace(/\/+$/, '');
+        let encodedBase = normalizedBase.split('/').map((seg, idx) => {
+            if (idx === 0 && seg.endsWith(':')) return seg;
+            return encodeURIComponent(decodeURIComponent(seg));
+        }).join('/');
+
+        let count = 0;
+        document.querySelectorAll('a[href^="vscode://file/"]').forEach(link => {
+            if (!link.dataset.relPath) {
+                let href = link.getAttribute('href');
+                const marker = 'BillAlert/';
+                const markerIndex = href.indexOf(marker);
+                if (markerIndex !== -1) {
+                    link.dataset.relPath = href.substring(markerIndex + marker.length);
+                } else if (href.includes(ORIGINAL_AUTHOR_PATH)) {
+                    link.dataset.relPath = href.replace(ORIGINAL_AUTHOR_PATH + '/', '');
+                }
+            }
+            if (link.dataset.relPath) {
+                link.setAttribute('href', `vscode://file/${encodedBase}/${link.dataset.relPath}`);
+                count++;
+            }
+        });
+
+        const input = document.getElementById('billalertLocalWorkspacePathInput') || document.getElementById('localWorkspacePathInput');
+        if (input) {
+            input.value = decodeURIComponent(encodedBase);
+        }
+        const status = document.getElementById('billalertPathDetectionStatus') || document.getElementById('pathDetectionStatus');
+        if (status) {
+            const isCustom = localStorage.getItem('billalert_team_path');
+            if (isCustom) {
+                status.innerHTML = `<span style="color: #F59E0B; font-weight: 700;">● Custom Path (${count} links connected)</span>`;
+            } else {
+                status.innerHTML = `<span style="color: #10B981; font-weight: 700;">● Auto-Detected (${count} links connected to this PC)</span>`;
+            }
+        }
+    }
+
+    window.saveManualWorkspacePath = function() {
+        const input = document.getElementById('billalertLocalWorkspacePathInput') || document.getElementById('localWorkspacePathInput');
+        if (!input) return;
+        let val = input.value.trim();
+        if (!val) return;
+        val = val.replace(/\\/g, '/');
+        localStorage.setItem('billalert_team_path', val);
+        rewriteAllDeepLinks(val);
+        showWorkspaceToast("Workspace path updated! Clicking buttons opens files on your laptop.");
+    };
+
+    window.resetAutoDetectedPath = function() {
+        localStorage.removeItem('billalert_team_path');
+        const autoPath = detectLocalFolderPath();
+        rewriteAllDeepLinks(autoPath);
+        showWorkspaceToast("Reset to auto-detected local path.");
+    };
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            rewriteAllDeepLinks(getEffectiveBasePath());
+        });
+    } else {
+        rewriteAllDeepLinks(getEffectiveBasePath());
+    }
+})();
+</script>
+
+</body>
+</html>

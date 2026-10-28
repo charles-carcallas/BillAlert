@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BillAlert — Team Defense Hub & Architecture Portal</title>
+    <style>
+        :root {
+            --bg-primary: #090D16;
+            --bg-secondary: #0F172A;
+            --bg-card: #141E33;
+            --bg-card-hover: #1A2744;
+            --border-color: #243452;
+            --border-hover: #6366F1;
+            --accent-indigo: #6366F1;
+            --accent-blue: #38BDF8;
+            --accent-emerald: #10B981;
+            --accent-amber: #F59E0B;
+            --accent-rose: #F43F5E;
+            --accent-purple: #A855F7;
+            --text-main: #F1F5F9;
+            --text-muted: #94A3B8;
+            --text-dim: #64748B;
+            --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            font-family: var(--font-main);
+            line-height: 1.5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Workspace Banner */
+        .workspace-banner {
+            position: sticky;
+            top: 0;
+            z-index: 999;
+            background: linear-gradient(90deg, #0F172A, #1E1B4B);
+            border-bottom: 2px solid var(--accent-indigo);
+            padding: 10px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            font-size: 13px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+
+        .workspace-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 700;
+            color: #C7D2FE;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent-emerald);
+            box-shadow: 0 0 8px var(--accent-emerald);
+        }
+
+        .workspace-input {
+            background: #090D16;
+            border: 1px solid #4338CA;
+            color: var(--accent-blue);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            width: 440px;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .workspace-input:focus {
+            border-color: #818CF8;
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
+        }
+
+        .btn-action {
+            background: #4F46E5;
+            border: 1px solid #6366F1;
+            color: #fff;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-action:hover {
+            background: #4338CA;
+        }
+
+        .btn-reset {
+            background: #1E293B;
+            border: 1px solid #334155;
+            color: #94A3B8;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-reset:hover {
+            background: #334155;
+            color: #fff;
+        }
+
+        .path-status-badge {
+            font-size: 12px;
+            color: #A5B4FC;
+            white-space: nowrap;
+        }
+
+        /* Hero Header */
+        .hero {
+            padding: 48px 24px 32px;
+            text-align: center;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 16px;
+            border-radius: 9999px;
+            background: rgba(99, 102, 241, 0.12);
+            border: 1px solid rgba(99, 102, 241, 0.35);
+            color: #A5B4FC;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 20px;
+        }
+
+        .hero-title {
+            font-size: 40px;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            background: linear-gradient(135deg, #FFFFFF 30%, #94A3B8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 14px;
+        }
+
+        .hero-sub {
+            font-size: 18px;
+            color: var(--text-muted);
+            max-width: 760px;
+            margin: 0 auto 28px;
+            line-height: 1.6;
+        }
+
+        .hero-stats {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            flex-wrap: wrap;
+            margin-top: 24px;
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            padding: 12px 24px;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stat-num {
+            font-size: 22px;
+            font-weight: 800;
+            color: var(--accent-blue);
+            font-family: var(--font-mono);
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 600;
+        }
+
+        /* Container & Role Grid */
+        .container {
+            max-width: 1240px;
+            margin: 0 auto;
+            padding: 0 24px 60px;
+            width: 100%;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #FFFFFF;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .role-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            margin-bottom: 48px;
+        }
+
+        .role-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 28px;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+
+        .role-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--role-color);
+            box-shadow: 0 16px 36px rgba(0,0,0,0.4), 0 0 20px rgba(var(--role-rgb), 0.2);
+        }
+
+        .role-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--role-color);
+        }
+
+        .role-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 18px;
+        }
+
+        .role-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            background: rgba(var(--role-rgb), 0.15);
+            border: 1px solid rgba(var(--role-rgb), 0.3);
+        }
+
+        .role-badge {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 9999px;
+            background: rgba(var(--role-rgb), 0.15);
+            color: var(--role-color);
+            border: 1px solid rgba(var(--role-rgb), 0.3);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .member-name {
+            font-size: 20px;
+            font-weight: 800;
+            color: #FFFFFF;
+            margin-bottom: 4px;
+        }
+
+        .role-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--role-color);
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .role-desc {
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.6;
+            margin-bottom: 20px;
+            flex-grow: 1;
+        }
+
+        .feature-list {
+            list-style: none;
+            margin-bottom: 24px;
+            padding: 12px 14px;
+            background: var(--bg-secondary);
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+        }
+
+        .feature-item {
+            font-size: 12px;
+            color: #CBD5E1;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .feature-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .feature-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--role-color);
+        }
+
+        .card-footer {
+            margin-top: auto;
+        }
+
+        .btn-launch {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 700;
+            text-decoration: none;
+            color: #FFFFFF;
+            background: linear-gradient(135deg, var(--role-color), var(--role-dark));
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 4px 14px rgba(var(--role-rgb), 0.35);
+            transition: all 0.2s ease;
+        }
+
+        .btn-launch:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(var(--role-rgb), 0.5);
+            filter: brightness(1.1);
+        }
+
+        .btn-launch svg {
+            transition: transform 0.2s;
+        }
+
+        .btn-launch:hover svg {
+            transform: translateX(4px);
+        }
+
+        .links-count {
+            display: block;
+            text-align: center;
+            font-size: 11px;
+            color: var(--text-dim);
+            margin-top: 8px;
+            font-weight: 600;
+        }
+
+        /* Live Handoff Section */
+        .handoff-box {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 28px;
+            margin-bottom: 40px;
+        }
+
+        .handoff-header {
+            margin-bottom: 18px;
+        }
+
+        .handoff-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #FFFFFF;
+            margin-bottom: 6px;
+        }
+
+        .handoff-subtitle {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .handoff-steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px;
+            margin-top: 20px;
+        }
+
+        .handoff-step {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 18px;
+            position: relative;
+        }
+
+        .step-num {
+            font-size: 11px;
+            font-weight: 800;
+            color: var(--accent-indigo);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 6px;
+        }
+
+        .step-heading {
+            font-size: 14px;
+            font-weight: 700;
+            color: #FFFFFF;
+            margin-bottom: 6px;
+        }
+
+        .step-desc {
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        /* Instructions Footer */
+        .help-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .help-card {
+            background: #0E1626;
+            border: 1px solid #1E293B;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .help-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--accent-blue);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: var(--accent-emerald);
+            color: #090D16;
+            font-weight: 700;
+            font-size: 12px;
+            padding: 10px 18px;
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            z-index: 100000;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s;
+            pointer-events: none;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Footer */
+        footer {
+            margin-top: auto;
+            border-top: 1px solid var(--border-color);
+            padding: 24px;
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-dim);
+            background: #060911;
+        }
+
+        /* Role specific colors */
+        .role-reader {
+            --role-color: #38BDF8;
+            --role-dark: #0284C7;
+            --role-rgb: 56, 189, 248;
+        }
+
+        .role-admin {
+            --role-color: #6366F1;
+            --role-dark: #4338CA;
+            --role-rgb: 99, 102, 241;
+        }
+
+        .role-cashier {
+            --role-color: #10B981;
+            --role-dark: #059669;
+            --role-rgb: 16, 185, 129;
+        }
+
+        .role-consumer {
+            --role-color: #F59E0B;
+            --role-dark: #D97706;
+            --role-rgb: 245, 158, 11;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Workspace Banner -->
+    <div class="workspace-banner" id="hubWorkspaceBanner">
+        <div class="workspace-controls">
+            <span class="status-pill">
+                <span class="status-dot"></span>
+                <span>Team Workspace:</span>
+            </span>
+            <input type="text" id="hubWorkspaceInput" class="workspace-input" placeholder="Auto-detecting repository path...">
+            <button class="btn-action" onclick="saveHubPath()">Save Workspace</button>
+            <button class="btn-reset" onclick="resetHubPath()">Reset Auto</button>
+        </div>
+        <span id="hubPathStatus" class="path-status-badge">⚡ Auto-detecting...</span>
+    </div>
+
+    <!-- Hero Header -->
+    <header class="hero">
+        <div class="hero-badge">⚡ Official Thesis Defense Portal</div>
+        <h1 class="hero-title">BillAlert Defense Hub</h1>
+        <p class="hero-sub">
+            Welcome to the centralized code navigation & architecture defense hub for <strong>BillAlert</strong>.
+            Select your assigned role below to launch your personal interactive code explorer.
+        </p>
+
+        <div class="hero-stats">
+            <div class="stat-card">
+                <span class="stat-num">4 Roles</span>
+                <span class="stat-label">Mapped & Ready</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-num">367 Links</span>
+                <span class="stat-label">Zero-Hallucination Jump Links</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-num">100% Offline</span>
+                <span class="stat-label">Local Drift DB & Outbox</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-num">0 Config</span>
+                <span class="stat-label">No Flutter/SDK Required</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="container">
+        
+        <div class="section-header">
+            <h2 class="section-title">
+                <span>👥 Select Who You Are</span>
+            </h2>
+            <span style="font-size: 13px; color: var(--text-muted);">Click your card to launch your personal defense explorer</span>
+        </div>
+
+        <!-- 4 Role Cards Grid -->
+        <div class="role-grid">
+            
+            <!-- 1. Mary Tiffany I. Busalanan (Meter Reader) -->
+            <div class="role-card role-reader">
+                <div class="role-header">
+                    <div class="role-avatar">⚡</div>
+                    <span class="role-badge">Route /reader</span>
+                </div>
+                <h3 class="member-name">Mary Tiffany I. Busalanan</h3>
+                <div class="role-title">Meter Reader (MeterReaderUser)</div>
+                <p class="role-desc">
+                    Field operations, route consumer lists, offline-first meter dial captures, consumption delta calculations, duplicate defense, and cash remittance handovers.
+                </p>
+                <ul class="feature-list">
+                    <li class="feature-item"><span class="feature-dot"></span> Offline-First Dial Capture & Kwh Subtraction</li>
+                    <li class="feature-item"><span class="feature-dot"></span> Duplicate Reading Prevention (FR-23)</li>
+                    <li class="feature-item"><span class="feature-dot"></span> Service Area Route Roster & Progress</li>
+                    <li class="feature-item"><span class="feature-dot"></span> Monthly Reading Sheet for BOHECO</li>
+                    <li class="feature-item"><span class="feature-dot"></span> Cash Remittance Handover (₱500 Comp)</li>
+                </ul>
+                <div class="card-footer">
+                    <a href="READER_ROLE_EXPLORER.html" class="btn-launch">
+                        <span>Launch Meter Reader Explorer</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </a>
+                    <span class="links-count">89 Verified Deep Links · 100% Working</span>
+                </div>
+            </div>
+
+            <!-- 2. Charles Carcallas (Admin) -->
+            <div class="role-card role-admin">
+                <div class="role-header">
+                    <div class="role-avatar">🛡️</div>
+                    <span class="role-badge">Route /admin</span>
+                </div>
+                <h3 class="member-name">Charles Carcallas</h3>
+                <div class="role-title">System Admin (AdminUser)</div>
+                <p class="role-desc">
+                    System provisioning, user management, billing cycle activation, tiered tariff computation, Pondo ledger audits, and end-to-end database governance.
+                </p>
+                <ul class="feature-list">
+                    <li class="feature-item"><span class="feature-dot"></span> Consumer Provisioning & Meter Setup</li>
+                    <li class="feature-item"><span class="feature-dot"></span> Billing Cycle Activation & Locking</li>
+                    <li class="feature-item"><span class="feature-dot"></span> Tiered Tariff Pricing Execution</li>
+                    <li class="feature-item"><span class="feature-dot"></span> Pondo Ledger & Reserve Governance</li>
+                    <li class="feature-item"><span class="feature-dot"></span> Disconnection Enforcement & Security</li>
+                </ul>
+                <div class="card-footer">
+                    <a href="ADMIN_ROLE_EXPLORER.html" class="btn-launch">
+                        <span>Launch Admin Explorer</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </a>
+                    <span class="links-count">116 Verified Deep Links · 100% Working</span>
+                </div>
+            </div>
+
+            <!-- 3. Cristell (Cashier) -->
+            <div class="role-card role-cashier">
+                <div class="role-header">
+                    <div class="role-avatar">💵</div>
+                    <span class="role-badge">Route /cashier</span>
+                </div>
+                <h3 class="member-name">Cristell</h3>
+                <div class="role-title">Cashier (CashierUser)</div>
+                <p class="role-desc">
+                    Over-the-counter payments, official receipt issuance, partial/advance payments, daily collection balancing, and monthly remittance handover freeze.
+                </p>
+                <ul class="feature-list">
+                    <li class="feature-item"><span class="feature-dot"></span> Over-the-counter Payment Capture</li>
+                    <li class="feature-item"><span class="feature-dot"></span> Official Cash Receipt Issuance</li>
+                    <li class="feature-item"><span class="feature-dot"></span> Daily Drawer Balancing & Auditing</li>
+                    <li class="feature-item"><span class="feature-dot"></span> BOHECO Remittance Handover Freeze</li>
+                    <li class="feature-item"><span class="feature-dot"></span> Reader Compensation Disbursal</li>
+                </ul>
+                <div class="card-footer">
+                    <a href="CASHIER_ROLE_EXPLORER.html" class="btn-launch">
+                        <span>Launch Cashier Explorer</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </a>
+                    <span class="links-count">81 Verified Deep Links · 100% Working</span>
+                </div>
+            </div>
+
+            <!-- 4. Krisha Mae (Consumer) -->
+            <div class="role-card role-consumer">
+                <div class="role-header">
+                    <div class="role-avatar">📱</div>
+                    <span class="role-badge">Route /consumer</span>
+                </div>
+                <h3 class="member-name">Krisha Mae</h3>
+                <div class="role-title">Consumer (ConsumerUser)</div>
+                <p class="role-desc">
+                    Account dashboard, real-time bill breakdown, tiered consumption analytics, payment verification, and automated due-date disconnection warnings.
+                </p>
+                <ul class="feature-list">
+                    <li class="feature-item"><span class="feature-dot"></span> Live Account Status & Current Bill</li>
+                    <li class="feature-item"><span class="feature-dot"></span> Itemized Tariff Breakdown (Kwh & Rates)</li>
+                    <li class="feature-item"><span class="feature-dot"></span> Historical Consumption Trends</li>
+                    <li class="feature-item"><span class="feature-dot"></span> Payment Receipt History</li>
+                    <li class="feature-item"><span class="feature-dot"></span> Disconnection Warning Notifications</li>
+                </ul>
+                <div class="card-footer">
+                    <a href="CONSUMER_ROLE_EXPLORER.html" class="btn-launch">
+                        <span>Launch Consumer Explorer</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </a>
+                    <span class="links-count">81 Verified Deep Links · 100% Working</span>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Cross-Role Data Flow & Live Demo Transition Map -->
+        <div class="handoff-box">
+            <div class="handoff-header">
+                <h3 class="handoff-title">🔄 End-to-End Live Demo Sequence</h3>
+                <p class="handoff-subtitle">How data seamlessly flows through the team during the defense presentation</p>
+            </div>
+
+            <div class="handoff-steps">
+                <div class="handoff-step">
+                    <div class="step-num">Step 1 · Admin (Charles)</div>
+                    <div class="step-heading">Provisions Cycle & Tariff</div>
+                    <div class="step-desc">
+                        Opens active billing cycle in <code>billing_cycles</code>, defines tariff tiers in <code>coop_tariffs</code>, and initializes consumer meters.
+                    </div>
+                </div>
+
+                <div class="handoff-step">
+                    <div class="step-num">Step 2 · Reader (Mary Tiffany)</div>
+                    <div class="step-heading">Captures Dial & Outbox</div>
+                    <div class="step-desc">
+                        Visits consumer, records reading offline in Drift <code>CachedConsumers</code>, syncs to Supabase RPC <code>fn_record_meter_reading</code>.
+                    </div>
+                </div>
+
+                <div class="handoff-step">
+                    <div class="step-num">Step 3 · Consumer (Krisha Mae)</div>
+                    <div class="step-heading">Views Generated Bill</div>
+                    <div class="step-desc">
+                        Pulls computed bill from <code>v_consumer_bills</code>, inspects itemized kWh consumption delta, and monitors due date.
+                    </div>
+                </div>
+
+                <div class="handoff-step">
+                    <div class="step-num">Step 4 · Cashier (Cristell)</div>
+                    <div class="step-heading">Collects & Disburses</div>
+                    <div class="step-desc">
+                        Accepts cash payment, marks bill paid in <code>payments</code>, locks <code>remit_handovers</code> for BOHECO, and pays Mary Tiffany's ₱500 compensation.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Tips for Teammates -->
+        <div class="help-grid">
+            <div class="help-card">
+                <div class="help-title">💡 How to Explore Your Code</div>
+                <div class="help-text">
+                    Launch your explorer by clicking your card above. When viewing code traces, click any blue button to jump directly to that exact line in VS Code. No Flutter compilation or Android emulator needed.
+                </div>
+            </div>
+            <div class="help-card">
+                <div class="help-title">📁 Path Auto-Detection</div>
+                <div class="help-text">
+                    The banner at the very top automatically adapts all 367 VS Code links to your computer's local directory. If you move the project to a different drive or folder, click "Reset Auto" anytime.
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <div id="hubToast" class="toast"></div>
+
+    <!-- Footer -->
+    <footer>
+        <p><strong>BillAlert</strong> · Barangay Electric Cooperative Utility Management System · Thesis Defense Documentation</p>
+        <p style="margin-top: 6px; color: var(--text-dim);">Designed & Built for Charles Carcallas, Mary Tiffany I. Busalanan, Cristell, and Krisha Mae</p>
+    </footer>
+
+    <!-- Path Auto-Detection Script -->
+    <script>
+    (function() {
+        const ORIGINAL_AUTHOR_PATH = "c:/Users/Charles%20Carcallas/Documents/Atigravity/BillAlert";
+
+        function showToast(msg) {
+            const toast = document.getElementById('hubToast');
+            if (toast) {
+                toast.innerText = msg;
+                toast.classList.add('show');
+                setTimeout(() => toast.classList.remove('show'), 3500);
+            } else {
+                alert(msg);
+            }
+        }
+
+        function detectLocalFolderPath() {
+            if (window.location.protocol === 'file:') {
+                let path = window.location.href;
+                path = path.replace(/^file:\/\/\//i, '');
+                path = path.replace(/\/[^\/]+\.html([?#].*)?$/i, '');
+                path = path.replace(/\\/g, '/');
+                return path;
+            }
+            return ORIGINAL_AUTHOR_PATH;
+        }
+
+        function initHub() {
+            const detected = detectLocalFolderPath();
+            const stored = localStorage.getItem('billalert_team_path');
+            const effective = stored && stored.trim().length > 0 ? stored.trim() : detected;
+
+            const input = document.getElementById('hubWorkspaceInput');
+            const status = document.getElementById('hubPathStatus');
+
+            if (input) {
+                input.value = decodeURIComponent(effective);
+            }
+            if (status) {
+                if (stored) {
+                    status.innerHTML = `<span style="color: #F59E0B; font-weight: 700;">● Custom Path Active</span>`;
+                } else {
+                    status.innerHTML = `<span style="color: #10B981; font-weight: 700;">● Auto-Detected (${effective.split('/').pop()})</span>`;
+                }
+            }
+        }
+
+        window.saveHubPath = function() {
+            const input = document.getElementById('hubWorkspaceInput');
+            if (!input || !input.value.trim()) return;
+            let val = input.value.trim().replace(/\\/g, '/');
+            localStorage.setItem('billalert_team_path', val);
+            showToast("Workspace path saved! All 4 role explorers will use this path.");
+            initHub();
+        };
+
+        window.resetHubPath = function() {
+            localStorage.removeItem('billalert_team_path');
+            initHub();
+            showToast("Reset to auto-detected local path.");
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initHub);
+        } else {
+            initHub();
+        }
+    })();
+    </script>
+</body>
+</html>
