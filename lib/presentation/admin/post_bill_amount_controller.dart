@@ -74,9 +74,17 @@ class PostBillAmountController extends Notifier<PostBillAmountState> {
   /// the first one's future and waits for the same result. One load at a
   /// time, and `refresh()` genuinely completes when the data has arrived.
   Future<void>? _inFlight;
+  int _generation = 0;
 
   @override
   PostBillAmountState build() {
+    ref.watch(
+      authControllerProvider.select(
+        (s) => s.value?.accessScope,
+      ),
+    );
+    _generation++;
+    _inFlight = null;
     final subscription = ref.read(syncServiceProvider).reports.listen((
       SyncReport report,
     ) {
@@ -97,11 +105,13 @@ class PostBillAmountController extends Notifier<PostBillAmountState> {
   }
 
   Future<void> _doLoad() async {
+    final generation = _generation;
     // Awaited, not read synchronously. `authControllerProvider` restores the
     // session asynchronously, so reading `.value` here can land before it has
     // resolved and see null - which this method would then report as "you
     // have no service area", which is not what happened at all.
     final user = await ref.read(authControllerProvider.future);
+    if (!ref.mounted || generation != _generation) return;
 
     // An Admin is an Area President: the queue is their area's, and RLS
     // enforces the same thing server-side.
@@ -120,13 +130,24 @@ class PostBillAmountController extends Notifier<PostBillAmountState> {
 
     switch (await ref.read(billRepositoryProvider).awaitingAmount(areaId)) {
       case Ok(:final value):
-        final locallyQueued = await _locallyQueuedPostBillIds();
+        final local = await ref.read(outboxRepositoryProvider).all();
+        if (!ref.mounted || generation != _generation) return;
+        if (local case Err(:final failure)) {
+          state = state.copyWith(isLoading: false, failure: failure);
+          return;
+        }
+        final locallyQueued = (local as Ok<List<OutboxEntry>>).value
+            .map((e) => e.operation)
+            .whereType<PostAmountOperation>()
+            .map((op) => op.billId.value)
+            .toSet();
         state = PostBillAmountState(
           queue: value
               .where((entry) => !locallyQueued.contains(entry.bill.id.value))
               .toList(growable: false),
         );
       case Err(:final failure):
+        if (!ref.mounted || generation != _generation) return;
         // A failed refresh must not turn a useful on-screen queue into an
         // empty one. Keep the last successful data and show the failure over
         // it so the Admin knows it may be stale.
@@ -134,7 +155,11 @@ class PostBillAmountController extends Notifier<PostBillAmountState> {
     }
   }
 
-  Future<void> refresh() => _load();
+  Future<void> refresh() async {
+    do {
+      await _load();
+    } while (ref.mounted && state.isLoading);
+  }
 
   /// Posts one amount.
   ///
@@ -146,6 +171,7 @@ class PostBillAmountController extends Notifier<PostBillAmountState> {
     required String amountText,
     required PhDate? dueDate,
   }) async {
+    final generation = _generation;
     final Money? amount = Money.tryParse(amountText);
     if (amount == null) {
       state = state.copyWith(
@@ -170,12 +196,15 @@ class PostBillAmountController extends Notifier<PostBillAmountState> {
 
     state = state.copyWith(queue: state.queue, posting: entry.bill.id);
 
+    final uuid = ref.read(clientUuidFactoryProvider)();
     final result = await ref.read(postBillAmountProvider)(
+      clientUuid: uuid,
       bill: entry.bill,
       amount: amount,
       dueDate: dueDate,
     );
 
+    if (!ref.mounted || generation != _generation) return;
     switch (result) {
       case Err(:final failure):
         state = state.copyWith(queue: state.queue, failure: failure);
@@ -186,9 +215,22 @@ class PostBillAmountController extends Notifier<PostBillAmountState> {
         // meter reader - who is out of signal by design - this one is awaited:
         // the Admin is at a desk and is watching the list to see it go.
         await ref.read(syncServiceProvider).syncNow();
+        if (!ref.mounted || generation != _generation) return;
         await _load();
-        final locallyQueued = await _locallyQueuedPostBillIds();
-        final bool stillWaiting = locallyQueued.contains(entry.bill.id.value);
+        final local = await ref.read(outboxRepositoryProvider).all();
+        if (!ref.mounted || generation != _generation) return;
+        if (local case Err(:final failure)) {
+          state = state.copyWith(failure: failure);
+          return;
+        }
+        final matched = (local as Ok<List<OutboxEntry>>).value.where(
+          (e) => e.operation.clientUuid == uuid,
+        );
+        final confirmed =
+            matched.length == 1 &&
+            matched.single.status == OutboxStatus.synced &&
+            matched.single.serverId != null;
+        final bool stillWaiting = !confirmed;
         state = state.copyWith(
           // The server still returns this unpriced bill while offline, but it
           // is no longer actionable: its amount is already safely queued on
@@ -203,24 +245,6 @@ class PostBillAmountController extends Notifier<PostBillAmountState> {
                     'and waiting to sync.'
               : '${roundedAmount.format()} posted for ${entry.consumerName}.',
         );
-    }
-  }
-
-  /// Bill ids that already have a durable post-amount operation on-device.
-  ///
-  /// Use `all`, not only pending: a server-rejected operation must remain
-  /// non-actionable too, otherwise the Admin can accidentally queue a second
-  /// amount while the first one is shown as failed in Profile.
-  Future<Set<String>> _locallyQueuedPostBillIds() async {
-    switch (await ref.read(outboxRepositoryProvider).all()) {
-      case Ok(:final value):
-        return value
-            .map((OutboxEntry entry) => entry.operation)
-            .whereType<PostAmountOperation>()
-            .map((PostAmountOperation operation) => operation.billId.value)
-            .toSet();
-      case Err():
-        return const <String>{};
     }
   }
 

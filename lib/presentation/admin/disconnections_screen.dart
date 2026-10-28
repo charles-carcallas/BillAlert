@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/errors/app_failure.dart';
 import '../../core/result/result.dart';
+import '../../domain/outbox/outbox_operation.dart';
 import '../../domain/repositories/notice_repository.dart';
 import '../../domain/value_objects/ph_date.dart';
 import '../auth/auth_controller.dart';
@@ -11,6 +12,8 @@ import '../common/failure_banner.dart';
 import '../common/local_search_field.dart';
 import '../common/local_sort_button.dart';
 import '../common/notice_search.dart';
+import '../common/profile_screen.dart';
+import '../common/saved_list_time.dart';
 import '../common/staff_app_bar.dart';
 import '../providers.dart';
 import '../router.dart';
@@ -30,6 +33,17 @@ final activeNoticesProvider = FutureProvider<List<ActiveNotice>>((
 
   final result = await ref.watch(noticeRepositoryProvider).activeFor(areaId);
   return switch (result) {
+    Ok(:final value) => value,
+    Err(:final failure) => throw failure,
+  };
+});
+
+final closedNoticesProvider = FutureProvider<List<ClosedNotice>>((ref) async {
+  final user = await ref.watch(authControllerProvider.future);
+  if (user?.areaId == null) return [];
+  return switch (await ref
+      .watch(noticeRepositoryProvider)
+      .historyFor(user!.areaId!)) {
     Ok(:final value) => value,
     Err(:final failure) => throw failure,
   };
@@ -75,6 +89,50 @@ class _DisconnectionsScreenState extends ConsumerState<DisconnectionsScreen> {
 
     return Scaffold(
       appBar: const StaffAppBar(title: 'Disconnections'),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final actions = [
+                  TextButton.icon(
+                    onPressed: () =>
+                        context.push('/admin/disconnections/history'),
+                    icon: const Icon(Icons.history),
+                    label: const Text('Closed notice history'),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => context.push('/admin/overdue'),
+                    icon: const Icon(Icons.event_busy),
+                    label: const Text('Overdue collection approvals'),
+                  ),
+                ];
+                if (constraints.maxWidth < 600 ||
+                    MediaQuery.textScalerOf(context).scale(14) > 18) {
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: actions,
+                  );
+                }
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: actions,
+                );
+              },
+            ),
+          ),
+        ),
+      ),
       floatingActionButton: FloatingActionButton.extended(
         // `push`, so the back arrow returns to this list, and the list
         // refreshes when the notice lands.
@@ -86,176 +144,196 @@ class _DisconnectionsScreenState extends ConsumerState<DisconnectionsScreen> {
         label: const Text('Serve a notice'),
       ),
       body: SafeArea(
-        child: notices.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (Object error, StackTrace _) => Padding(
-            padding: const EdgeInsets.all(16),
-            child: FailureBanner(
-              failure: error is AppFailure
-                  ? error
-                  : ServerFailure(ServerFailure.defaultMessage, '$error'),
-              onRetry: () => ref.invalidate(activeNoticesProvider),
-            ),
-          ),
-          data: (List<ActiveNotice> list) {
-            final int elapsedCount = list
-                .where((ActiveNotice notice) => notice.periodElapsed)
-                .length;
-            final String query = _search.text.trim();
-            final visible =
-                list.where((ActiveNotice notice) {
-                  final bool matchesFilter =
-                      _filter == _NoticeFilter.all || notice.periodElapsed;
-                  if (!matchesFilter) return false;
-                  return noticeMatchesSearch(notice, query);
-                }).toList()..sort((a, b) {
-                  final byDate = _sort == _NoticeSort.oldest
-                      ? a.servedAt.compareTo(b.servedAt)
-                      : b.servedAt.compareTo(a.servedAt);
-                  return byDate != 0
-                      ? byDate
-                      : a.noticeNo.compareTo(b.noticeNo);
-                });
-            return RefreshIndicator(
-              onRefresh: () async => ref.invalidate(activeNoticesProvider),
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
-                children: <Widget>[
-                  if (list.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 64),
-                      child: Column(
-                        children: <Widget>[
-                          Icon(
-                            Icons.verified_outlined,
-                            size: 40,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'No active notices.',
-                            style: text.titleMedium,
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Nobody in this area is under a disconnection '
-                            'notice.',
-                            style: text.bodyMedium,
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
-                    )
-                  else ...<Widget>[
-                    Text.rich(
-                      TextSpan(
-                        children: <InlineSpan>[
-                          TextSpan(
-                            text: '${list.length}',
-                            style: text.headlineMedium,
-                          ),
-                          TextSpan(
-                            text: ' awaiting review',
-                            style: text.bodyMedium,
-                          ),
-                          if (elapsedCount > 0)
-                            TextSpan(
-                              text: '  ·  $elapsedCount past 48h',
-                              style: text.bodyMedium?.copyWith(
-                                color: Theme.of(context).colorScheme.error,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
+        child: Column(
+          children: [
+            const _NoticeUploads(),
+            Expanded(
+              child: notices.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (Object error, StackTrace _) => Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: FailureBanner(
+                    failure: error is AppFailure
+                        ? error
+                        : ServerFailure(ServerFailure.defaultMessage, '$error'),
+                    onRetry: () => ref.invalidate(activeNoticesProvider),
+                  ),
+                ),
+                data: (List<ActiveNotice> list) {
+                  final int elapsedCount = list
+                      .where((ActiveNotice notice) => notice.periodElapsed)
+                      .length;
+                  final String query = _search.text.trim();
+                  final visible =
+                      list.where((ActiveNotice notice) {
+                        final bool matchesFilter =
+                            _filter == _NoticeFilter.all ||
+                            notice.periodElapsed;
+                        if (!matchesFilter) return false;
+                        return noticeMatchesSearch(notice, query);
+                      }).toList()..sort((a, b) {
+                        final byDate = _sort == _NoticeSort.oldest
+                            ? a.servedAt.compareTo(b.servedAt)
+                            : b.servedAt.compareTo(a.servedAt);
+                        return byDate != 0
+                            ? byDate
+                            : a.noticeNo.compareTo(b.noticeNo);
+                      });
+                  return RefreshIndicator(
+                    onRefresh: () async =>
+                        ref.invalidate(activeNoticesProvider),
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
                       children: <Widget>[
-                        Expanded(
-                          child: LocalSearchField(
-                            fieldKey: const ValueKey<String>(
-                              'admin-notices-search',
-                            ),
-                            controller: _search,
-                            onChanged: (_) => setState(() {}),
-                            hintText: 'Search consumer, account or notice',
-                          ),
+                        const SavedListTime(
+                          cacheKey: 'active_notices',
+                          areaScoped: true,
                         ),
-                        const SizedBox(width: 8),
-                        SizedBox(
-                          width: 120,
-                          child: LocalSortButton<_NoticeSort>(
-                            buttonKey: const ValueKey('admin-notices-sort'),
-                            value: _sort,
-                            options: const <LocalSortOption<_NoticeSort>>[
-                              LocalSortOption(
-                                value: _NoticeSort.oldest,
-                                label: 'Oldest',
-                                icon: Icons.arrow_upward,
+                        if (list.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 64),
+                            child: Column(
+                              children: <Widget>[
+                                Icon(
+                                  Icons.verified_outlined,
+                                  size: 40,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'No active notices.',
+                                  style: text.titleMedium,
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Nobody in this area is under a disconnection '
+                                  'notice.',
+                                  style: text.bodyMedium,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          )
+                        else ...<Widget>[
+                          Text.rich(
+                            TextSpan(
+                              children: <InlineSpan>[
+                                TextSpan(
+                                  text: '${list.length}',
+                                  style: text.headlineMedium,
+                                ),
+                                TextSpan(
+                                  text: ' awaiting review',
+                                  style: text.bodyMedium,
+                                ),
+                                if (elapsedCount > 0)
+                                  TextSpan(
+                                    text: '  ·  $elapsedCount past 48h',
+                                    style: text.bodyMedium?.copyWith(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.error,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: <Widget>[
+                              Expanded(
+                                child: LocalSearchField(
+                                  fieldKey: const ValueKey<String>(
+                                    'admin-notices-search',
+                                  ),
+                                  controller: _search,
+                                  onChanged: (_) => setState(() {}),
+                                  hintText:
+                                      'Search consumer, account or notice',
+                                ),
                               ),
-                              LocalSortOption(
-                                value: _NoticeSort.newest,
-                                label: 'Newest',
-                                icon: Icons.arrow_downward,
+                              const SizedBox(width: 8),
+                              SizedBox(
+                                width: 120,
+                                child: LocalSortButton<_NoticeSort>(
+                                  buttonKey: const ValueKey(
+                                    'admin-notices-sort',
+                                  ),
+                                  value: _sort,
+                                  options: const <LocalSortOption<_NoticeSort>>[
+                                    LocalSortOption(
+                                      value: _NoticeSort.oldest,
+                                      label: 'Oldest',
+                                      icon: Icons.arrow_upward,
+                                    ),
+                                    LocalSortOption(
+                                      value: _NoticeSort.newest,
+                                      label: 'Newest',
+                                      icon: Icons.arrow_downward,
+                                    ),
+                                  ],
+                                  onChanged: (value) =>
+                                      setState(() => _sort = value),
+                                ),
                               ),
                             ],
-                            onChanged: (value) => setState(() => _sort = value),
                           ),
-                        ),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            children: <Widget>[
+                              ChoiceChip(
+                                label: const Text('All'),
+                                selected: _filter == _NoticeFilter.all,
+                                onSelected: (_) =>
+                                    setState(() => _filter = _NoticeFilter.all),
+                              ),
+                              ChoiceChip(
+                                label: const Text('Past 48h'),
+                                selected: _filter == _NoticeFilter.elapsed,
+                                onSelected: (_) => setState(
+                                  () => _filter = _NoticeFilter.elapsed,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          if (visible.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 36),
+                              child: Text(
+                                query.isEmpty
+                                    ? 'No notices match this filter.'
+                                    : 'No notice matches that search and filter.',
+                                style: text.bodyMedium,
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          for (final ActiveNotice notice in visible)
+                            _NoticeTile(
+                              notice: notice,
+                              // Returning from the document refreshes the list: a
+                              // notice closed in there is no longer active, and it
+                              // must not linger here looking as though it were.
+                              onOpen: () async {
+                                await context.push(
+                                  Routes.noticeDocumentFor(notice.id.value),
+                                );
+                                ref.invalidate(activeNoticesProvider);
+                              },
+                            ),
+                        ],
                       ],
                     ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      children: <Widget>[
-                        ChoiceChip(
-                          label: const Text('All'),
-                          selected: _filter == _NoticeFilter.all,
-                          onSelected: (_) =>
-                              setState(() => _filter = _NoticeFilter.all),
-                        ),
-                        ChoiceChip(
-                          label: const Text('Past 48h'),
-                          selected: _filter == _NoticeFilter.elapsed,
-                          onSelected: (_) =>
-                              setState(() => _filter = _NoticeFilter.elapsed),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    if (visible.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 36),
-                        child: Text(
-                          query.isEmpty
-                              ? 'No notices match this filter.'
-                              : 'No notice matches that search and filter.',
-                          style: text.bodyMedium,
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    for (final ActiveNotice notice in visible)
-                      _NoticeTile(
-                        notice: notice,
-                        // Returning from the document refreshes the list: a
-                        // notice closed in there is no longer active, and it
-                        // must not linger here looking as though it were.
-                        onOpen: () async {
-                          await context.push(
-                            Routes.noticeDocumentFor(notice.id.value),
-                          );
-                          ref.invalidate(activeNoticesProvider);
-                        },
-                      ),
-                  ],
-                ],
+                  );
+                },
               ),
-            );
-          },
+            ),
+          ],
         ),
       ),
     );
@@ -315,8 +393,10 @@ class _NoticeTile extends StatelessWidget {
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
-                      elapsed
-                          ? '48h elapsed'
+                      notice.readyToClose
+                          ? 'Ready to close'
+                          : elapsed
+                          ? 'Period elapsed'
                           : '${notice.hoursRemaining}h left',
                       style: text.bodySmall?.copyWith(
                         color: colours.onSurfaceVariant,
@@ -332,7 +412,9 @@ class _NoticeTile extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                elapsed
+                notice.readyToClose
+                    ? 'Payment confirmed. Review receipts and close as Settled.'
+                    : elapsed
                     ? 'The notice period has passed. Disconnection may now be '
                           'referred to the cooperative.'
                     : 'Disconnection is not lawful until the period is over.',
@@ -375,4 +457,40 @@ class _NoticeTile extends StatelessWidget {
     ];
     return '${day.day} ${months[day.month - 1]} ${day.year}';
   }
+}
+
+class _NoticeUploads extends ConsumerWidget {
+  const _NoticeUploads();
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => ref
+      .watch(pendingOutboxProvider)
+      .when(
+        loading: () => const Text('Checking notice uploads…'),
+        error: (_, _) => const Text(
+          'Notice upload status could not be checked. Open Profile.',
+        ),
+        data: (entries) {
+          final notices = entries
+              .where((e) => e.operation is IssueNoticeOperation)
+              .toList();
+          if (notices.isEmpty) return const SizedBox.shrink();
+          return ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 160),
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                for (final entry in notices)
+                  ListTile(
+                    leading: const Icon(Icons.cloud_upload_outlined),
+                    title: Text(entry.description),
+                    subtitle: Text(
+                      '${entry.status.name} · ${entry.lastError ?? 'Saved locally; server acceptance pending'}',
+                    ),
+                    onTap: () => context.push('/admin/profile'),
+                  ),
+              ],
+            ),
+          );
+        },
+      );
 }

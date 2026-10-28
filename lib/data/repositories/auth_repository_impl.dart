@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -28,7 +30,11 @@ class AuthRepositoryImpl implements AuthRepository {
   final SupabaseClient _client;
   final AppDatabase _db;
 
-  const AuthRepositoryImpl(this._client, this._db);
+  AuthRepositoryImpl(this._client, this._db);
+  int _generation = 0;
+  AppUser? _confirmedProfile;
+  Future<Result<AppUser?>>? _profileInFlight;
+  Future<void> _cacheWrite = Future<void>.value();
 
   /// Turns the username a person types into the email their account was
   /// created with: "ledesman.dormal" -> "ledesman.dormal@billalert.local".
@@ -53,6 +59,9 @@ class AuthRepositoryImpl implements AuthRepository {
     required String username,
     required String password,
   }) async {
+    final generation = ++_generation;
+    _confirmedProfile = null;
+    _profileInFlight = null;
     try {
       final response = await _client.auth.signInWithPassword(
         email: emailForUsername(username),
@@ -72,6 +81,10 @@ class AuthRepositoryImpl implements AuthRepository {
       }
 
       final profileResult = await _loadProfile(user.id);
+      if (generation != _generation ||
+          _client.auth.currentUser?.id != user.id) {
+        return const Err<AppUser>(AuthFailure());
+      }
       switch (profileResult) {
         case Err(:final failure):
           return Err<AppUser>(failure);
@@ -102,6 +115,11 @@ class AuthRepositoryImpl implements AuthRepository {
     if (session == null) {
       return const Ok<AppUser?>(null);
     }
+    final confirmed = _confirmedProfile;
+    _confirmedProfile = null;
+    if (confirmed != null && confirmed.id.value == session.user.id) {
+      return Ok<AppUser?>(confirmed);
+    }
     return _loadProfileWithOfflineFallback(session.user.id);
   }
 
@@ -119,7 +137,11 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<Result<void>> signOut() async {
+    _generation++;
+    _confirmedProfile = null;
+    _profileInFlight = null;
     try {
+      await _cacheWrite;
       // GEN-06: the cached roster, bills and alerts belong to the person who
       // signed in, so they go. The outbox deliberately does not: signing out
       // with unsynced field work must not throw a morning of readings away.
@@ -145,9 +167,23 @@ class AuthRepositoryImpl implements AuthRepository {
     try {
       // Asked of Supabase Auth itself. A read through the database would
       // still succeed on an ended session until the access token expires.
-      await _client.auth.getUser();
+      final generation = _generation;
+      final response = await _client.auth.getUser();
+      if (response.user == null) {
+        return const Err<void>(AuthFailure());
+      }
+      final profile = await _loadProfileWithOfflineFallback(response.user!.id);
+      if (generation != _generation) return const Err<void>(AuthFailure());
+      if (profile case Err(:final failure)) return Err<void>(failure);
+      if (profile case Ok(value: null)) return const Err<void>(AuthFailure());
+      if (profile case Ok(:final value)) _confirmedProfile = value;
       return const Ok<void>(null);
     } on AuthException catch (error) {
+      if (error.code == 'user_banned') {
+        return Err<void>(
+          AuthFailure(AuthFailure.disabledMessage, error.toString()),
+        );
+      }
       if (_endedSessionCodes.contains(error.code)) {
         return Err<void>(
           AuthFailure(AuthFailure.defaultMessage, error.toString()),
@@ -171,6 +207,7 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<Result<void>> changePassword({required String newPassword}) async {
+    _confirmedProfile = null;
     try {
       await _client.auth.updateUser(UserAttributes(password: newPassword));
 
@@ -474,12 +511,7 @@ class AuthRepositoryImpl implements AuthRepository {
         return const Ok<AppUser?>(null);
       }
       if (row['account_status'] != 'active') {
-        return const Err<AppUser?>(
-          AuthFailure(
-            'This account is not active. Ask your Area President to activate '
-            'it.',
-          ),
-        );
+        return const Err<AppUser?>(AuthFailure(AuthFailure.disabledMessage));
       }
       return Ok<AppUser?>(ProfileDto.fromJson(row));
     } catch (error, stackTrace) {
@@ -491,12 +523,34 @@ class AuthRepositoryImpl implements AuthRepository {
   /// authenticated session usable offline. The fallback is accepted only
   /// for a network failure and only when the encrypted cache belongs to the
   /// exact profile id in Supabase's persisted session.
-  Future<Result<AppUser?>> _loadProfileWithOfflineFallback(
-    String userId,
-  ) async {
+  Future<Result<AppUser?>> _loadProfileWithOfflineFallback(String userId) {
+    final existing = _profileInFlight;
+    if (existing != null) return existing;
+    late final Future<Result<AppUser?>> request;
+    request = _performProfileLoad(userId).whenComplete(() {
+      if (identical(_profileInFlight, request)) _profileInFlight = null;
+    });
+    _profileInFlight = request;
+    return request;
+  }
+
+  Future<Result<AppUser?>> _performProfileLoad(String userId) async {
+    final generation = _generation;
     final remote = await _loadProfile(userId);
+    if (generation != _generation || _client.auth.currentUser?.id != userId) {
+      return const Err<AppUser?>(AuthFailure());
+    }
     if (remote case Ok(:final value)) {
       if (value != null) await _claimCacheFor(value);
+      if (generation != _generation || _client.auth.currentUser?.id != userId) {
+        return const Err<AppUser?>(AuthFailure());
+      }
+      if (value == null) await _db.clearCachedData();
+      return remote;
+    }
+    if (remote case Err(failure: AuthFailure())) {
+      _confirmedProfile = null;
+      await _db.clearCachedData();
       return remote;
     }
     if (remote case Err(failure: NetworkFailure())) {
@@ -516,6 +570,13 @@ class AuthRepositoryImpl implements AuthRepository {
       return null;
     }
 
+    final metadata =
+        await (_db.select(_db.cachedQueries)
+              ..where((t) => t.queryKey.equals('profile-access:$userId')))
+            .getSingleOrNull();
+    final access = metadata == null
+        ? <String, dynamic>{}
+        : jsonDecode(metadata.rowsJson) as Map<String, dynamic>;
     return ProfileDto.fromJson(<String, dynamic>{
       'id': row.profileId,
       'username': row.username,
@@ -525,15 +586,42 @@ class AuthRepositoryImpl implements AuthRepository {
       'area_id': row.areaId,
       'must_change_password': row.mustChangePassword,
       'account_status': 'active',
+      ...access,
     });
   }
 
   /// SYS-05: records who this cache belongs to, and empties it first if the
   /// previous owner was somebody else. Two staff sharing one phone must not
   /// be able to see each other's area.
-  Future<void> _claimCacheFor(AppUser user) async {
+  Future<void> _claimCacheFor(AppUser user) {
+    final generation = _generation;
+    final next = _cacheWrite.then((_) async {
+      if (generation != _generation ||
+          _client.auth.currentUser?.id != user.id.value) {
+        throw const AuthFailure();
+      }
+      await _writeCacheOwner(user);
+    });
+    _cacheWrite = next.catchError((Object _) {});
+    return next;
+  }
+
+  Future<void> _writeCacheOwner(AppUser user) async {
     final existing = await _db.select(_db.cacheOwner).getSingleOrNull();
-    if (existing != null && existing.profileId != user.id.value) {
+    final metadata =
+        await (_db.select(_db.cachedQueries)..where(
+              (t) => t.queryKey.equals('profile-access:${user.id.value}'),
+            ))
+            .getSingleOrNull();
+    final oldVersion = metadata == null
+        ? null
+        : (jsonDecode(metadata.rowsJson)
+              as Map<String, dynamic>)['access_version'];
+    if (existing != null &&
+        (existing.profileId != user.id.value ||
+            existing.role != user.roleCode ||
+            existing.areaId != user.areaId?.value ||
+            oldVersion != user.accessVersion)) {
       await _db.clearCachedData();
     }
     await _db
@@ -549,6 +637,19 @@ class AuthRepositoryImpl implements AuthRepository {
             role: user.roleCode,
             areaId: Value<String?>(user.areaId?.value),
             cachedAt: DateTime.now().toUtc().toIso8601String(),
+          ),
+        );
+    await _db
+        .into(_db.cachedQueries)
+        .insertOnConflictUpdate(
+          CachedQueriesCompanion.insert(
+            queryKey: 'profile-access:${user.id.value}',
+            rowsJson: jsonEncode({
+              'role': user.historicalRole,
+              'staff_enabled': user.hasWorkAccess,
+              'access_version': user.accessVersion,
+            }),
+            savedAt: DateTime.now().toUtc().toIso8601String(),
           ),
         );
   }

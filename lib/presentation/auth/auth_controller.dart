@@ -22,6 +22,8 @@ class AuthController extends AsyncNotifier<AppUser?> {
   /// True while this person's own sign-out runs, so it is not mistaken for
   /// the server ending the session.
   bool _signingOut = false;
+  int _generation = 0;
+  bool _confirming = false;
 
   @override
   Future<AppUser?> build() async {
@@ -30,8 +32,14 @@ class AuthController extends AsyncNotifier<AppUser?> {
     // Reacts to a sign-out or an expired token from anywhere, so the router
     // moves without every screen having to poll.
     final subscription = repository.authChanges().listen((AppUser? user) {
-      if (_ready) {
+      if (_ready && !_signingOut) {
         if (user == null) {
+          ref.read(outboxSessionProvider).bind(null);
+          unawaited(ref.read(syncServiceProvider).stop());
+          if (!_signingOut) {
+            unawaited(ref.read(backgroundAlertsProvider).stop());
+            unawaited(ref.read(phoneNotifierProvider).cancelAll());
+          }
           // A session that has ended cannot still be waiting to be unlocked.
           ref.read(appLockControllerProvider.notifier).reset();
           // Signed out without asking to be: the session was ended somewhere
@@ -40,6 +48,30 @@ class AuthController extends AsyncNotifier<AppUser?> {
           if (!_signingOut && state.value != null) {
             ref.read(signInNoticeProvider.notifier).show(_signedOutByReset);
           }
+        }
+        final session = ref.read(outboxSessionProvider);
+        final scope = session.scope;
+        if (user != null &&
+            scope != null &&
+            (scope.id != user.id.value ||
+                scope.role != user.roleCode ||
+                scope.area != user.areaId?.value ||
+                state.value?.accessVersion != user.accessVersion)) {
+          session.bind(null);
+          final sync = ref.read(syncServiceProvider);
+          unawaited(
+            sync.stop().then((_) {
+              if (!ref.mounted ||
+                  state.value?.id != user.id ||
+                  state.value?.roleCode != user.roleCode ||
+                  state.value?.areaId != user.areaId) {
+                return;
+              }
+              session.bind(user);
+              sync.start();
+              unawaited(sync.syncNow());
+            }),
+          );
         }
         state = AsyncData<AppUser?>(user);
       }
@@ -69,6 +101,7 @@ class AuthController extends AsyncNotifier<AppUser?> {
       // password sign-in. Without this, force-killing the app while offline
       // and reopening it left the durable outbox stranded even after signal
       // returned.
+      ref.read(outboxSessionProvider).bind(user);
       final sync = ref.read(syncServiceProvider);
       sync.start();
       unawaited(sync.syncNow());
@@ -83,6 +116,7 @@ class AuthController extends AsyncNotifier<AppUser?> {
     required String username,
     required String password,
   }) async {
+    final generation = ++_generation;
     // Deliberately NOT `state = AsyncLoading()`.
     //
     // This state means "who is signed in", and the router watches it. Setting
@@ -94,13 +128,19 @@ class AuthController extends AsyncNotifier<AppUser?> {
     //
     // The spinner is the screen's own business; LoginScreen tracks it with
     // `_isSubmitting`.
+    await ref.read(syncServiceProvider).stop();
+    ref.read(outboxSessionProvider).bind(null);
     final result = await ref.read(signInProvider)(
       username: username,
       password: password,
     );
+    if (!ref.mounted || generation != _generation) return const AuthFailure();
 
     switch (result) {
       case Ok(:final value):
+        if (!ref.mounted || generation != _generation) {
+          return const AuthFailure();
+        }
         _ready = true;
         // The server just accepted this password, so this phone may check it
         // again later when the lock is opened without signal.
@@ -112,6 +152,10 @@ class AuthController extends AsyncNotifier<AppUser?> {
         await ref
             .read(appLockControllerProvider.notifier)
             .afterPasswordSignIn(value);
+        if (!ref.mounted || generation != _generation) {
+          return const AuthFailure();
+        }
+        ref.read(outboxSessionProvider).bind(value);
         state = AsyncData<AppUser?>(value);
         // MTR-11/12: start draining anything left in the outbox from the last
         // session as soon as somebody is signed in again.
@@ -126,9 +170,13 @@ class AuthController extends AsyncNotifier<AppUser?> {
   }
 
   Future<AppFailure?> signOut() async {
+    _generation++;
     _signingOut = true;
     try {
       final AppUser? leaving = state.value;
+      state = const AsyncData<AppUser?>(null);
+      await ref.read(syncServiceProvider).stop();
+      ref.read(outboxSessionProvider).bind(null);
       final result = await ref.read(signOutProvider)();
       if (leaving != null) {
         await ref.read(passwordVerifierProvider).forget(leaving.id);
@@ -159,17 +207,60 @@ class AuthController extends AsyncNotifier<AppUser?> {
   /// Without signal nothing happens: the phone keeps working from what it has
   /// saved and asks again next time.
   Future<void> confirmSession() async {
-    if (state.value == null) return;
-    final Result<void> result;
+    if (state.value == null || _confirming || _signingOut) return;
+    _confirming = true;
+    final generation = _generation;
+    final previous = state.value!;
     try {
-      result = await ref.read(authRepositoryProvider).confirmSession();
-    } catch (_) {
-      return;
-    }
-    if (result case Err(:final failure) when failure is AuthFailure) {
-      if (state.value == null) return;
-      ref.read(signInNoticeProvider.notifier).show(_signedOutByReset);
-      await signOut();
+      final Result<void> result;
+      try {
+        result = await ref.read(authRepositoryProvider).confirmSession();
+      } catch (_) {
+        return;
+      }
+      if (!ref.mounted ||
+          generation != _generation ||
+          state.value?.id != previous.id) {
+        return;
+      }
+      if (result case Err(:final failure) when failure is AuthFailure) {
+        if (state.value == null) return;
+        ref
+            .read(signInNoticeProvider.notifier)
+            .show(
+              failure.message == AuthFailure.disabledMessage
+                  ? AuthFailure.disabledMessage
+                  : _signedOutByReset,
+            );
+        await signOut();
+        return;
+      }
+      if (result is Err<void>) return;
+      final refreshed = await ref.read(authRepositoryProvider).currentUser();
+      if (!ref.mounted ||
+          generation != _generation ||
+          state.value?.id != previous.id) {
+        return;
+      }
+      if (refreshed case Ok(:final value)) {
+        if (value == null) {
+          await signOut();
+          return;
+        }
+        if (previous.accessScope != value.accessScope) {
+          ref.read(outboxSessionProvider).bind(null);
+          await ref.read(syncServiceProvider).stop();
+          await ref.read(phoneNotifierProvider).cancelAll();
+          if (!ref.mounted || generation != _generation) return;
+          ref.read(outboxSessionProvider).bind(value);
+          ref.read(syncServiceProvider).start();
+        }
+        state = AsyncData<AppUser?>(value);
+      } else if (refreshed case Err(failure: AuthFailure())) {
+        await signOut();
+      }
+    } finally {
+      _confirming = false;
     }
   }
 
@@ -179,10 +270,12 @@ class AuthController extends AsyncNotifier<AppUser?> {
     required String newPassword,
     required String confirmPassword,
   }) async {
+    final generation = _generation;
     final result = await ref.read(changePasswordProvider)(
       newPassword: newPassword,
       confirmPassword: confirmPassword,
     );
+    if (!ref.mounted || generation != _generation) return const AuthFailure();
 
     switch (result) {
       case Err(:final failure):
@@ -201,12 +294,18 @@ class AuthController extends AsyncNotifier<AppUser?> {
         return failure;
       case Ok():
         final refreshed = await ref.read(authRepositoryProvider).currentUser();
+        if (!ref.mounted || generation != _generation) {
+          return const AuthFailure();
+        }
         if (refreshed case Ok(:final value)) {
           if (value != null) {
             // The old password must stop opening the lock offline.
             await ref
                 .read(passwordVerifierProvider)
                 .remember(value.id, newPassword);
+          }
+          if (!ref.mounted || generation != _generation) {
+            return const AuthFailure();
           }
           state = AsyncData<AppUser?>(value);
         }

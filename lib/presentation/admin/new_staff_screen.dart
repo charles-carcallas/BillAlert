@@ -9,6 +9,7 @@ import '../common/final_confirmation_dialog.dart';
 import '../common/staff_app_bar.dart';
 import 'account_form_widgets.dart';
 import 'new_staff_controller.dart';
+import 'staff_household_setup.dart';
 import 'temporary_password_card.dart';
 
 /// FR-31 — Admin › New Staff Account, adapted from Figma 70:1436.
@@ -80,6 +81,7 @@ class _AdminNewStaffScreenState extends ConsumerState<AdminNewStaffScreen> {
 
     final Widget content = SafeArea(
       child: AdminAccountFormLayout(
+        maxWidth: 560,
         children: <Widget>[
           if (widget.showIntro) ...<Widget>[
             Text(
@@ -93,8 +95,11 @@ class _AdminNewStaffScreenState extends ConsumerState<AdminNewStaffScreen> {
             FailureBanner(failure: state.failure!),
             const SizedBox(height: 20),
           ],
-          const AccountFormSectionTitle('Staff details'),
-          const SizedBox(height: 14),
+          const AccountFormSectionTitle(
+            'Staff details',
+            icon: Icons.badge_outlined,
+          ),
+          const SizedBox(height: 20),
           AccountFormField(
             label: 'First name',
             child: TextField(
@@ -170,7 +175,7 @@ class _AdminNewStaffScreenState extends ConsumerState<AdminNewStaffScreen> {
                     .map(
                       (StaffRole role) => ButtonSegment<StaffRole>(
                         value: role,
-                        label: Text(role.label),
+                        label: Text(role.label, textAlign: TextAlign.center),
                       ),
                     )
                     .toList(),
@@ -183,16 +188,16 @@ class _AdminNewStaffScreenState extends ConsumerState<AdminNewStaffScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          const AccountFormNote(
+          const AccountFormHint(
             icon: Icons.location_on_outlined,
-            title: 'Your service area',
-            message:
-                'The account is assigned to your Admin area automatically. '
-                'The server also verifies that the role can be assigned.',
+            message: 'Assigned to your service area automatically.',
           ),
-          const SizedBox(height: 24),
-          const AccountFormSectionTitle('Sign-in details'),
-          const SizedBox(height: 14),
+          const SizedBox(height: 32),
+          const AccountFormSectionTitle(
+            'Sign-in details',
+            icon: Icons.lock_outline,
+          ),
+          const SizedBox(height: 20),
           AccountFormField(
             label: 'Username',
             child: TextField(
@@ -208,19 +213,18 @@ class _AdminNewStaffScreenState extends ConsumerState<AdminNewStaffScreen> {
               ],
               decoration: const InputDecoration(
                 hintText: 'e.g. rodrigo.balistoy',
-                helperText:
-                    'Filled from the name. You can edit it if already taken.',
+                helperText: 'Suggested from the name. You can edit it.',
+                helperMaxLines: 2,
               ),
             ),
           ),
           const SizedBox(height: 16),
           const AccountFormNote(
-            icon: Icons.password_outlined,
+            compact: true,
+            icon: Icons.key_outlined,
             title: 'Temporary password',
             message:
-                'BillAlert makes one, like BillAlert4829, and shows it once '
-                'after the account is created. The staff member must choose '
-                'their own at first sign-in.',
+                'Generated after creation. Must be changed at first sign-in.',
           ),
           const SizedBox(height: 16),
           SizedBox(
@@ -372,6 +376,15 @@ class _CreatedStaff extends StatelessWidget {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
+                StaffHouseholdSetupButton(
+                  person: {
+                    'id': account.id.value,
+                    'first_name': account.firstName,
+                    'last_name': account.lastName,
+                  },
+                  label: 'Set up their household',
+                ),
+                const SizedBox(height: 8),
                 OutlinedButton(
                   onPressed: onCreateAnother,
                   child: const Text('Create another'),

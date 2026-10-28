@@ -31,22 +31,48 @@ final class IssueDisconnectionNotice {
   Future<Result<void>> call({
     required Consumer consumer,
     String? reason,
+    ClientUuid? clientUuid,
   }) async {
+    final captureSession = outbox.sessionGeneration;
     if (!consumer.isActive) {
-      return Err(ValidationFailure(
-        '${consumer.fullName} is not an active account, so a disconnection '
-        'notice does not apply.',
-      ));
+      return Err(
+        ValidationFailure(
+          '${consumer.fullName} is not an active account, so a disconnection '
+          'notice does not apply.',
+        ),
+      );
     }
 
+    final pending = await outbox.pending();
+    if (pending case Err(:final failure)) return Err<void>(failure);
+    if (pending case Ok(:final value)) {
+      if (value.any(
+        (e) =>
+            e.operation is IssueNoticeOperation &&
+            (e.operation as IssueNoticeOperation).consumerId == consumer.id,
+      )) {
+        return const Err<void>(
+          ConflictFailure(
+            'A notice for this household is already saved. Check its status in Profile.',
+          ),
+        );
+      }
+    }
     final operation = IssueNoticeOperation(
-      clientUuid: newClientUuid(),
+      clientUuid: clientUuid ?? newClientUuid(),
       capturedAt: clock.nowUtc(),
       consumerId: consumer.id,
       consumerLabel: consumer.fullName,
       reason: reason,
     );
 
+    if (captureSession != outbox.sessionGeneration) {
+      return const Err(
+        AuthFailure(
+          'The signed-in account changed. Nothing was queued for the new account.',
+        ),
+      );
+    }
     return switch (await outbox.enqueue(operation)) {
       Err(:final failure) => Err<void>(failure),
       Ok() => const Ok<void>(null),
@@ -71,6 +97,5 @@ final class RecordNoticeOutcome {
     required NoticeId noticeId,
     required NoticeOutcome outcome,
     String? notes,
-  }) =>
-      notices.closeNotice(noticeId: noticeId, outcome: outcome, notes: notes);
+  }) => notices.closeNotice(noticeId: noticeId, outcome: outcome, notes: notes);
 }

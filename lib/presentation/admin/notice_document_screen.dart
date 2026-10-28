@@ -1,12 +1,14 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/repositories/notice_repository.dart';
 import '../../domain/value_objects/ph_date.dart';
 import '../common/failure_banner.dart';
+import '../common/saved_list_time.dart';
 import 'notice_document_controller.dart';
 
-/// DOM-05 — the document for one active disconnection notice.
+/// DOM-05 — the document for an active or closed disconnection notice.
 ///
 /// `noticeId` comes from `/admin/notice/:noticeId`. The document renders the
 /// server's lawful moment and elapsed flag as received; it never derives a
@@ -22,6 +24,44 @@ class NoticeDocumentScreen extends ConsumerStatefulWidget {
 }
 
 class _NoticeDocumentScreenState extends ConsumerState<NoticeDocumentScreen> {
+  Timer? _timer;
+  late final AppLifecycleListener _lifecycle;
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle = AppLifecycleListener(
+      onResume: _resume,
+      onPause: () => _timer?.cancel(),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) => _resume());
+  }
+
+  void _resume() {
+    if (!mounted) return;
+    _timer?.cancel();
+    unawaited(
+      ref
+          .read(noticeDocumentControllerProvider(widget.noticeId).notifier)
+          .load(),
+    );
+    _timer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) {
+        unawaited(
+          ref
+              .read(noticeDocumentControllerProvider(widget.noticeId).notifier)
+              .load(),
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final NoticeDocumentState state = ref.watch(
@@ -69,12 +109,15 @@ class _NoticeDocumentScreenState extends ConsumerState<NoticeDocumentScreen> {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: <Widget>[
           _NoticeBanner(noticeNo: notice.noticeNo),
+          SavedListTime(cacheKey: 'notice-review:${widget.noticeId}'),
+          if (state.review case final NoticeReview review)
+            _ReviewEvidence(review: review),
           const SizedBox(height: 14),
           _LawfulMoment(notice: notice),
           const SizedBox(height: 14),
           _NoticeDetails(notice: notice),
           const SizedBox(height: 14),
-          _HowToSettle(notice: notice),
+          if (state.review?.isActive == true) _HowToSettle(notice: notice),
           const SizedBox(height: 14),
           _ScopeStatement(periodElapsed: notice.periodElapsed),
           if (state.failure != null) ...<Widget>[
@@ -82,20 +125,21 @@ class _NoticeDocumentScreenState extends ConsumerState<NoticeDocumentScreen> {
             FailureBanner(failure: state.failure!),
           ],
           const SizedBox(height: 20),
-          OutlinedButton.icon(
-            onPressed: state.isClosing
-                ? null
-                : () => _showCloseDialog(controller),
-            icon: state.isClosing
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.task_alt),
-            label: Text(
-              state.isClosing ? 'Recording outcome…' : 'Close this notice',
+          if (state.review?.isActive == true)
+            OutlinedButton.icon(
+              onPressed: state.isClosing
+                  ? null
+                  : () => _showCloseDialog(controller),
+              icon: state.isClosing
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.task_alt),
+              label: Text(
+                state.isClosing ? 'Recording outcome…' : 'Close this notice',
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -104,6 +148,12 @@ class _NoticeDocumentScreenState extends ConsumerState<NoticeDocumentScreen> {
   Future<void> _showCloseDialog(NoticeDocumentController controller) async {
     final TextEditingController notes = TextEditingController();
     NoticeOutcome? selected;
+    final canSettle =
+        ref
+            .read(noticeDocumentControllerProvider(widget.noticeId))
+            .review
+            ?.readyToClose ==
+        true;
 
     final _CloseChoice? choice = await showDialog<_CloseChoice>(
       context: context,
@@ -120,6 +170,10 @@ class _NoticeDocumentScreenState extends ConsumerState<NoticeDocumentScreen> {
                     'Choose the outcome that cooperative records support. '
                     'This is an online-only action and cannot be queued.',
                   ),
+                  if (!canSettle)
+                    const Text(
+                      'Settled is unavailable until payment and receipts are confirmed. Refresh online after collection.',
+                    ),
                   const SizedBox(height: 16),
                   Wrap(
                     spacing: 8,
@@ -129,11 +183,14 @@ class _NoticeDocumentScreenState extends ConsumerState<NoticeDocumentScreen> {
                         ChoiceChip(
                           label: Text(_outcomeTitle(outcome)),
                           selected: selected == outcome,
-                          onSelected: (bool chosen) {
-                            setDialogState(
-                              () => selected = chosen ? outcome : null,
-                            );
-                          },
+                          onSelected:
+                              outcome == NoticeOutcome.settled && !canSettle
+                              ? null
+                              : (bool chosen) {
+                                  setDialogState(
+                                    () => selected = chosen ? outcome : null,
+                                  );
+                                },
                         ),
                     ],
                   ),
@@ -150,8 +207,13 @@ class _NoticeDocumentScreenState extends ConsumerState<NoticeDocumentScreen> {
                   TextField(
                     controller: notes,
                     maxLines: 3,
-                    decoration: const InputDecoration(
-                      labelText: 'Notes (optional)',
+                    onChanged: (_) => setDialogState(() {}),
+                    decoration: InputDecoration(
+                      labelText: selected == NoticeOutcome.cancelled
+                          ? 'Cancellation reason (required)'
+                          : selected == NoticeOutcome.referred
+                          ? 'Referral details (required)'
+                          : 'Notes (optional)',
                       hintText: 'Record supporting details',
                     ),
                   ),
@@ -164,7 +226,10 @@ class _NoticeDocumentScreenState extends ConsumerState<NoticeDocumentScreen> {
                 child: const Text('Cancel'),
               ),
               FilledButton(
-                onPressed: selected == null
+                onPressed:
+                    selected == null ||
+                        (selected != NoticeOutcome.settled &&
+                            notes.text.trim().isEmpty)
                     ? null
                     : () => Navigator.of(
                         dialogContext,
@@ -188,6 +253,78 @@ final class _CloseChoice {
   final String notes;
 
   const _CloseChoice(this.outcome, this.notes);
+}
+
+class _ReviewEvidence extends StatelessWidget {
+  final NoticeReview review;
+  const _ReviewEvidence({required this.review});
+  @override
+  Widget build(BuildContext context) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            !review.isActive
+                ? 'Closed: ${review.status}'
+                : review.readyToClose
+                ? 'Payment confirmed — ready to close'
+                : 'Overdue payment still needs review',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          Text(
+            'Last server check: ${_phStamp(review.checkedAt)}. Closure is checked again online.',
+          ),
+          if (!review.isActive) ...[
+            Text(
+              'Closed ${review.closedAt == null ? 'time not recorded' : _phStamp(review.closedAt!)}',
+            ),
+            Text('By ${review.closedBy ?? 'Not recorded'}'),
+            Text(review.outcomeNotes ?? 'No supporting notes recorded'),
+          ],
+          const SizedBox(height: 12),
+          const Text('Bills covered by this notice'),
+          if (review.coveredBills.isEmpty)
+            const Text(
+              'Original bill association is unavailable. Review records before closure.',
+            ),
+          for (final b in review.coveredBills)
+            Text(
+              '${b.cycle} · ${b.billNo}\n${b.amountAtIssue == null ? 'Original balance not recorded' : 'At issue: ${b.amountAtIssue!.format()}'} · Remaining ${b.balance.format()}',
+            ),
+          if (review.coveredBills.any((b) => b.legacy))
+            const Text(
+              'Older bill associations were reconstructed. Their original balances are not assumed.',
+            ),
+          const SizedBox(height: 12),
+          const Text('Overdue balances at last check'),
+          if (review.overdueBills.isEmpty)
+            const Text('No overdue balance at last check.'),
+          for (final b in review.overdueBills)
+            Text('${b.cycle} · Due ${b.dueDate} · ${b.balance.format()}'),
+          const SizedBox(height: 12),
+          const Text('Payment receipts for covered bills'),
+          if (review.receipts.isEmpty)
+            const Text('No receipt evidence recorded for these bills.'),
+          for (final r in review.receipts)
+            Text(
+              '${r.receiptNo} · ${r.billNo} · ${r.amount.format()}\n${_phStamp(r.paidAt)}',
+            ),
+          const SizedBox(height: 12),
+          const Text('Notice SMS delivery'),
+          if (review.sms.isEmpty) const Text('No SMS delivery record.'),
+          for (final sms in review.sms)
+            Text(
+              '${sms.label}${sms.sentAt == null ? '' : '\n${_phStamp(sms.sentAt!)}'}',
+            ),
+          const Text(
+            'An SMS send record does not prove the household read it.',
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _NoticeBanner extends StatelessWidget {
@@ -375,8 +512,9 @@ class _HowToSettle extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Settle ${notice.amountOverdue.format()} at the cooperative '
-            'counter. Quote reference ${notice.noticeNo}.',
+            notice.readyToClose
+                ? 'Review the receipts and close this notice as Settled.'
+                : 'Ask the Area President to authorize overdue collection, then pay the Cashier. Quote reference ${notice.noticeNo}.',
             style: text.bodyMedium?.copyWith(color: colours.onSurface),
           ),
         ],

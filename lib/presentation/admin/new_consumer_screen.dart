@@ -124,6 +124,7 @@ class _AdminNewConsumerScreenState
 
     final Widget content = SafeArea(
       child: AdminAccountFormLayout(
+        maxWidth: 560,
         children: <Widget>[
           if (widget.showIntro) ...<Widget>[
             Text(
@@ -137,8 +138,11 @@ class _AdminNewConsumerScreenState
             FailureBanner(failure: state.failure!),
             const SizedBox(height: 20),
           ],
-          const AccountFormSectionTitle('Household details'),
-          const SizedBox(height: 14),
+          const AccountFormSectionTitle(
+            'Household details',
+            icon: Icons.home_outlined,
+          ),
+          const SizedBox(height: 20),
           AccountFormField(
             label: 'Consumer number',
             child: TextField(
@@ -212,21 +216,24 @@ class _AdminNewConsumerScreenState
               inputFormatters: <TextInputFormatter>[
                 FilteringTextInputFormatter.deny(RegExp(r'\s')),
               ],
-              decoration: const InputDecoration(hintText: 'e.g. BIEC-08317'),
+              decoration: const InputDecoration(
+                hintText: 'e.g. BIEC-08317',
+                helperText: 'Leave blank if the meter is not installed yet.',
+                helperMaxLines: 2,
+              ),
             ),
           ),
           const SizedBox(height: 16),
-          const AccountFormNote(
-            icon: Icons.home_work_outlined,
-            title: 'Assigned automatically',
-            message:
-                'Barangay Tubod and your service area come from your Admin '
-                'account. Leave the meter number blank if the meter is not '
-                'installed yet.',
+          const AccountFormHint(
+            icon: Icons.location_on_outlined,
+            message: 'Assigned to your service area automatically.',
           ),
-          const SizedBox(height: 24),
-          const AccountFormSectionTitle('Sign-in details'),
-          const SizedBox(height: 14),
+          const SizedBox(height: 32),
+          const AccountFormSectionTitle(
+            'Sign-in details',
+            icon: Icons.lock_outline,
+          ),
+          const SizedBox(height: 20),
           AccountFormField(
             label: 'Username',
             child: TextField(
@@ -240,17 +247,20 @@ class _AdminNewConsumerScreenState
                 FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9._-]')),
               ],
               onChanged: (_) => _usernameEdited = true,
-              decoration: const InputDecoration(hintText: 'e.g. lorna.caberte'),
+              decoration: const InputDecoration(
+                hintText: 'e.g. lorna.caberte',
+                helperText: 'Suggested from the name. You can edit it.',
+                helperMaxLines: 2,
+              ),
             ),
           ),
           const SizedBox(height: 16),
           const AccountFormNote(
-            icon: Icons.password_outlined,
+            compact: true,
+            icon: Icons.key_outlined,
             title: 'Temporary password',
             message:
-                'BillAlert makes one, like BillAlert4829, and shows it once '
-                'after the household is created. The household must choose '
-                'its own at first sign-in.',
+                'Generated after creation. Must be changed at first sign-in.',
           ),
           const SizedBox(height: 16),
           SizedBox(
@@ -265,17 +275,6 @@ class _AdminNewConsumerScreenState
                     )
                   : const Text('Create consumer account'),
             ),
-          ),
-          const SizedBox(height: 8),
-          // MTR-04: households added before sign-ins were created here, and a
-          // sign-in that could not be created at the time, are finished from
-          // here. Below the form, so the household fields keep their place.
-          TextButton.icon(
-            onPressed: state.isSubmitting
-                ? null
-                : () => context.push(Routes.householdLogin),
-            icon: const Icon(Icons.how_to_reg_outlined, size: 18),
-            label: const Text('Give an existing household a sign-in'),
           ),
         ],
       ),

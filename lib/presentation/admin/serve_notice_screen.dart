@@ -19,7 +19,8 @@ import 'serve_notice_controller.dart';
 /// notice served on a Friday afternoon with no signal would otherwise give
 /// the household less time than the law allows.
 class ServeNoticeScreen extends ConsumerStatefulWidget {
-  const ServeNoticeScreen({super.key});
+  const ServeNoticeScreen({super.key, this.consumerId});
+  final String? consumerId;
 
   @override
   ConsumerState<ServeNoticeScreen> createState() => _ServeNoticeScreenState();
@@ -27,6 +28,18 @@ class ServeNoticeScreen extends ConsumerStatefulWidget {
 
 class _ServeNoticeScreenState extends ConsumerState<ServeNoticeScreen> {
   final TextEditingController _reason = TextEditingController();
+  bool _selectionHandled = false;
+  bool _ready = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.microtask(() {
+      if (!mounted) return;
+      ref.invalidate(serveNoticeControllerProvider);
+      setState(() => _ready = true);
+    });
+  }
 
   @override
   void dispose() {
@@ -36,9 +49,29 @@ class _ServeNoticeScreenState extends ConsumerState<ServeNoticeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_ready) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Serve a notice')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
     final state = ref.watch(serveNoticeControllerProvider);
     final controller = ref.read(serveNoticeControllerProvider.notifier);
     final TextTheme text = Theme.of(context).textTheme;
+    if (!_selectionHandled &&
+        widget.consumerId != null &&
+        !state.isLoading &&
+        state.households.isNotEmpty) {
+      final matches = state.households.where(
+        (c) => c.id.value == widget.consumerId,
+      );
+      if (matches.isNotEmpty && state.canServe(matches.first)) {
+        _selectionHandled = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) controller.select(matches.first);
+        });
+      }
+    }
 
     if (state.servedTo != null) {
       return _Served(
@@ -56,11 +89,21 @@ class _ServeNoticeScreenState extends ConsumerState<ServeNoticeScreen> {
             ? null
             : IconButton(
                 icon: const Icon(Icons.arrow_back),
-                onPressed: controller.clearSelection,
+                onPressed: widget.consumerId == null
+                    ? controller.clearSelection
+                    : () => Navigator.of(context).maybePop(),
               ),
       ),
       body: SafeArea(
-        child: chosen == null
+        child: chosen == null && widget.consumerId != null
+            ? Center(
+                child: state.isLoading
+                    ? const CircularProgressIndicator()
+                    : const Text(
+                        'This household does not need a new notice. Go back and refresh.',
+                      ),
+              )
+            : chosen == null
             ? _Picker(state: state, controller: controller)
             : ListView(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
@@ -91,7 +134,7 @@ class _ServeNoticeScreenState extends ConsumerState<ServeNoticeScreen> {
                         Text(chosen.fullName, style: text.titleLarge),
                         Text(
                           '${chosen.consumerNo.value}'
-                          '${chosen.purok == null ? '' : ' · ${chosen.purok}'}',
+                          '${chosen.purok == null ? '' : ' Â· ${chosen.purok}'}',
                           style: text.bodySmall,
                         ),
                       ],
@@ -190,7 +233,7 @@ class _ServeNoticeScreenState extends ConsumerState<ServeNoticeScreen> {
   }
 }
 
-enum _ServeSort { eligibleFirst, nameAz, nameZa }
+enum _ServeSort { nameAz, nameZa }
 
 class _Picker extends StatefulWidget {
   final ServeNoticeState state;
@@ -203,7 +246,7 @@ class _Picker extends StatefulWidget {
 }
 
 class _PickerState extends State<_Picker> {
-  _ServeSort _sort = _ServeSort.eligibleFirst;
+  _ServeSort _sort = _ServeSort.nameAz;
 
   @override
   Widget build(BuildContext context) {
@@ -211,15 +254,13 @@ class _PickerState extends State<_Picker> {
     final state = widget.state;
     final controller = widget.controller;
     final List<Consumer> visible = List.of(state.visible);
-    if (_sort != _ServeSort.eligibleFirst) {
-      visible.sort(
-        (a, b) => compareNames(
-          a.fullName,
-          b.fullName,
-          _sort == _ServeSort.nameAz ? LocalNameSort.az : LocalNameSort.za,
-        ),
-      );
-    }
+    visible.sort(
+      (a, b) => compareNames(
+        a.fullName,
+        b.fullName,
+        _sort == _ServeSort.nameAz ? LocalNameSort.az : LocalNameSort.za,
+      ),
+    );
 
     return Column(
       children: <Widget>[
@@ -243,11 +284,6 @@ class _PickerState extends State<_Picker> {
                   buttonKey: const ValueKey('serve-notice-sort'),
                   value: _sort,
                   options: const <LocalSortOption<_ServeSort>>[
-                    LocalSortOption(
-                      value: _ServeSort.eligibleFirst,
-                      label: 'Eligible',
-                      icon: Icons.priority_high,
-                    ),
                     LocalSortOption(
                       value: _ServeSort.nameAz,
                       label: 'Name A–Z',
@@ -275,31 +311,11 @@ class _PickerState extends State<_Picker> {
           ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 2, 16, 10),
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).colorScheme.primary.withValues(alpha: 0.07),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Icon(
-                  Icons.info_outline,
-                  size: 18,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(width: 9),
-                Expanded(
-                  child: Text(
-                    'Only households with an overdue bill can be served. '
-                    'Eligible households are listed first.',
-                    style: text.bodySmall,
-                  ),
-                ),
-              ],
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Unpaid past due date, with BOHECO referral confirmed.',
+              style: text.bodySmall,
             ),
           ),
         ),
@@ -319,10 +335,11 @@ class _PickerState extends State<_Picker> {
                                 32,
                               ),
                               child: Text(
-                                state.households.isEmpty
-                                    ? 'No households on this device yet. Pull '
-                                          'down to fetch them.'
-                                    : 'No household matches that search.',
+                                state.failure != null
+                                    ? 'Unable to check eligible households. Try refreshing.'
+                                    : state.query.trim().isNotEmpty
+                                    ? 'No eligible household matches that search.'
+                                    : 'No households need a new notice.',
                                 style: text.bodyMedium,
                                 textAlign: TextAlign.center,
                               ),
@@ -332,58 +349,23 @@ class _PickerState extends State<_Picker> {
                       : ListView.separated(
                           padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                           itemCount: visible.length,
-                          separatorBuilder: (_, _) => const SizedBox(height: 8),
+                          separatorBuilder: (_, _) => const Divider(height: 1),
                           itemBuilder: (BuildContext context, int index) {
                             final Consumer c = visible[index];
-                            final int overdue = state.overdueCountFor(c);
-                            // The server refuses a household with nothing
-                            // overdue, and refuses an inactive account. Both
-                            // are shown here rather than discovered by being
-                            // told no after choosing a name.
-                            final bool allowed = state.canServe(c);
-
-                            return Container(
-                              decoration: BoxDecoration(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.surfaceContainerLowest,
-                                border: Border.all(
-                                  color: allowed
-                                      ? Theme.of(
-                                          context,
-                                        ).colorScheme.outlineVariant
-                                      : Theme.of(context)
-                                            .colorScheme
-                                            .outlineVariant
-                                            .withValues(alpha: 0.55),
-                                ),
-                                borderRadius: BorderRadius.circular(14),
+                            return ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 8,
                               ),
-                              child: ListTile(
-                                title: Text(
-                                  c.fullName,
-                                  style: text.titleMedium,
-                                ),
-                                subtitle: Text(
-                                  <String>[
-                                    c.consumerNo.value,
-                                    if (c.purok != null) c.purok!,
-                                    if (!c.isActive)
-                                      'not an active account'
-                                    else if (overdue == 0)
-                                      'nothing overdue'
-                                    else
-                                      '$overdue overdue bill'
-                                          '${overdue == 1 ? '' : 's'}',
-                                  ].join(' · '),
-                                  style: text.bodySmall,
-                                ),
-                                trailing: allowed
-                                    ? const Icon(Icons.chevron_right)
-                                    : null,
-                                enabled: allowed,
-                                onTap: () => controller.select(c),
+                              title: Text(c.fullName, style: text.titleMedium),
+                              subtitle: Text(
+                                '${c.consumerNo.value} · ${state.overdueAmountFor(c).format()} overdue',
+                                style: text.bodySmall,
                               ),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: state.isLoading
+                                  ? null
+                                  : () => controller.select(c),
                             );
                           },
                         ),
@@ -427,7 +409,7 @@ class _Served extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 'It now appears under Notices with the time remaining. The '
-                'household has been told.',
+                'household alert has been queued. Delivery may take time.',
                 style: text.bodyMedium,
                 textAlign: TextAlign.center,
               ),

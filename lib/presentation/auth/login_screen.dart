@@ -5,6 +5,7 @@ import '../../core/errors/app_failure.dart';
 import '../../domain/entities/app_user.dart';
 import '../common/billalert_logo.dart';
 import '../common/failure_banner.dart';
+import '../common/responsive_layout.dart';
 import '../providers.dart';
 import 'app_lock_controller.dart';
 import 'auth_controller.dart';
@@ -163,7 +164,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: Center(
+        child: DesktopSignInLayout(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
             child: ConstrainedBox(

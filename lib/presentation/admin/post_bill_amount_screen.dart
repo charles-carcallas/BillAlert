@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../domain/outbox/outbox_operation.dart';
 import '../../domain/repositories/bill_repository.dart';
 import '../../domain/value_objects/kwh.dart';
 import '../../domain/value_objects/money.dart';
@@ -9,7 +10,12 @@ import '../../domain/value_objects/ph_date.dart';
 import '../common/expandable_bottom_sheet.dart';
 import '../common/failure_banner.dart';
 import '../common/local_sort_button.dart';
+import '../common/profile_screen.dart' show pendingOutboxProvider;
+import '../common/responsive_layout.dart';
+import '../common/saved_list_time.dart';
 import '../common/staff_app_bar.dart';
+import '../providers.dart';
+import 'billing_schedule_screen.dart';
 import 'post_bill_amount_controller.dart';
 
 /// FR-21b — Admin › Amounts.
@@ -55,6 +61,13 @@ class _PostBillAmountScreenState extends ConsumerState<PostBillAmountScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(postBillAmountControllerProvider);
     final controller = ref.read(postBillAmountControllerProvider.notifier);
+    final pendingPosts =
+        ref
+            .watch(pendingOutboxProvider)
+            .value
+            ?.where((entry) => entry.operation is PostAmountOperation)
+            .length ??
+        0;
     final List<AwaitingAmountEntry> visibleQueue = _matchingEntries(
       state.queue,
       _search.text,
@@ -69,6 +82,19 @@ class _PostBillAmountScreenState extends ConsumerState<PostBillAmountScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: <Widget>[
+              const SavedListTime(
+                cacheKey: 'awaiting_amount',
+                compact: true,
+                areaScoped: true,
+              ),
+              if (pendingPosts > 0)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    '$pendingPosts bill post${pendingPosts == 1 ? '' : 's'} awaiting sync. Review in Profile / Sync.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
               _Header(
                 count: state.queue.length,
                 cycleLabel: _cycleLabel(state),
@@ -182,15 +208,19 @@ class _PostBillAmountScreenState extends ConsumerState<PostBillAmountScreen> {
                       'number.',
                 )
               else
-                for (final AwaitingAmountEntry entry in visibleQueue)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _QueueCard(
-                      entry: entry,
-                      isPosting: state.posting == entry.bill.id,
-                      onTap: () => _openAmount(entry),
-                    ),
-                  ),
+                ResponsiveCards(
+                  children: [
+                    for (final AwaitingAmountEntry entry in visibleQueue)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _QueueCard(
+                          entry: entry,
+                          isPosting: state.posting == entry.bill.id,
+                          onTap: () => _openAmount(entry),
+                        ),
+                      ),
+                  ],
+                ),
             ],
           ),
         ),
@@ -395,31 +425,6 @@ class _Header extends StatelessWidget {
                 child: Text(
                   'reading${count == 1 ? '' : 's'} awaiting an amount',
                   style: text.titleSmall,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Padding(
-                padding: const EdgeInsets.only(top: 1),
-                child: Icon(
-                  Icons.info_outline,
-                  size: 16,
-                  color: colours.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  "Copy the amount and due date from the cooperative's "
-                  'statement — BillAlert never calculates them. Posting '
-                  'alerts the household in the app and by text.',
-                  style: text.bodySmall?.copyWith(
-                    color: colours.onSurfaceVariant,
-                  ),
                 ),
               ),
             ],
@@ -727,6 +732,27 @@ class _AmountSheetState extends ConsumerState<_AmountSheet> {
                     ),
                   ),
                   IconButton(
+                    tooltip: 'About posting a bill',
+                    icon: const Icon(Icons.info_outline),
+                    onPressed: () => showDialog<void>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Posting a bill'),
+                        content: const Text(
+                          "Copy the cooperative's amount and confirm the due date against its statement. "
+                          'Amounts with centavos are rounded up to the next peso. '
+                          'Posting queues an app alert and an SMS for households with a contact number.',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Got it'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  IconButton(
                     tooltip: 'Close amount form',
                     onPressed: _posting ? null : _close,
                     icon: const Icon(Icons.close),
@@ -805,7 +831,7 @@ class _AmountSheetState extends ConsumerState<_AmountSheet> {
 
 /// The household, its reading, and the two figures copied from the
 /// cooperative statement.
-class _AmountForm extends StatefulWidget {
+class _AmountForm extends ConsumerStatefulWidget {
   final AwaitingAmountEntry entry;
   final bool isPosting;
   final void Function(String amountText, PhDate? dueDate) onPost;
@@ -819,12 +845,19 @@ class _AmountForm extends StatefulWidget {
   });
 
   @override
-  State<_AmountForm> createState() => _AmountFormState();
+  ConsumerState<_AmountForm> createState() => _AmountFormState();
 }
 
-class _AmountFormState extends State<_AmountForm> {
+class _AmountFormState extends ConsumerState<_AmountForm> {
   final TextEditingController _amount = TextEditingController();
   PhDate? _dueDate;
+  PhDate? _initialDueDate;
+  bool _defaultApplied = false, _dueDateChosen = false;
+  @override
+  void initState() {
+    super.initState();
+    // Wait for this area's saved schedule; never silently use another default.
+  }
 
   @override
   void dispose() {
@@ -834,6 +867,16 @@ class _AmountFormState extends State<_AmountForm> {
 
   @override
   Widget build(BuildContext context) {
+    final schedule = ref.watch(billingScheduleProvider);
+    if (!_defaultApplied && !_dueDateChosen && schedule.hasValue) {
+      _dueDate = widget.entry.bill.suggestedDueDate(
+        ref.read(phClockProvider).today(),
+        defaultDay: schedule.value!.dueDay,
+      );
+      _initialDueDate = _dueDate;
+      _defaultApplied = true;
+    }
+
     final AwaitingAmountEntry entry = widget.entry;
     final TextTheme text = Theme.of(context).textTheme;
     final ColorScheme colours = Theme.of(context).colorScheme;
@@ -924,6 +967,10 @@ class _AmountFormState extends State<_AmountForm> {
         const SizedBox(height: 20),
 
         Text('Due date', style: text.titleSmall),
+        if (schedule.isLoading)
+          const Text('Loading the saved billing schedule…'),
+        if (schedule.hasError)
+          const Text('Schedule unavailable. Choose the statement’s due date.'),
         const SizedBox(height: 8),
         _DueDateField(
           dueDate: _dueDate,
@@ -967,11 +1014,12 @@ class _AmountFormState extends State<_AmountForm> {
   }
 
   Future<void> _pickDueDate() async {
-    final DateTime now = DateTime.now();
+    final today = ref.read(phClockProvider).today();
+    final now = DateTime(today.year, today.month, today.day);
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _dueDate == null
-          ? now.add(const Duration(days: 14))
+      initialDate: _dueDate == null || _dueDate!.isBefore(today)
+          ? now
           : DateTime(_dueDate!.year, _dueDate!.month, _dueDate!.day),
       // A due date in the past is refused by fn_post_bill_amount, so the
       // picker does not offer one.
@@ -980,13 +1028,17 @@ class _AmountFormState extends State<_AmountForm> {
     );
 
     if (picked != null && mounted) {
-      setState(() => _dueDate = PhDate(picked.year, picked.month, picked.day));
+      setState(() {
+        _dueDateChosen = true;
+        _dueDate = PhDate(picked.year, picked.month, picked.day);
+      });
       _reportDirty();
     }
   }
 
-  void _reportDirty() =>
-      widget.onDirtyChanged(_amount.text.isNotEmpty || _dueDate != null);
+  void _reportDirty() => widget.onDirtyChanged(
+    _amount.text.isNotEmpty || _dueDate != _initialDueDate,
+  );
 
   Future<void> _submit() async {
     final Money? enteredAmount = Money.tryParse(_amount.text);
@@ -1006,6 +1058,7 @@ class _AmountFormState extends State<_AmountForm> {
           context: context,
           builder: (BuildContext context) => _ConfirmPostingDialog(
             consumerName: widget.entry.consumerName,
+            cycleLabel: widget.entry.bill.cycle.displayName,
             enteredAmount: enteredAmount,
             roundedAmount: roundedAmount,
             dueDate: dueDate,
@@ -1061,12 +1114,14 @@ class _DueDateField extends StatelessWidget {
 }
 
 class _ConfirmPostingDialog extends StatelessWidget {
+  final String cycleLabel;
   final String consumerName;
   final Money enteredAmount;
   final Money roundedAmount;
   final PhDate dueDate;
 
   const _ConfirmPostingDialog({
+    required this.cycleLabel,
     required this.consumerName,
     required this.enteredAmount,
     required this.roundedAmount,
@@ -1086,6 +1141,7 @@ class _ConfirmPostingDialog extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(consumerName, style: text.titleMedium),
+          Text('Billing month: $cycleLabel'),
           const SizedBox(height: 16),
           if (wasRounded) ...<Widget>[
             _ConfirmationRow(

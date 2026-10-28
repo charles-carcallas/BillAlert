@@ -7,14 +7,19 @@ import 'package:flutter/material.dart';
 /// without changing the edge-to-edge phone layout.
 class AdminAccountFormLayout extends StatelessWidget {
   final List<Widget> children;
+  final double maxWidth;
 
-  const AdminAccountFormLayout({required this.children, super.key});
+  const AdminAccountFormLayout({
+    required this.children,
+    this.maxWidth = 400,
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) => Align(
     alignment: Alignment.topCenter,
     child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 400),
+      constraints: BoxConstraints(maxWidth: maxWidth),
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
         children: children,
@@ -42,7 +47,7 @@ class AdminAccountTypeSelector extends StatelessWidget {
     final ColorScheme colours = Theme.of(context).colorScheme;
 
     return Container(
-      height: 44,
+      height: 48 * MediaQuery.textScalerOf(context).scale(13) / 13,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: colours.primary.withValues(alpha: 0.06),
@@ -99,6 +104,7 @@ class _AccountTypeButton extends StatelessWidget {
           child: Center(
             child: Text(
               label,
+              textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -114,12 +120,53 @@ class _AccountTypeButton extends StatelessWidget {
 
 class AccountFormSectionTitle extends StatelessWidget {
   final String label;
+  final IconData? icon;
 
-  const AccountFormSectionTitle(this.label, {super.key});
+  const AccountFormSectionTitle(this.label, {this.icon, super.key});
 
   @override
-  Widget build(BuildContext context) =>
-      Text(label, style: Theme.of(context).textTheme.titleMedium);
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    if (icon == null) return Text(label, style: theme.textTheme.titleMedium);
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: theme.colorScheme.primary),
+        const SizedBox(width: 10),
+        Flexible(
+          flex: 3,
+          child: Text(
+            label,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(child: Divider(color: theme.colorScheme.outlineVariant)),
+      ],
+    );
+  }
+}
+
+class AccountFormHint extends StatelessWidget {
+  const AccountFormHint({required this.icon, required this.message, super.key});
+  final IconData icon;
+  final String message;
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Icon(
+        icon,
+        size: 16,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+      const SizedBox(width: 8),
+      Expanded(
+        child: Text(message, style: Theme.of(context).textTheme.bodySmall),
+      ),
+    ],
+  );
 }
 
 class AccountFormField extends StatelessWidget {
@@ -150,11 +197,13 @@ class AccountFormNote extends StatelessWidget {
   final IconData icon;
   final String title;
   final String message;
+  final bool compact;
 
   const AccountFormNote({
     required this.icon,
     required this.title,
     required this.message,
+    this.compact = false,
     super.key,
   });
 
@@ -164,10 +213,15 @@ class AccountFormNote extends StatelessWidget {
     final TextTheme text = Theme.of(context).textTheme;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 0 : 16,
+        vertical: compact ? 8 : 12,
+      ),
       decoration: BoxDecoration(
-        color: colours.primary.withValues(alpha: 0.06),
-        border: Border.all(color: colours.outlineVariant),
+        color: compact
+            ? Colors.transparent
+            : colours.primary.withValues(alpha: 0.06),
+        border: compact ? null : Border.all(color: colours.outlineVariant),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(

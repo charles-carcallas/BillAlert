@@ -36,7 +36,9 @@ final class PostBillAmount {
     required Bill bill,
     required Money amount,
     required PhDate dueDate,
+    ClientUuid? clientUuid,
   }) async {
+    final captureSession = outbox.sessionGeneration;
     // A bill is priced once. Posting a second amount is a mistake, not an
     // edit, and the database says the same with bills_pricing_consistent.
     if (bill.isPayable) {
@@ -73,7 +75,7 @@ final class PostBillAmount {
     }
 
     final operation = PostAmountOperation(
-      clientUuid: newClientUuid(),
+      clientUuid: clientUuid ?? newClientUuid(),
       capturedAt: clock.nowUtc(),
       billId: bill.id,
       amount: amount.roundUpToWholePeso(),
@@ -82,6 +84,13 @@ final class PostBillAmount {
       billLabel: bill.billNo.value,
     );
 
+    if (captureSession != outbox.sessionGeneration) {
+      return const Err(
+        AuthFailure(
+          'The signed-in account changed. Nothing was queued for the new account.',
+        ),
+      );
+    }
     return switch (await outbox.enqueue(operation)) {
       Err(:final failure) => Err<void>(failure),
       Ok() => const Ok<void>(null),
